@@ -633,7 +633,7 @@ export const PdfMapNavigator: React.FC = () => {
       const color = marker.color || categoryObj.color;
       
       const pinHtml = `
-        <div class="tactical-pin-wrap" style="transform: translate(-50%, -100%);">
+        <div class="tactical-pin-wrap">
           <div style="position: relative; display: flex; flex-direction: column; align-items: center;">
             <div style="
               width: ${isTarget ? '32px' : '26px'};
@@ -827,7 +827,7 @@ export const PdfMapNavigator: React.FC = () => {
     // Update or Create Leaflet User GPS Marker
     const headingDeg = heading !== null && !isNaN(heading) ? heading : 0;
     const userMarkerHtml = `
-      <div class="user-gps-pulse-wrapper" style="position: relative; width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; transform: translate(-50%, -50%);">
+      <div class="user-gps-pulse-wrapper" style="position: relative; width: 36px; height: 36px; display: flex; align-items: center; justify-content: center;">
         <div style="position: absolute; inset: 0; border-radius: 50%; background: rgba(14, 165, 233, 0.35); animation: ping 2s cubic-bezier(0, 0, 0.2, 1) infinite;"></div>
         <div style="width: 20px; height: 20px; border-radius: 50%; background: #0284c7; border: 3px solid #ffffff; box-shadow: 0 0 14px rgba(2, 132, 199, 0.9); display: flex; align-items: center; justify-content: center;">
           <div style="width: 6px; height: 6px; border-radius: 50%; background: #ffffff;"></div>
