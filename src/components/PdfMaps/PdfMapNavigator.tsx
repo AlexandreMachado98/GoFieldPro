@@ -503,8 +503,8 @@ export const PdfMapNavigator: React.FC = () => {
           if (docs.length > 0) {
             setDocuments(docs);
             const requested = localStorage.getItem('geofield_selected_pdf_id');
-            if (requested) {
-              localStorage.removeItem('geofield_selected_pdf_id');
+            const exists = docs.some(d => d.id === requested);
+            if (requested && exists) {
               setActiveDocId(requested);
             } else {
               setActiveDocId(docs[0].id);
@@ -515,7 +515,7 @@ export const PdfMapNavigator: React.FC = () => {
           }
         }
       } catch (e) {
-        console.error('Error loading documents from IndexedDB', e);
+        console.error('Failed to load PDF documents', e);
       } finally {
         if (mounted) setIsLoadingDocs(false);
       }

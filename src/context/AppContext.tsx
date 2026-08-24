@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
+import { saveAppState, loadAppState } from '../utils/stateStorage';
 import {
   ProjectFolder,
   LayerItem,
@@ -394,6 +395,47 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       return defaultSettings;
     }
   });
+
+  // IndexedDB Persistence for core collections
+  const [isStateLoaded, setIsStateLoaded] = useState(false);
+
+  useEffect(() => {
+    (async () => {
+      const savedLayers = await loadAppState<LayerItem[]>('geofield_layers');
+      if (savedLayers && savedLayers.length > 0) setLayers(savedLayers);
+      
+      const savedProjects = await loadAppState<ProjectFolder[]>('geofield_projects');
+      if (savedProjects && savedProjects.length > 0) setProjects(savedProjects);
+      
+      const savedWaypoints = await loadAppState<Waypoint[]>('geofield_waypoints');
+      if (savedWaypoints && savedWaypoints.length > 0) setWaypoints(savedWaypoints);
+      
+      const savedTracks = await loadAppState<Track[]>('geofield_savedTracks');
+      if (savedTracks && savedTracks.length > 0) setSavedTracks(savedTracks);
+
+      setIsStateLoaded(true);
+    })();
+  }, []);
+
+  useEffect(() => {
+    if (!isStateLoaded) return;
+    saveAppState('geofield_layers', layers);
+  }, [layers, isStateLoaded]);
+
+  useEffect(() => {
+    if (!isStateLoaded) return;
+    saveAppState('geofield_projects', projects);
+  }, [projects, isStateLoaded]);
+
+  useEffect(() => {
+    if (!isStateLoaded) return;
+    saveAppState('geofield_waypoints', waypoints);
+  }, [waypoints, isStateLoaded]);
+
+  useEffect(() => {
+    if (!isStateLoaded) return;
+    saveAppState('geofield_savedTracks', savedTracks);
+  }, [savedTracks, isStateLoaded]);
 
   const updateSettings = useCallback((partial: Partial<AppSettings>) => {
     setSettings((prev) => {
