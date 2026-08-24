@@ -77,14 +77,15 @@ export async function generateMeasurementMapCanvasAsync(
   const centerLat = (minLat + maxLat) / 2;
   const centerLng = (minLng + maxLng) / 2;
 
-  let zoom = 18;
-  for (let z = 18; z >= 11; z--) {
+  // Clamp zoom to avoid over-zooming beyond imagery availability
+  let zoom = 17;
+  for (let z = 17; z >= 11; z--) {
     const pMin = projectMercator(maxLat, minLng, z);
     const pMax = projectMercator(minLat, maxLng, z);
     const boxW = Math.abs(pMax.px - pMin.px);
     const boxH = Math.abs(pMax.py - pMin.py);
 
-    if (boxW <= width * 0.72 && boxH <= height * 0.72) {
+    if (boxW <= width * 0.68 && boxH <= height * 0.68) {
       zoom = z;
       break;
     }
@@ -104,10 +105,10 @@ export async function generateMeasurementMapCanvasAsync(
 
   let tilesDrawn = 0;
   if (mapType !== 'drawing') {
-    const minTileX = lon2tileX(centerLng - (lngSpan * 1.6), zoom);
-    const maxTileX = lon2tileX(centerLng + (lngSpan * 1.6), zoom);
-    const minTileY = lat2tileY(centerLat + (latSpan * 1.6), zoom);
-    const maxTileY = lat2tileY(centerLat - (latSpan * 1.6), zoom);
+    const minTileX = lon2tileX(centerLng - (lngSpan * 1.8), zoom);
+    const maxTileX = lon2tileX(centerLng + (lngSpan * 1.8), zoom);
+    const minTileY = lat2tileY(centerLat + (latSpan * 1.8), zoom);
+    const maxTileY = lat2tileY(centerLat - (latSpan * 1.8), zoom);
 
     const tilePromises: Promise<void>[] = [];
 
@@ -119,17 +120,34 @@ export async function generateMeasurementMapCanvasAsync(
         const screenY = tileMercY - originY;
 
         if (screenX + 256 >= 0 && screenX <= width && screenY + 256 >= 0 && screenY <= height) {
-          const tileUrl =
+          // Candidate tile URLs with Google Satellite as primary (100% Brazilian coverage)
+          const candidateUrls =
             mapType === 'satellite'
-              ? `https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/${zoom}/${ty}/${tx}`
-              : `https://tile.openstreetmap.org/${zoom}/${tx}/${ty}.png`;
+              ? [
+                  `https://mt1.google.com/vt/lyrs=s&x=${tx}&y=${ty}&z=${zoom}`,
+                  `https://mt2.google.com/vt/lyrs=y&x=${tx}&y=${ty}&z=${zoom}`,
+                  `https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/${Math.min(zoom, 15)}/${lat2tileY(centerLat, Math.min(zoom, 15))}/${lon2tileX(centerLng, Math.min(zoom, 15))}`,
+                  `https://tile.openstreetmap.org/${zoom}/${tx}/${ty}.png`,
+                ]
+              : [
+                  `https://tile.openstreetmap.org/${zoom}/${tx}/${ty}.png`,
+                  `https://a.basemaps.cartocdn.com/rastertiles/voyager/${zoom}/${tx}/${ty}.png`,
+                ];
 
-          const p = loadImageAsync(tileUrl)
-            .then((img) => {
-              ctx.drawImage(img, screenX, screenY, 256, 256);
-              tilesDrawn++;
-            })
-            .catch(() => {});
+          const p = (async () => {
+            for (const url of candidateUrls) {
+              try {
+                const img = await loadImageAsync(url);
+                if (img && img.width > 0) {
+                  ctx.drawImage(img, screenX, screenY, 256, 256);
+                  tilesDrawn++;
+                  return;
+                }
+              } catch {
+                // Try next candidate
+              }
+            }
+          })();
 
           tilePromises.push(p);
         }
@@ -138,7 +156,7 @@ export async function generateMeasurementMapCanvasAsync(
 
     await Promise.race([
       Promise.allSettled(tilePromises),
-      new Promise((resolve) => setTimeout(resolve, 2500)),
+      new Promise((resolve) => setTimeout(resolve, 3000)),
     ]);
   }
 
