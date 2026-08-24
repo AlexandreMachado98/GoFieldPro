@@ -17,7 +17,7 @@ import {
   TrendingUp,
 } from 'lucide-react';
 import { MeasurementPoint, MeasurementSession, Track } from '../../types';
-import { calculateDistanceMeters, latLngToUTM } from '../../utils/geoUtils';
+import { calculateDistanceMeters, latLngToUTM, calculatePolygonArea } from '../../utils/geoUtils';
 import {
   generateMeasurementPdfReport,
   exportMeasurementKml,
@@ -114,6 +114,13 @@ export const MeasurementSummaryModal: React.FC<MeasurementSummaryModalProps> = (
 
   const previewCanvasImg = generateMeasurementMapCanvas(points, 800, 360);
 
+  const isClosed =
+    points.length >= 3 &&
+    points[0].lat === points[points.length - 1].lat &&
+    points[0].lng === points[points.length - 1].lng;
+
+  const areaResult = isClosed ? calculatePolygonArea(points) : { m2: 0, hectares: 0 };
+
   return (
     <div className="fixed inset-0 z-[10000] flex items-center justify-center p-3 sm:p-5 bg-black/85 backdrop-blur-sm animate-in fade-in duration-200">
       <div className="bg-slate-900 border border-slate-800 w-full max-w-4xl rounded-3xl shadow-2xl flex flex-col max-h-[92dvh] overflow-hidden text-slate-100">
@@ -126,9 +133,15 @@ export const MeasurementSummaryModal: React.FC<MeasurementSummaryModalProps> = (
             <div>
               <div className="flex items-center gap-2">
                 <h2 className="font-black text-lg text-white">Resumo Técnico da Medição</h2>
-                <span className="text-xs px-2 py-0.5 rounded-full bg-rose-500/20 text-rose-300 font-bold border border-rose-500/30">
-                  {points.length} vértices
-                </span>
+                {isClosed ? (
+                  <span className="text-xs px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 font-extrabold border border-emerald-500/40">
+                    Perímetro Fechado
+                  </span>
+                ) : (
+                  <span className="text-xs px-2 py-0.5 rounded-full bg-rose-500/20 text-rose-300 font-bold border border-rose-500/30">
+                    {points.length} vértices
+                  </span>
+                )}
               </div>
               <p className="text-xs text-slate-400">
                 Projeto: <span className="text-slate-200 font-medium">{activeProject.name}</span> • Datum WGS84 / SIRGAS 2000
@@ -164,36 +177,55 @@ export const MeasurementSummaryModal: React.FC<MeasurementSummaryModalProps> = (
             <div className="bg-slate-950/80 border border-rose-500/30 p-3.5 rounded-2xl">
               <div className="text-[10px] text-slate-400 uppercase font-semibold flex items-center gap-1">
                 <Activity className="w-3.5 h-3.5 text-rose-400" />
-                Distância Total
+                {isClosed ? 'Perímetro Total' : 'Distância Total'}
               </div>
               <div className="text-xl sm:text-2xl font-black font-mono text-rose-400 mt-1">
                 {totalDistanceMeters >= 1000
                   ? `${(totalDistanceMeters / 1000).toFixed(2)} km`
                   : `${totalDistanceMeters.toFixed(0)} m`}
               </div>
-              <div className="text-[10px] text-slate-500 mt-0.5">{Math.round(totalDistanceMeters)} metros exatos</div>
+              <div className="text-[10px] text-slate-500 mt-0.5">
+                {isClosed ? 'Polígono 100% fechado' : `${Math.round(totalDistanceMeters)} metros exatos`}
+              </div>
             </div>
 
-            <div className="bg-slate-950/80 border border-slate-800 p-3.5 rounded-2xl">
-              <div className="text-[10px] text-slate-400 uppercase font-semibold flex items-center gap-1">
-                <Flag className="w-3.5 h-3.5 text-emerald-400" />
-                Pontos de Parada
+            {isClosed ? (
+              <div className="bg-slate-950/80 border border-emerald-500/40 p-3.5 rounded-2xl">
+                <div className="text-[10px] text-emerald-400 uppercase font-semibold flex items-center gap-1">
+                  <Layers className="w-3.5 h-3.5 text-emerald-400" />
+                  Área Calculada
+                </div>
+                <div className="text-xl sm:text-2xl font-black font-mono text-emerald-400 mt-1">
+                  {areaResult.hectares} <span className="text-xs font-bold">ha</span>
+                </div>
+                <div className="text-[10px] text-slate-400 mt-0.5">
+                  {areaResult.m2.toLocaleString('pt-BR')} m² exatos
+                </div>
               </div>
-              <div className="text-xl sm:text-2xl font-black font-mono text-emerald-400 mt-1">
-                {stopsCount}
+            ) : (
+              <div className="bg-slate-950/80 border border-slate-800 p-3.5 rounded-2xl">
+                <div className="text-[10px] text-slate-400 uppercase font-semibold flex items-center gap-1">
+                  <Flag className="w-3.5 h-3.5 text-emerald-400" />
+                  Pontos de Parada
+                </div>
+                <div className="text-xl sm:text-2xl font-black font-mono text-emerald-400 mt-1">
+                  {stopsCount}
+                </div>
+                <div className="text-[10px] text-slate-500 mt-0.5">Vistorias / checkpoints</div>
               </div>
-              <div className="text-[10px] text-slate-500 mt-0.5">Vistorias / checkpoints</div>
-            </div>
+            )}
 
             <div className="bg-slate-950/80 border border-slate-800 p-3.5 rounded-2xl">
               <div className="text-[10px] text-slate-400 uppercase font-semibold flex items-center gap-1">
                 <AlertTriangle className="w-3.5 h-3.5 text-amber-400" />
-                Alertas de Risco
+                {isClosed ? 'Paradas / Alertas' : 'Alertas de Risco'}
               </div>
               <div className="text-xl sm:text-2xl font-black font-mono text-amber-400 mt-1">
-                {hazardsCount}
+                {hazardsCount + (isClosed ? stopsCount : 0)}
               </div>
-              <div className="text-[10px] text-slate-500 mt-0.5">Obstáculos mapeados</div>
+              <div className="text-[10px] text-slate-500 mt-0.5">
+                {isClosed ? `${stopsCount} paradas • ${hazardsCount} alertas` : 'Obstáculos mapeados'}
+              </div>
             </div>
 
             <div className="bg-slate-950/80 border border-slate-800 p-3.5 rounded-2xl">

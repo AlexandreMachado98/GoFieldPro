@@ -21,6 +21,7 @@ interface MeasurementControlBarProps {
   onAddCurrentGpsPoint: () => void;
   onUndoLastPoint: () => void;
   onClearMeasurement: () => void;
+  onCloseLoop?: () => void;
   onFinishMeasurement: () => void;
   onClose: () => void;
 }
@@ -33,6 +34,7 @@ export const MeasurementControlBar: React.FC<MeasurementControlBarProps> = ({
   onAddCurrentGpsPoint,
   onUndoLastPoint,
   onClearMeasurement,
+  onCloseLoop,
   onFinishMeasurement,
   onClose,
 }) => {
@@ -43,6 +45,11 @@ export const MeasurementControlBar: React.FC<MeasurementControlBarProps> = ({
 
   const stopsCount = points.filter((p) => p.type === 'stop').length;
   const hazardsCount = points.filter((p) => p.type === 'hazard').length;
+
+  const isClosed =
+    points.length >= 3 &&
+    points[0].lat === points[points.length - 1].lat &&
+    points[0].lng === points[points.length - 1].lng;
 
   return (
     <div className="absolute top-16 left-1/2 -translate-x-1/2 z-20 w-full max-w-2xl px-3 pointer-events-none animate-in fade-in slide-in-from-top-4 duration-200">
@@ -58,9 +65,15 @@ export const MeasurementControlBar: React.FC<MeasurementControlBarProps> = ({
                 <h4 className="text-xs font-black uppercase tracking-wider text-rose-400">
                   Régua Geodésica de Medição
                 </h4>
-                <span className="text-[10px] bg-rose-500/20 text-rose-300 font-bold px-1.5 py-0.5 rounded border border-rose-500/30">
-                  Toque no mapa para marcar
-                </span>
+                {isClosed ? (
+                  <span className="text-[10px] bg-emerald-500/20 text-emerald-300 font-bold px-1.5 py-0.5 rounded border border-emerald-500/30">
+                    Perímetro Fechado
+                  </span>
+                ) : (
+                  <span className="text-[10px] bg-rose-500/20 text-rose-300 font-bold px-1.5 py-0.5 rounded border border-rose-500/30">
+                    Clique no mapa ou no Ponto 1 para fechar
+                  </span>
+                )}
               </div>
               <p className="text-[11px] text-slate-400">
                 {points.length === 0
@@ -74,7 +87,7 @@ export const MeasurementControlBar: React.FC<MeasurementControlBarProps> = ({
           <div className="flex items-center gap-2">
             <div className="bg-slate-950 border border-rose-500/40 px-3 py-1.5 rounded-xl text-right">
               <div className="text-[9px] uppercase tracking-wider text-slate-400 font-semibold">
-                Distância Total
+                {isClosed ? 'Perímetro Total' : 'Distância Total'}
               </div>
               <div className="text-sm sm:text-base font-black font-mono text-rose-400">
                 {formattedDist}
@@ -132,8 +145,20 @@ export const MeasurementControlBar: React.FC<MeasurementControlBarProps> = ({
             </button>
           </div>
 
-          {/* Controls: Add GPS, Undo, Clear, Finish */}
-          <div className="flex items-center gap-1.5 shrink-0 ml-auto">
+          {/* Controls: Close Loop, Add GPS, Undo, Clear, Finish */}
+          <div className="flex items-center gap-1.5 shrink-0 ml-auto flex-wrap">
+            {/* Fechar no Ponto 1 */}
+            {points.length >= 2 && !isClosed && onCloseLoop && (
+              <button
+                onClick={onCloseLoop}
+                title="Conectar diretamente ao ponto inicial sem perder metros"
+                className="flex items-center gap-1 px-3 py-1.5 rounded-xl bg-gradient-to-r from-amber-600 to-rose-600 hover:from-amber-500 hover:to-rose-500 text-white text-xs font-black shadow-md border border-amber-400/40 transition-all active:scale-95 animate-pulse"
+              >
+                <RotateCcw className="w-3.5 h-3.5" />
+                <span>Fechar no Início</span>
+              </button>
+            )}
+
             <button
               onClick={onAddCurrentGpsPoint}
               title="Adicionar ponto na coordenada GPS atual"

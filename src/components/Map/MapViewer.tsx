@@ -481,6 +481,35 @@ export const MapViewer: React.FC = () => {
     const handleMapClick = (e: L.LeafletMouseEvent) => {
       if (!isMeasuring) return;
 
+      // If user has >= 2 points and clicks near the starting point (< 25m), snap directly to close loop
+      if (measurementPoints.length >= 2) {
+        const startPt = measurementPoints[0];
+        const distToStart = calculateDistanceMeters(e.latlng.lat, e.latlng.lng, startPt.lat, startPt.lng);
+        if (distToStart < 25) {
+          const isAlreadyClosed =
+            measurementPoints.length >= 3 &&
+            measurementPoints[0].lat === measurementPoints[measurementPoints.length - 1].lat &&
+            measurementPoints[0].lng === measurementPoints[measurementPoints.length - 1].lng;
+
+          if (!isAlreadyClosed) {
+            const closePt: MeasurementPoint = {
+              id: `meas-close-${Date.now()}`,
+              lat: startPt.lat,
+              lng: startPt.lng,
+              altitude: startPt.altitude,
+              type: 'stop',
+              label: `Fechamento (Ponto 1)`,
+              notes: 'Ponto final conectado exatamente ao início para fechamento de perímetro sem perda métrica',
+              photos: [],
+              timestamp: Date.now(),
+            };
+            setMeasurementPoints((prev) => [...prev, closePt]);
+            notifySuccess('Perímetro Fechado', 'Traçado conectado com precisão cirúrgica ao ponto inicial.');
+            return;
+          }
+        }
+      }
+
       const type = currentMeasureTypeRef.current;
       const pointIndex = measurementPoints.length;
       let label = `Ponto ${pointIndex + 1}`;
@@ -512,7 +541,7 @@ export const MapViewer: React.FC = () => {
     return () => {
       map.off('click', handleMapClick);
     };
-  }, [isMeasuring, measurementPoints.length, currentGps.altitude]);
+  }, [isMeasuring, measurementPoints, currentGps.altitude]);
 
   // Render Measurement Visuals: Markers, Polyline, Distance Pills
   useEffect(() => {
@@ -522,14 +551,19 @@ export const MapViewer: React.FC = () => {
 
     if (measurementPoints.length === 0) return;
 
+    const isClosed =
+      measurementPoints.length >= 3 &&
+      measurementPoints[0].lat === measurementPoints[measurementPoints.length - 1].lat &&
+      measurementPoints[0].lng === measurementPoints[measurementPoints.length - 1].lng;
+
     // 1. Draw Connecting Polyline with glow
     if (measurementPoints.length > 1) {
       const latLngs = measurementPoints.map((p) => [p.lat, p.lng] as [number, number]);
 
-      const polyline = L.polyline(latLngs, {
-        color: '#e11d48', // rose-600
+      L.polyline(latLngs, {
+        color: isClosed ? '#10b981' : '#e11d48', // emerald if closed, rose if open
         weight: 3.5,
-        dashArray: '6, 6',
+        dashArray: isClosed ? undefined : '6, 6',
         opacity: 0.95,
       }).addTo(group);
 
@@ -549,7 +583,7 @@ export const MapViewer: React.FC = () => {
           html: `
             <div style="
               background: rgba(15, 23, 42, 0.9);
-              border: 1.5px solid #f43f5e;
+              border: 1.5px solid ${isClosed ? '#10b981' : '#f43f5e'};
               color: #ffffff;
               font-weight: 800;
               font-size: 10px;
@@ -583,6 +617,8 @@ export const MapViewer: React.FC = () => {
         iconSymbol = `⚠️ ${idx + 1}`;
       }
 
+      const isStartPoint = idx === 0;
+
       const pointIcon = L.divIcon({
         className: 'custom-measure-point-marker',
         html: `
@@ -593,7 +629,7 @@ export const MapViewer: React.FC = () => {
               padding: 0 4px;
               border-radius: 13px;
               background-color: ${bgColor};
-              border: 2px solid #ffffff;
+              border: 2px solid ${isStartPoint && measurementPoints.length >= 2 && !isClosed ? '#fbbf24' : '#ffffff'};
               box-shadow: 0 4px 10px rgba(0,0,0,0.6);
               color: white;
               font-weight: 800;
@@ -625,10 +661,14 @@ export const MapViewer: React.FC = () => {
 
       const marker = L.marker([pt.lat, pt.lng], { icon: pointIcon, zIndexOffset: 500 });
 
-      // Click to edit point details/photos
+      // Click to edit point details/photos or close loop if clicking start point
       marker.on('click', (e) => {
         L.DomEvent.stopPropagation(e);
-        setSelectedPointForEdit({ point: pt, index: idx });
+        if (idx === 0 && measurementPoints.length >= 2 && !isClosed) {
+          handleCloseLoop();
+        } else {
+          setSelectedPointForEdit({ point: pt, index: idx });
+        }
       });
 
       marker.addTo(group);
@@ -636,6 +676,34 @@ export const MapViewer: React.FC = () => {
   }, [measurementPoints]);
 
   // Measurement Actions
+  const handleCloseLoop = () => {
+    if (measurementPoints.length < 2) return;
+    const startPt = measurementPoints[0];
+    const isAlreadyClosed =
+      measurementPoints.length >= 3 &&
+      measurementPoints[0].lat === measurementPoints[measurementPoints.length - 1].lat &&
+      measurementPoints[0].lng === measurementPoints[measurementPoints.length - 1].lng;
+
+    if (isAlreadyClosed) {
+      notifyInfo('Perímetro Fechado', 'A medição já está fechada no ponto inicial.');
+      return;
+    }
+
+    const closePt: MeasurementPoint = {
+      id: `meas-close-${Date.now()}`,
+      lat: startPt.lat,
+      lng: startPt.lng,
+      altitude: startPt.altitude,
+      type: 'stop',
+      label: `Fechamento (Ponto 1)`,
+      notes: 'Ponto final conectado exatamente ao início para fechamento de perímetro sem perda métrica',
+      photos: [],
+      timestamp: Date.now(),
+    };
+
+    setMeasurementPoints((prev) => [...prev, closePt]);
+    notifySuccess('Perímetro Fechado', 'Traçado conectado com precisão cirúrgica ao ponto inicial.');
+  };
   const handleAddCurrentGpsPoint = () => {
     const type = currentMeasureType;
     const pointIndex = measurementPoints.length;
@@ -729,6 +797,7 @@ export const MapViewer: React.FC = () => {
           onAddCurrentGpsPoint={handleAddCurrentGpsPoint}
           onUndoLastPoint={handleUndoLastPoint}
           onClearMeasurement={handleClearMeasurement}
+          onCloseLoop={handleCloseLoop}
           onFinishMeasurement={() => setIsSummaryModalOpen(true)}
           onClose={() => setIsMeasuring(false)}
         />

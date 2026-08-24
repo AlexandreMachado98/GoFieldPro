@@ -1,7 +1,7 @@
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { MeasurementPoint, MeasurementSession } from '../types';
-import { calculateDistanceMeters, formatToDMS, latLngToUTM } from './geoUtils';
+import { calculateDistanceMeters, formatToDMS, latLngToUTM, calculatePolygonArea } from './geoUtils';
 
 /**
  * Renders a high-resolution cartographic canvas illustration of the measured route,
@@ -75,14 +75,33 @@ export function generateMeasurementMapCanvas(
   }));
 
   // 3. Draw Connecting Polylines & Glow
+  const isClosed =
+    points.length >= 3 &&
+    points[0].lat === points[points.length - 1].lat &&
+    points[0].lng === points[points.length - 1].lng;
+
   if (pixelPoints.length > 1) {
+    // Fill closed polygon
+    if (isClosed) {
+      ctx.save();
+      ctx.fillStyle = 'rgba(16, 185, 129, 0.12)';
+      ctx.beginPath();
+      ctx.moveTo(pixelPoints[0].x, pixelPoints[0].y);
+      for (let i = 1; i < pixelPoints.length; i++) {
+        ctx.lineTo(pixelPoints[i].x, pixelPoints[i].y);
+      }
+      ctx.closePath();
+      ctx.fill();
+      ctx.restore();
+    }
+
     // Glow effect
     ctx.save();
-    ctx.shadowColor = 'rgba(14, 165, 233, 0.6)';
+    ctx.shadowColor = isClosed ? 'rgba(16, 185, 129, 0.6)' : 'rgba(14, 165, 233, 0.6)';
     ctx.shadowBlur = 12;
-    ctx.strokeStyle = '#0284c7'; // sky-600
+    ctx.strokeStyle = isClosed ? '#10b981' : '#0284c7'; // emerald if closed, sky if open
     ctx.lineWidth = 4;
-    ctx.setLineDash([8, 4]);
+    ctx.setLineDash(isClosed ? [] : [8, 4]);
 
     ctx.beginPath();
     ctx.moveTo(pixelPoints[0].x, pixelPoints[0].y);
@@ -107,7 +126,7 @@ export function generateMeasurementMapCanvas(
       ctx.font = 'bold 13px sans-serif';
       const textWidth = ctx.measureText(distFormatted).width;
       ctx.fillStyle = 'rgba(15, 23, 42, 0.88)';
-      ctx.strokeStyle = '#38bdf8';
+      ctx.strokeStyle = isClosed ? '#10b981' : '#38bdf8';
       ctx.lineWidth = 1.5;
 
       const pillPad = 6;
@@ -313,13 +332,20 @@ export async function generateMeasurementPdfReport(
   const walkMinutes = Math.round((session.totalDistanceMeters / 4000) * 60); // 4 km/h
   const vehicleMinutes = Math.round((session.totalDistanceMeters / 35000) * 60); // 35 km/h field speed
 
-  // Column 1: Distância Total
+  const isClosed =
+    session.points.length >= 3 &&
+    session.points[0].lat === session.points[session.points.length - 1].lat &&
+    session.points[0].lng === session.points[session.points.length - 1].lng;
+
+  const area = isClosed ? calculatePolygonArea(session.points) : { m2: 0, hectares: 0 };
+
+  // Column 1: Distância Total / Perímetro
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(7.5);
   doc.setTextColor(100, 116, 139);
-  doc.text('DISTÂNCIA TOTAL MEDIDA', 18, startY + 6);
+  doc.text(isClosed ? 'PERÍMETRO TOTAL (FECHADO)' : 'DISTÂNCIA TOTAL MEDIDA', 18, startY + 6);
   doc.setFontSize(11);
-  doc.setTextColor(2, 132, 199);
+  doc.setTextColor(isClosed ? 16 : 2, isClosed ? 185 : 132, isClosed ? 129 : 199);
   doc.text(totalDistFormatted, 18, startY + 14);
   doc.setFontSize(7);
   doc.setTextColor(100, 116, 139);
@@ -344,17 +370,27 @@ export async function generateMeasurementPdfReport(
   // Divider
   doc.line(138, startY + 4, 138, startY + 20);
 
-  // Column 3: Estimativa de Tempo
+  // Column 3: Área Calculada (se fechado) ou Estimativa de Tempo
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(7.5);
   doc.setTextColor(100, 116, 139);
-  doc.text('TEMPO DE DESLOCAMENTO', 143, startY + 6);
-  doc.setFontSize(10);
-  doc.setTextColor(15, 23, 42);
-  doc.text(`A pé: ~${walkMinutes} min`, 143, startY + 14);
-  doc.setFontSize(7);
-  doc.setTextColor(100, 116, 139);
-  doc.text(`Veículo 4x4: ~${Math.max(vehicleMinutes, 1)} min`, 143, startY + 20);
+  if (isClosed) {
+    doc.text('ÁREA TOTAL CALCULADA', 143, startY + 6);
+    doc.setFontSize(10);
+    doc.setTextColor(16, 185, 129);
+    doc.text(`${area.hectares} ha`, 143, startY + 14);
+    doc.setFontSize(7);
+    doc.setTextColor(100, 116, 139);
+    doc.text(`${area.m2.toLocaleString('pt-BR')} m² exatos`, 143, startY + 20);
+  } else {
+    doc.text('TEMPO DE DESLOCAMENTO', 143, startY + 6);
+    doc.setFontSize(10);
+    doc.setTextColor(15, 23, 42);
+    doc.text(`A pé: ~${walkMinutes} min`, 143, startY + 14);
+    doc.setFontSize(7);
+    doc.setTextColor(100, 116, 139);
+    doc.text(`Veículo 4x4: ~${Math.max(vehicleMinutes, 1)} min`, 143, startY + 20);
+  }
 
   // 3. Render Cartographic Map Snapshot
   const mapImgData = generateMeasurementMapCanvas(session.points, 1200, 720);

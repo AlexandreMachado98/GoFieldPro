@@ -444,6 +444,41 @@ export const PdfMapNavigator: React.FC = () => {
             ? pdfToGps(e.latlng.lat, e.latlng.lng, activeDoc)
             : { lat: -23.542, lng: -46.638 };
 
+          // If clicking near the start point (< 30px in PDF sheet) and length >= 2, snap to close loop
+          if (measurementPoints.length >= 2) {
+            const startPt = measurementPoints[0];
+            if (startPt.pdfX !== undefined && startPt.pdfY !== undefined) {
+              const dx = e.latlng.lat - startPt.pdfX;
+              const dy = e.latlng.lng - startPt.pdfY;
+              const distPx = Math.sqrt(dx * dx + dy * dy);
+              if (distPx < 30) {
+                const isAlreadyClosed =
+                  measurementPoints.length >= 3 &&
+                  measurementPoints[0].lat === measurementPoints[measurementPoints.length - 1].lat &&
+                  measurementPoints[0].lng === measurementPoints[measurementPoints.length - 1].lng;
+
+                if (!isAlreadyClosed) {
+                  const closePt: MeasurementPoint = {
+                    id: `pdf-meas-close-${Date.now()}`,
+                    lat: startPt.lat,
+                    lng: startPt.lng,
+                    pdfX: startPt.pdfX,
+                    pdfY: startPt.pdfY,
+                    altitude: startPt.altitude,
+                    type: 'stop',
+                    label: `Fechamento (Ponto 1)`,
+                    notes: 'Ponto final conectado exatamente ao início para fechamento de perímetro sem perda métrica',
+                    photos: [],
+                    timestamp: Date.now(),
+                  };
+                  setMeasurementPoints((prev) => [...prev, closePt]);
+                  notifySuccess('Perímetro Fechado', 'Traçado conectado com precisão cirúrgica ao ponto inicial.');
+                  return;
+                }
+              }
+            }
+          }
+
           const type = currentMeasureTypeRef.current;
           const ptIndex = measurementPoints.length;
           let label = `Ponto ${ptIndex + 1}`;
@@ -838,6 +873,38 @@ export const PdfMapNavigator: React.FC = () => {
     notifyInfo('Ponto Adicionado', `Coordenada GPS (${gpsLat.toFixed(5)}°, ${gpsLng.toFixed(5)}°) inserida.`);
   };
 
+  // Close measurement loop on PDF map
+  const handleCloseLoopPdf = () => {
+    if (measurementPoints.length < 2) return;
+    const startPt = measurementPoints[0];
+    const isAlreadyClosed =
+      measurementPoints.length >= 3 &&
+      measurementPoints[0].lat === measurementPoints[measurementPoints.length - 1].lat &&
+      measurementPoints[0].lng === measurementPoints[measurementPoints.length - 1].lng;
+
+    if (isAlreadyClosed) {
+      notifyInfo('Perímetro Fechado', 'A medição já está fechada no ponto inicial.');
+      return;
+    }
+
+    const closePt: MeasurementPoint = {
+      id: `pdf-meas-close-${Date.now()}`,
+      lat: startPt.lat,
+      lng: startPt.lng,
+      pdfX: startPt.pdfX,
+      pdfY: startPt.pdfY,
+      altitude: startPt.altitude,
+      type: 'stop',
+      label: `Fechamento (Ponto 1)`,
+      notes: 'Ponto final conectado exatamente ao início para fechamento de perímetro na folha PDF',
+      photos: [],
+      timestamp: Date.now(),
+    };
+
+    setMeasurementPoints((prev) => [...prev, closePt]);
+    notifySuccess('Perímetro Fechado', 'Traçado conectado com precisão cirúrgica ao ponto inicial.');
+  };
+
   // Render Measurement Overlay on PDF Map
   useEffect(() => {
     if (!measureLayerRef.current) return;
@@ -845,6 +912,11 @@ export const PdfMapNavigator: React.FC = () => {
     group.clearLayers();
 
     if (measurementPoints.length === 0) return;
+
+    const isClosed =
+      measurementPoints.length >= 3 &&
+      measurementPoints[0].lat === measurementPoints[measurementPoints.length - 1].lat &&
+      measurementPoints[0].lng === measurementPoints[measurementPoints.length - 1].lng;
 
     // Draw Polyline along (pdfX, pdfY)
     if (measurementPoints.length > 1) {
@@ -854,9 +926,9 @@ export const PdfMapNavigator: React.FC = () => {
 
       if (latLngs.length > 1) {
         L.polyline(latLngs, {
-          color: '#e11d48',
+          color: isClosed ? '#10b981' : '#e11d48',
           weight: 3.5,
-          dashArray: '6, 6',
+          dashArray: isClosed ? undefined : '6, 6',
           opacity: 0.95,
         }).addTo(group);
 
@@ -876,7 +948,7 @@ export const PdfMapNavigator: React.FC = () => {
               html: `
                 <div style="
                   background: rgba(15, 23, 42, 0.9);
-                  border: 1.5px solid #f43f5e;
+                  border: 1.5px solid ${isClosed ? '#10b981' : '#f43f5e'};
                   color: #ffffff;
                   font-weight: 800;
                   font-size: 10px;
@@ -913,6 +985,8 @@ export const PdfMapNavigator: React.FC = () => {
         iconSymbol = `⚠️ ${idx + 1}`;
       }
 
+      const isStartPoint = idx === 0;
+
       const pointIcon = L.divIcon({
         className: 'custom-pdf-measure-marker',
         html: `
@@ -923,7 +997,7 @@ export const PdfMapNavigator: React.FC = () => {
               padding: 0 4px;
               border-radius: 13px;
               background-color: ${bgColor};
-              border: 2px solid #ffffff;
+              border: 2px solid ${isStartPoint && measurementPoints.length >= 2 && !isClosed ? '#fbbf24' : '#ffffff'};
               box-shadow: 0 4px 10px rgba(0,0,0,0.6);
               color: white;
               font-weight: 800;
@@ -956,7 +1030,11 @@ export const PdfMapNavigator: React.FC = () => {
       const marker = L.marker([pt.pdfX, pt.pdfY], { icon: pointIcon, zIndexOffset: 500 });
       marker.on('click', (e) => {
         L.DomEvent.stopPropagation(e);
-        setSelectedMeasurePointForEdit({ point: pt, index: idx });
+        if (idx === 0 && measurementPoints.length >= 2 && !isClosed) {
+          handleCloseLoopPdf();
+        } else {
+          setSelectedMeasurePointForEdit({ point: pt, index: idx });
+        }
       });
 
       marker.addTo(group);
@@ -1894,6 +1972,7 @@ export const PdfMapNavigator: React.FC = () => {
             setMeasurementPoints([]);
             notifyInfo('Medição Limpa', 'Todos os pontos foram removidos.');
           }}
+          onCloseLoop={handleCloseLoopPdf}
           onFinishMeasurement={() => setIsMeasureSummaryOpen(true)}
           onClose={() => setActiveTool('pan')}
         />
