@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   X,
   FileText,
@@ -22,6 +22,7 @@ import {
   generateMeasurementPdfReport,
   exportMeasurementKml,
   generateMeasurementMapCanvas,
+  generateMeasurementMapCanvasAsync,
 } from '../../utils/measurementPdfReport';
 import { useApp } from '../../context/AppContext';
 
@@ -47,6 +48,33 @@ export const MeasurementSummaryModal: React.FC<MeasurementSummaryModalProps> = (
   const [sessionName, setSessionName] = useState(
     `Levantamento de Medição - ${new Date().toLocaleDateString('pt-BR')}`
   );
+  const [mapType, setMapType] = useState<'satellite' | 'street' | 'drawing'>('satellite');
+  const [previewCanvasImg, setPreviewCanvasImg] = useState<string>('');
+  const [isLoadingMap, setIsLoadingMap] = useState<boolean>(true);
+
+  useEffect(() => {
+    if (!isOpen || points.length === 0) return;
+    let isMounted = true;
+    setIsLoadingMap(true);
+
+    generateMeasurementMapCanvasAsync(points, 960, 480, mapType)
+      .then((dataUrl) => {
+        if (isMounted) {
+          setPreviewCanvasImg(dataUrl);
+          setIsLoadingMap(false);
+        }
+      })
+      .catch(() => {
+        if (isMounted) {
+          setPreviewCanvasImg(generateMeasurementMapCanvas(points, 800, 360));
+          setIsLoadingMap(false);
+        }
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [isOpen, points, mapType]);
 
   if (!isOpen || points.length === 0) return null;
 
@@ -92,8 +120,9 @@ export const MeasurementSummaryModal: React.FC<MeasurementSummaryModalProps> = (
         companyName: 'GOFIELD PRO • GESTÃO E ENGENHARIA DE CAMPO',
         responsibleName: 'Carlos Silva',
         weatherCondition: 'Operação de Campo Normal',
+        mapType,
       });
-      notifySuccess('Relatório PDF Gerado', 'O PDF com o mapa ilustrado e distâncias foi baixado com sucesso.');
+      notifySuccess('Relatório PDF Gerado', 'O PDF com o mapa de satélite real e dados organizados foi baixado.');
     } catch (err) {
       console.error(err);
       notifyError('Erro ao Gerar PDF', 'Não foi possível compilar o relatório técnico.');
@@ -111,8 +140,6 @@ export const MeasurementSummaryModal: React.FC<MeasurementSummaryModalProps> = (
       notifyError('Erro ao exportar KML', 'Falha ao estruturar o arquivo geográfico.');
     }
   };
-
-  const previewCanvasImg = generateMeasurementMapCanvas(points, 800, 360);
 
   const isClosed =
     points.length >= 3 &&
@@ -241,24 +268,65 @@ export const MeasurementSummaryModal: React.FC<MeasurementSummaryModalProps> = (
           </div>
 
           {/* Cartographic Map Snapshot Preview */}
-          {previewCanvasImg && (
-            <div className="bg-slate-950/80 border border-slate-800 rounded-2xl p-3 overflow-hidden">
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
-                  <Layers className="w-4 h-4 text-sky-400" />
-                  Ilustração Cartográfica do Traçado
-                </span>
-                <span className="text-[10px] text-slate-500">Incluído automaticamente no relatório PDF</span>
-              </div>
-              <div className="w-full aspect-[20/9] max-h-56 rounded-xl overflow-hidden border border-slate-800 bg-slate-950 flex items-center justify-center">
-                <img
-                  src={previewCanvasImg}
-                  alt="Ilustração do Mapa Medido"
-                  className="w-full h-full object-contain"
-                />
+          <div className="bg-slate-950/80 border border-slate-800 rounded-2xl p-3 overflow-hidden">
+            <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
+              <span className="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
+                <Layers className="w-4 h-4 text-sky-400" />
+                Mapa de Campo (Imagem Real no PDF)
+              </span>
+
+              {/* Map Layer Selector */}
+              <div className="flex items-center bg-slate-900 border border-slate-700 p-0.5 rounded-lg text-[10px]">
+                <button
+                  onClick={() => setMapType('satellite')}
+                  className={`px-2.5 py-1 rounded-md font-bold transition-all ${
+                    mapType === 'satellite'
+                      ? 'bg-sky-600 text-white shadow'
+                      : 'text-slate-400 hover:text-slate-200'
+                  }`}
+                >
+                  🛰️ Satélite Real
+                </button>
+                <button
+                  onClick={() => setMapType('street')}
+                  className={`px-2.5 py-1 rounded-md font-bold transition-all ${
+                    mapType === 'street'
+                      ? 'bg-sky-600 text-white shadow'
+                      : 'text-slate-400 hover:text-slate-200'
+                  }`}
+                >
+                  🗺️ Ruas / OSM
+                </button>
+                <button
+                  onClick={() => setMapType('drawing')}
+                  className={`px-2.5 py-1 rounded-md font-bold transition-all ${
+                    mapType === 'drawing'
+                      ? 'bg-sky-600 text-white shadow'
+                      : 'text-slate-400 hover:text-slate-200'
+                  }`}
+                >
+                  📐 Vetorial
+                </button>
               </div>
             </div>
-          )}
+
+            <div className="w-full aspect-[20/9] max-h-64 rounded-xl overflow-hidden border border-slate-800 bg-slate-950 flex items-center justify-center relative">
+              {isLoadingMap ? (
+                <div className="flex flex-col items-center gap-2 text-slate-400">
+                  <Loader2 className="w-6 h-6 animate-spin text-sky-400" />
+                  <span className="text-xs font-semibold">Carregando imagem de satélite georreferenciada...</span>
+                </div>
+              ) : previewCanvasImg ? (
+                <img
+                  src={previewCanvasImg}
+                  alt="Enquadramento do Mapa Medido"
+                  className="w-full h-full object-contain"
+                />
+              ) : (
+                <span className="text-xs text-slate-500">Sem prévia disponível</span>
+              )}
+            </div>
+          </div>
 
           {/* Point-by-Point Segment Breakdown Table */}
           <div>
