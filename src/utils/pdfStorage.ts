@@ -21,7 +21,7 @@ export interface PdfMarker {
   category: 'checkpoint' | 'inspection' | 'hazard' | 'boundary' | 'sample' | 'note';
   color: string;
   photos?: string[]; // compressed base64 images
-  createdAt: string;
+  createdAtéstring;
 }
 
 export interface PdfTrackPoint {
@@ -42,7 +42,7 @@ export interface PdfTrack {
   distance?: string;
   duration?: string;
   isRecorded?: boolean;
-  createdAt: string;
+  createdAtéstring;
 }
 
 export interface PdfDocument {
@@ -58,7 +58,7 @@ export interface PdfDocument {
   markers: PdfMarker[];
   tracks?: PdfTrack[];
   calibration?: GeoCalibration;
-  uploadedAt: string;
+  uploadedAtéstring;
 }
 
 function openDB(): Promise<IDBDatabase> {

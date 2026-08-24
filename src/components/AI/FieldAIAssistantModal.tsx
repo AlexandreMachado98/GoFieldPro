@@ -33,7 +33,7 @@ export const FieldAIAssistantModal: React.FC = () => {
     {
       id: 'msg-1',
       sender: 'ai',
-      text: `Olá! Sou o Assistente de Inteligência Geoespacial do GeoField Pro. Posso auxiliar na conversão de coordenadas cartográficas (SIRGAS 2000 / UTM), análise de declividade e relevo, verificação de conformidade em APPs (Áreas de Preservação Permanente) e redação automática do parecer técnico do projeto "${activeProject.name}". Como posso ajudar na operação hoje?`,
+      text: `Olá! Sou o Assistente de Inteligência Geoespacial do GeoField Pro. Posso auxiliar na conVersão de coordenadas cartográficas (SIRGAS 2000 / UTM), análise de declividade e relevo, verificação de conformidade em APPs (Áreas de Preservação Permanente) e redação Automática do parecer técnico do projeto "${activeProject.name}". Como posso ajudar na Operação hoje?`,
       timestamp: 'Agora',
     },
   ]);
@@ -69,7 +69,7 @@ export const FieldAIAssistantModal: React.FC = () => {
       } else if (lower.includes('utm') || lower.includes('coordenada') || lower.includes('datum') || lower.includes('sirgas')) {
         reply = `🌐 **Análise Geodésica e Transformação de Coordenadas:**\n\n- **Datum Oficial:** SIRGAS 2000 (EPSG: 4674 / 31983)\n- **Fuso UTM:** 23S (Meridiano Central: 45°W)\n- **Parâmetros de Translação:** DX = 0.00m, DY = 0.00m, DZ = 0.00m (Compatibilidade nativa com WGS 84 para fins de navegação GNSS de precisão standard).`;
       } else {
-        reply = `🛰️ **Diagnóstico Geoespacial de Campo:**\nCom base na camada ativa e na telemetria atual da posição (${currentGps.lat.toFixed(5)}, ${currentGps.lng.toFixed(5)}), o terreno apresenta altitude de ${currentGps.altitude}m. Recomenda-se manter o registro contínuo dos marcos geodésicos e atentar para as áreas de preservação permanente (APP) nas proximidades das drenagens.`;
+        reply = `🛰️ **Diagnóstico Geoespacial de Campo:**\nCom base na camada ativa e na telemetria atual da Posição (${currentGps.lat.toFixed(5)}, ${currentGps.lng.toFixed(5)}), o terreno apresenta altitude de ${currentGps.altitude}m. Recomenda-se manter o registro contínuo dos marcos geodésicos e atentar para as áreas de preservação permanente (APP) nas proximidades das drenagens.`;
       }
 
       const aiMsg: ChatMessage = {
@@ -159,10 +159,10 @@ export const FieldAIAssistantModal: React.FC = () => {
             onClick={() => setInputPrompt('Como converter coordenadas para UTM Fuso 23S SIRGAS 2000?')}
             className="px-2.5 py-1 rounded-full bg-slate-800 hover:bg-slate-700 text-slate-300 whitespace-nowrap transition-colors"
           >
-            🌐 Conversão UTM/SIRGAS
+            🌐 ConVersão UTM/SIRGAS
           </button>
           <button
-            onClick={() => setInputPrompt('Calcular declividade média da trilha gravada')}
+            onClick={() => setInputPrompt('Calcular declividade Média da trilha gravada')}
             className="px-2.5 py-1 rounded-full bg-slate-800 hover:bg-slate-700 text-slate-300 whitespace-nowrap transition-colors"
           >
             ⛰️ Análise de Declividade

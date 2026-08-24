@@ -193,7 +193,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
                       Modo de Alta Precisão (GPS Nativo)
                     </h4>
                     <p className="text-[11px] text-slate-400 mt-0.5">
-                      Usa o hardware de GPS com satélites GNSS (GPS, GLONASS, Galileo) para máxima acurácia
+                      Usa o hardware de GPS com satélites GNSS (GPS, GLONASS, Galileo) para Máxima acurácia
                     </p>
                   </div>
                   <button
@@ -210,7 +210,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
               <div className="bg-slate-950/60 border border-slate-800 rounded-2xl p-4 space-y-3">
                 <h4 className="text-xs font-bold text-white">Intervalo de Amostragem do GPS</h4>
                 <p className="text-[11px] text-slate-400">
-                  Frequência em que a posição é atualizada na tela e nos mapas em PDF.
+                  Frequência em que a Posição é atualizada na tela e nos mapas em PDF.
                 </p>
                 <div className="grid grid-cols-3 gap-2">
                   {[
@@ -260,7 +260,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
                 <div>
                   <h4 className="text-xs font-bold text-white">Centralização Automática (Auto-Pan)</h4>
                   <p className="text-[11px] text-slate-400 mt-0.5">
-                    Mantém sua posição sempre visível no centro do mapa durante o deslocamento
+                    Mantém sua Posição sempre visível no centro do mapa durante o deslocamento
                   </p>
                 </div>
                 <button
@@ -301,7 +301,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
               <div className="bg-slate-950/60 border border-slate-800 rounded-2xl p-4 space-y-3">
                 <h4 className="text-xs font-bold text-white">Formato Padrão de Exibição das Coordenadas</h4>
                 <p className="text-[11px] text-slate-400">
-                  Escolha como os pontos, waypoints e posição no PDF serão exibidos e exportados.
+                  Escolha como os pontos, waypoints e Posição no PDF serão exibidos e exportados.
                 </p>
 
                 <div className="space-y-2">
@@ -488,13 +488,13 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
                 </h4>
                 <div className="space-y-2 text-xs text-slate-300 leading-relaxed">
                   <p>
-                    • <b>Execução 100% no Dispositivo:</b> Toda a navegação GPS, posicionamento vetorial, conversão de coordenadas e renderização de PDFs operam <b>diretamente no navegador/hardware do seu celular</b>.
+                    • <b>Execução 100% no Dispositivo:</b> Toda a navegação GPS, posicionamento vetorial, conVersão de coordenadas e renderização de PDFs operam <b>diretamente no navegador/hardware do seu celular</b>.
                   </p>
                   <p>
                     • <b>Latência do GPS: 0 ms</b> (sem delay de rede para mapas e navegação local).
                   </p>
                   <p>
-                    • <b>Banco de Dados na Nuvem:</b> Sincronização automática para manter seus relatórios e pontos protegidos.
+                    • <b>Banco de Dados na Nuvem:</b> Sincronização Automática para manter seus relatórios e pontos protegidos.
                   </p>
                 </div>
               </div>

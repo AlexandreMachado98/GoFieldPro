@@ -81,7 +81,7 @@ export const Topbar: React.FC = () => {
         />
       )}
 
-      <header className="bg-slate-950 border-b border-slate-800 select-none z-[90000] sticky top-0">
+      <header className="bg-slate-950 border-b border-slate-800 select-none z-[96000] sticky top-0 relative">
         <div className="px-3 sm:px-4 py-2 flex items-center justify-between gap-2 h-14">
           {/* Left Side: Menu Trigger & App Title */}
           <div className="flex items-center gap-2 sm:gap-3">
@@ -183,7 +183,7 @@ export const Topbar: React.FC = () => {
                         <button
                           onClick={clearAllNotifications}
                           className="text-[10px] text-slate-400 hover:text-rose-400 p-1 rounded hover:bg-slate-800"
-                          title="Limpar todas as notificações"
+                          title="Limpar todas as Notificações"
                         >
                           <Trash2 className="w-3.5 h-3.5" />
                         </button>
@@ -193,7 +193,7 @@ export const Topbar: React.FC = () => {
                   <div className="max-h-80 overflow-y-auto space-y-1.5 py-1.5">
                     {notifications.length === 0 ? (
                       <div className="p-6 text-center text-xs text-slate-500">
-                        Nenhuma notificação no momento.
+                        Nenhuma Notificação no momento.
                       </div>
                     ) : (
                       notifications.map((n) => (

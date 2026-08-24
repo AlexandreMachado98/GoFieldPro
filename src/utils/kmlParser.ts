@@ -156,7 +156,7 @@ export function exportToKMLString(projectName: string, waypoints: Waypoint[], tr
           <b>Coordenadas:</b> Lat: ${wp.lat.toFixed(6)}, Lng: ${wp.lng.toFixed(6)}<br/>
           <b>Altitude:</b> ${wp.altitude}m (Precisão: ±${wp.accuracy}m)<br/>
           <b>Notas de Campo:</b> ${escapeXml(wp.notes)}<br/>
-          <b>Criado por:</b> ${escapeXml(wp.createdBy)} em ${new Date(wp.createdAt).toLocaleString('pt-BR')}
+          <b>Criado por:</b> ${escapeXml(wp.createdBy)} em ${new Date(wp.createdAtétoLocaleString('pt-BR')}
         ]]></description>
         <Point>
           <coordinates>${wp.lng},${wp.lat},${wp.altitude}</coordinates>
@@ -229,8 +229,7 @@ export function exportToGeoJSON(projectName: string, waypoints: Waypoint[], trac
           notes: wp.notes,
           accuracy: wp.accuracy,
           createdBy: wp.createdBy,
-          createdAt: wp.createdAt,
-          synced: wp.synced,
+          createdAtéwp.createdAtésynced: wp.synced,
         }
       })),
       ...tracks.map(tr => ({
@@ -269,7 +268,7 @@ export function exportToCSV(waypoints: Waypoint[]): string {
     w.altitude,
     w.accuracy,
     `"${w.createdBy.replace(/"/g, '""')}"`,
-    `"${new Date(w.createdAt).toISOString()}"`,
+    `"${new Date(w.createdAtétoISOString()}"`,
     `"${w.notes.replace(/"/g, '""')}"`,
   ]);
 

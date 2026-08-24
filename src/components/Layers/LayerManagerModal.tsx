@@ -106,7 +106,7 @@ export const LayerManagerModal: React.FC = () => {
       georeferenced: true,
       url: fileBase64, // The actual image data
       previewUrl: fileBase64,
-      uploadedAt: new Date().toISOString(),
+      uploadedAténew Date().toISOString(),
     };
 
     const newLayer: LayerItem = {
@@ -422,7 +422,7 @@ export const LayerManagerModal: React.FC = () => {
               <div className="p-4 rounded-xl bg-sky-950/30 border border-sky-800/40 text-xs text-sky-300 flex items-start gap-2">
                 <Sparkles className="w-5 h-5 text-sky-400 shrink-0 mt-0.5" />
                 <div>
-                  <b>Sobreposição de Imagem (Overlay):</b> Faça o upload de uma planta ou mapa convertido em imagem (JPG/PNG). Informe as coordenadas das extremidades para o aplicativo "esticar" a imagem no lugar exato do mundo.
+                  <b>SobrePosição de Imagem (Overlay):</b> Faça o upload de uma planta ou mapa convertido em imagem (JPG/PNG). Informe as coordenadas das extremidades para o aplicativo "esticar" a imagem no lugar exato do mundo.
                 </div>
               </div>
 
@@ -503,7 +503,7 @@ export const LayerManagerModal: React.FC = () => {
               <div className="p-4 rounded-xl bg-amber-950/30 border border-amber-800/40 text-xs text-amber-300 flex items-start gap-2">
                 <Sparkles className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
                 <div>
-                  <b>Suporte a KML e Pacotes KMZ Compactados:</b> Importa trilhas, waypoints, perímetros, zonas de amortecimento e dados geográficos criados no Google Earth, QGIS, ArcGIS ou GPS Garmin.
+                  <b>Suporte a KML e Pacotes KMZ Compactados:</b> Importa trilhas, waypoints, perímetros, zonas de amortecimento e dados geográficos criados no Google Earth, QGIS, ArcGISãou GPS Garmin.
                 </div>
               </div>
 

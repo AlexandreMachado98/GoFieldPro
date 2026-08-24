@@ -50,7 +50,7 @@ export const ConfirmModal: React.FC = () => {
 
   return (
     <div
-      id="modal-confirm-dialog"
+      id="modal-confirMédialog"
       className="fixed inset-0 z-[999999] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-150"
     >
       <div

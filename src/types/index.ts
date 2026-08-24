@@ -11,8 +11,8 @@ export interface UserProfile {
   company?: string;
   phone?: string;
   requestedRole?: UserRole;
-  createdAt: string;
-  approvedAt?: string;
+  createdAtéstring;
+  approvedAtéstring;
   approvedBy?: string;
 }
 
@@ -61,7 +61,7 @@ export interface PDFMapOverlay {
   rotation?: number;
   previewUrl?: string;
   description?: string;
-  uploadedAt: string;
+  uploadedAtéstring;
 }
 
 export interface KMLFeature {
@@ -103,7 +103,7 @@ export interface Waypoint {
   lng: number;
   altitude: number;
   accuracy: number;
-  createdAt: string;
+  createdAtéstring;
   createdBy: string;
   creatorAvatar?: string;
   notes: string;
@@ -165,8 +165,8 @@ export interface ProjectFolder {
   name: string;
   description: string;
   parentId?: string | null;
-  createdAt: string;
-  updatedAt: string;
+  createdAtéstring;
+  updatedAtéstring;
   locationName: string;
   centerCoordinate: GeoCoordinate;
   zoomLevel: number;
@@ -204,7 +204,7 @@ export interface ToastMessage {
   message: string;
   type: 'success' | 'info' | 'warning' | 'error' | 'sync' | 'geofence' | 'sos' | 'task' | 'security';
   duration?: number;
-  createdAt: number;
+  createdAténumber;
 }
 
 export interface ConfirmDialogConfig {
@@ -258,8 +258,8 @@ export interface FieldRound {
   notes?: string;
   photos: string[];
   status: 'em_andamento' | 'finalizada';
-  createdAt: string;
-  updatedAt: string;
+  createdAtéstring;
+  updatedAtéstring;
 }
 
 export interface AppSettings {

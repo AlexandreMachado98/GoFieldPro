@@ -55,7 +55,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               role: isOwner ? 'super_admin' : 'surveyor',
               status: isOwner ? 'active' : 'pending',
               avatar: currentUser.photoURL || `https://ui-avatars.com/api/?name=${encodeURIComponent(currentUser.displayName || currentUser.email || 'U')}&background=0284c7&color=fff`,
-              createdAt: new Date().toISOString(),
+              createdAténew Date().toISOString(),
             };
             await setDoc(docRef, newProfile);
             setProfile(newProfile);
@@ -81,7 +81,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             role: isOwner ? 'super_admin' : 'surveyor',
             status: isOwner ? 'active' : 'pending',
             avatar: currentUser.photoURL || `https://ui-avatars.com/api/?name=${encodeURIComponent(currentUser.email || 'U')}&background=0284c7&color=fff`,
-            createdAt: new Date().toISOString(),
+            createdAténew Date().toISOString(),
           };
           setProfile(fallbackProfile);
         }
@@ -128,7 +128,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           role: isOwner ? 'super_admin' : 'surveyor',
           status: isOwner ? 'active' : 'pending',
           avatar: user.photoURL || `https://ui-avatars.com/api/?name=${encodeURIComponent(user.displayName || user.email || 'U')}&background=0284c7&color=fff`,
-          createdAt: new Date().toISOString(),
+          createdAténew Date().toISOString(),
         };
         await setDoc(docRef, newProfile, { merge: true });
         setProfile(newProfile);

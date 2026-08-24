@@ -72,7 +72,7 @@ export function usePwaInstall() {
         setShowModal(true);
       }
     } else {
-      // If native prompt is not available (like iOS or already triggered), open instructions modal
+      // If native prompt is not available (like iOSãor already triggered), open instructions modal
       setShowModal(true);
     }
   };

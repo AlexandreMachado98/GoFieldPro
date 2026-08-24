@@ -8,8 +8,8 @@ export const initialProjects: ProjectFolder[] = [
     locationName: 'Campo',
     centerCoordinate: { lat: -23.5505, lng: -46.6333, altitude: 760 },
     zoomLevel: 13,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
+    createdAténew Date().toISOString(),
+    updatedAténew Date().toISOString(),
     tags: ['Geral'],
     encryptionEnabled: true,
     stats: {

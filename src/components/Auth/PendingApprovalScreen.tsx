@@ -96,7 +96,7 @@ export const PendingApprovalScreen: React.FC = () => {
             <div className="bg-sky-950/40 border border-sky-800/50 rounded-2xl p-3.5 flex items-start gap-3">
               <UserCheck className="w-5 h-5 text-sky-400 shrink-0 mt-0.5" />
               <p className="text-xs text-sky-200/90 leading-relaxed">
-                Você não precisa fechar o aplicativo. Assim que o administrador liberar seu usuário no painel, esta tela se desbloqueará automaticamente.
+                Vocênão precisa fechar o aplicativo. Assim que o administrador liberar seu Usuário no painel, esta tela se desbloqueará automaticamente.
               </p>
             </div>
           )}

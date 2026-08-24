@@ -87,7 +87,7 @@ export const generateFieldRoundsPdf = async (
   // Stat 3: Média KM / Rodada
   doc.setFontSize(7.5);
   doc.setTextColor(100, 116, 139);
-  doc.text('MÉDIA POR RODADA', 145, startY + 6);
+  doc.text('Média POR RODADA', 145, startY + 6);
   doc.setFontSize(12);
   doc.setTextColor(15, 23, 42);
   doc.text(`${avgKm} KM/visita`, 145, startY + 14);
