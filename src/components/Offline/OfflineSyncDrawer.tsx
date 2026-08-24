@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
 import {
   WifiOff,
@@ -10,7 +10,9 @@ import {
   Layers,
   ArrowDownCircle,
   ShieldCheck,
+  Download,
 } from 'lucide-react';
+import { OfflineMapDownloadModal } from './OfflineMapDownloadModal';
 
 export const OfflineSyncDrawer: React.FC = () => {
   const {
@@ -24,6 +26,8 @@ export const OfflineSyncDrawer: React.FC = () => {
     activeProject,
     t,
   } = useApp();
+
+  const [isDownloadModalOpen, setIsDownloadModalOpen] = useState(false);
 
   return (
     <div className="h-full overflow-y-auto p-4 space-y-4 max-w-4xl mx-auto text-slate-100 pb-32 sm:pb-16">
@@ -45,7 +49,15 @@ export const OfflineSyncDrawer: React.FC = () => {
           </div>
         </div>
 
-        <div className="flex items-center gap-2 shrink-0">
+        <div className="flex flex-wrap items-center gap-2 shrink-0">
+          <button
+            onClick={() => setIsDownloadModalOpen(true)}
+            className="px-4 py-2 rounded-xl text-xs font-bold bg-emerald-600 hover:bg-emerald-500 text-white flex items-center gap-1.5 shadow-lg transition-all active:scale-95 border border-emerald-400/40"
+          >
+            <Download className="w-4 h-4" />
+            <span>Baixar Mapa Offline</span>
+          </button>
+
           <button
             id="btn-toggle-field-offline-mode"
             onClick={() => setIsOffline(!isOffline)}
@@ -55,7 +67,7 @@ export const OfflineSyncDrawer: React.FC = () => {
                 : 'bg-slate-800 hover:bg-slate-700 text-slate-300'
             }`}
           >
-            {isOffline ? 'Simular Reconexão (Ficar Online)' : 'Simular Modo Campo Sem Internet'}
+            {isOffline ? 'Simular Reconexão (Ficar Online)' : 'Simular Modo Sem Internet'}
           </button>
         </div>
       </div>
@@ -163,6 +175,11 @@ export const OfflineSyncDrawer: React.FC = () => {
           https://amtst.vercel.app/
         </a>
       </footer>
+
+      <OfflineMapDownloadModal
+        isOpen={isDownloadModalOpen}
+        onClose={() => setIsDownloadModalOpen(false)}
+      />
     </div>
   );
 };

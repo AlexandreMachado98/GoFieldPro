@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, useCallback } from 'react';
+import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { useApp } from '../../context/AppContext';
 import { 
   UploadCloud, 
@@ -39,7 +39,8 @@ import {
   Sliders,
   Radio,
   Download,
-  Gauge
+  Gauge,
+  Ruler
 } from 'lucide-react';
 import L from 'leaflet';
 import * as pdfjsLib from 'pdfjs-dist';
@@ -62,6 +63,10 @@ import {
   getDocumentCalibration 
 } from '../../utils/geoTransform';
 import { calculateDistanceMeters } from '../../utils/geoUtils';
+import { MeasurementPoint, MeasurementPointType } from '../../types';
+import { MeasurementControlBar } from '../Map/MeasurementControlBar';
+import { PointDetailModal } from '../Map/PointDetailModal';
+import { MeasurementSummaryModal } from '../Map/MeasurementSummaryModal';
 import { PdfExportModal } from './PdfExportModal';
 
 // Configure PDF.js worker safely
@@ -268,6 +273,7 @@ const compressImageFile = (file: File, maxDim = 800, quality = 0.7): Promise<str
 export const PdfMapNavigator: React.FC = () => {
   const {
     addPdfFile,
+    currentGps,
     notifySuccess,
     notifyError,
     notifyWarning,
@@ -280,9 +286,20 @@ export const PdfMapNavigator: React.FC = () => {
   const [activeDocId, setActiveDocId] = useState<string | null>(null);
   const [isLoadingDocs, setIsLoadingDocs] = useState(true);
 
-  // Tools mode: 'pan', 'add_point', 'draw_track', 'record_track'
-  const [activeTool, setActiveTool] = useState<'pan' | 'add_point' | 'draw_track' | 'record_track'>('pan');
-  const activeToolRef = useRef<'pan' | 'add_point' | 'draw_track' | 'record_track'>('pan');
+  // Tools mode: 'pan', 'add_point', 'draw_track', 'record_track', 'measure'
+  const [activeTool, setActiveTool] = useState<'pan' | 'add_point' | 'draw_track' | 'record_track' | 'measure'>('pan');
+  const activeToolRef = useRef<'pan' | 'add_point' | 'draw_track' | 'record_track' | 'measure'>('pan');
+
+  // Measurement state on PDF sheet
+  const [measurementPoints, setMeasurementPoints] = useState<MeasurementPoint[]>([]);
+  const [currentMeasureType, setCurrentMeasureType] = useState<MeasurementPointType>('standard');
+  const currentMeasureTypeRef = useRef<MeasurementPointType>(currentMeasureType);
+  currentMeasureTypeRef.current = currentMeasureType;
+  const [selectedMeasurePointForEdit, setSelectedMeasurePointForEdit] = useState<{
+    point: MeasurementPoint;
+    index: number;
+  } | null>(null);
+  const [isMeasureSummaryOpen, setIsMeasureSummaryOpen] = useState(false);
 
   // Fullscreen state
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -358,6 +375,7 @@ export const PdfMapNavigator: React.FC = () => {
   const imageOverlayRef = useRef<L.ImageOverlay | null>(null);
   const markersLayerRef = useRef<L.LayerGroup | null>(null);
   const tracksLayerRef = useRef<L.LayerGroup | null>(null);
+  const measureLayerRef = useRef<L.LayerGroup | null>(null);
   const activeDrawPolylineRef = useRef<L.Polyline | null>(null);
   const liveRecordPolylineRef = useRef<L.Polyline | null>(null);
   const targetGuideLineRef = useRef<L.Polyline | null>(null);
@@ -400,6 +418,9 @@ export const PdfMapNavigator: React.FC = () => {
       const markersGroup = L.layerGroup().addTo(map);
       markersLayerRef.current = markersGroup;
 
+      const measureGroup = L.layerGroup().addTo(map);
+      measureLayerRef.current = measureGroup;
+
       // Click listener uses activeToolRef to prevent stale closures
       map.on('click', (e: L.LeafletMouseEvent) => {
         const currentTool = activeToolRef.current;
@@ -417,12 +438,44 @@ export const PdfMapNavigator: React.FC = () => {
             ...prev,
             { x: e.latlng.lat, y: e.latlng.lng, time: new Date().toLocaleTimeString('pt-BR') }
           ]);
+        } else if (currentTool === 'measure') {
+          const activeDoc = documents.find((d) => d.id === activeDocId);
+          const coords = activeDoc
+            ? pdfToGps(e.latlng.lat, e.latlng.lng, activeDoc)
+            : { lat: -23.542, lng: -46.638 };
+
+          const type = currentMeasureTypeRef.current;
+          const ptIndex = measurementPoints.length;
+          let label = `Ponto ${ptIndex + 1}`;
+          if (type === 'stop') {
+            const stopsSoFar = measurementPoints.filter((p) => p.type === 'stop').length;
+            label = `Parada ${stopsSoFar + 1}`;
+          } else if (type === 'hazard') {
+            const hazardsSoFar = measurementPoints.filter((p) => p.type === 'hazard').length;
+            label = `Atenção ${hazardsSoFar + 1}`;
+          }
+
+          const newPt: MeasurementPoint = {
+            id: `pdf-meas-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+            lat: coords.lat,
+            lng: coords.lng,
+            pdfX: e.latlng.lat,
+            pdfY: e.latlng.lng,
+            altitude: 1280,
+            type,
+            label,
+            notes: '',
+            photos: [],
+            timestamp: Date.now(),
+          };
+
+          setMeasurementPoints((prev) => [...prev, newPt]);
         }
       });
     } catch (err) {
       console.warn('Map initialization error:', err);
     }
-  }, []);
+  }, [activeDocId, documents, measurementPoints.length]);
 
   // Initialize Map on mount
   useEffect(() => {
@@ -448,6 +501,7 @@ export const PdfMapNavigator: React.FC = () => {
         imageOverlayRef.current = null;
         markersLayerRef.current = null;
         tracksLayerRef.current = null;
+        measureLayerRef.current = null;
       }
     };
   }, [initializeMap]);
@@ -733,6 +787,181 @@ export const PdfMapNavigator: React.FC = () => {
       });
     }
   }, [activeDoc?.tracks]);
+
+  // Calculate total measurement distance on PDF
+  const totalMeasureDistanceMeters = useMemo(() => {
+    if (measurementPoints.length < 2) return 0;
+    let total = 0;
+    for (let i = 1; i < measurementPoints.length; i++) {
+      total += calculateDistanceMeters(
+        measurementPoints[i - 1].lat,
+        measurementPoints[i - 1].lng,
+        measurementPoints[i].lat,
+        measurementPoints[i].lng
+      );
+    }
+    return total;
+  }, [measurementPoints]);
+
+  // Add GPS point to PDF measurement
+  const handleAddGpsToPdfMeasurement = () => {
+    if (!activeDoc) return;
+    const gpsLat = userGps?.lat || currentGps?.lat;
+    const gpsLng = userGps?.lng || currentGps?.lng;
+    if (!gpsLat || !gpsLng) {
+      notifyWarning('GPS Não Detectado', 'Ative o GPS para marcar sua coordenada na folha.');
+      return;
+    }
+
+    const pdfPos = gpsToPdf(gpsLat, gpsLng, activeDoc);
+    const type = currentMeasureType;
+    const ptIndex = measurementPoints.length;
+    let label = `Ponto GPS ${ptIndex + 1}`;
+    if (type === 'stop') label = `Parada GPS ${ptIndex + 1}`;
+    if (type === 'hazard') label = `Atenção GPS ${ptIndex + 1}`;
+
+    const newPt: MeasurementPoint = {
+      id: `pdf-meas-gps-${Date.now()}`,
+      lat: gpsLat,
+      lng: gpsLng,
+      pdfX: pdfPos.x,
+      pdfY: pdfPos.y,
+      altitude: userGps?.altitude || currentGps?.altitude || 1280,
+      type,
+      label,
+      notes: 'Marcado via GPS na folha PDF',
+      photos: [],
+      timestamp: Date.now(),
+    };
+
+    setMeasurementPoints((prev) => [...prev, newPt]);
+    notifyInfo('Ponto Adicionado', `Coordenada GPS (${gpsLat.toFixed(5)}°, ${gpsLng.toFixed(5)}°) inserida.`);
+  };
+
+  // Render Measurement Overlay on PDF Map
+  useEffect(() => {
+    if (!measureLayerRef.current) return;
+    const group = measureLayerRef.current;
+    group.clearLayers();
+
+    if (measurementPoints.length === 0) return;
+
+    // Draw Polyline along (pdfX, pdfY)
+    if (measurementPoints.length > 1) {
+      const latLngs = measurementPoints
+        .filter((p) => p.pdfX !== undefined && p.pdfY !== undefined)
+        .map((p) => [p.pdfX!, p.pdfY!] as [number, number]);
+
+      if (latLngs.length > 1) {
+        L.polyline(latLngs, {
+          color: '#e11d48',
+          weight: 3.5,
+          dashArray: '6, 6',
+          opacity: 0.95,
+        }).addTo(group);
+
+        // Segment distance badges
+        for (let i = 1; i < measurementPoints.length; i++) {
+          const p1 = measurementPoints[i - 1];
+          const p2 = measurementPoints[i];
+          if (p1.pdfX !== undefined && p1.pdfY !== undefined && p2.pdfX !== undefined && p2.pdfY !== undefined) {
+            const segDist = calculateDistanceMeters(p1.lat, p1.lng, p2.lat, p2.lng);
+            const segFormatted =
+              segDist >= 1000 ? `${(segDist / 1000).toFixed(2)} km` : `${Math.round(segDist)} m`;
+            const midX = (p1.pdfX + p2.pdfX) / 2;
+            const midY = (p1.pdfY + p2.pdfY) / 2;
+
+            const pillIcon = L.divIcon({
+              className: 'pdf-measure-seg-pill',
+              html: `
+                <div style="
+                  background: rgba(15, 23, 42, 0.9);
+                  border: 1.5px solid #f43f5e;
+                  color: #ffffff;
+                  font-weight: 800;
+                  font-size: 10px;
+                  padding: 2px 6px;
+                  border-radius: 9999px;
+                  box-shadow: 0 2px 6px rgba(0,0,0,0.5);
+                  white-space: nowrap;
+                  transform: translate(-50%, -50%);
+                ">
+                  ${segFormatted}
+                </div>
+              `,
+              iconSize: [0, 0],
+              iconAnchor: [0, 0],
+            });
+
+            L.marker([midX, midY], { icon: pillIcon, interactive: false }).addTo(group);
+          }
+        }
+      }
+    }
+
+    // Draw styled point markers on (pdfX, pdfY)
+    measurementPoints.forEach((pt, idx) => {
+      if (pt.pdfX === undefined || pt.pdfY === undefined) return;
+      let bgColor = '#0284c7';
+      let iconSymbol = `${idx + 1}`;
+
+      if (pt.type === 'stop') {
+        bgColor = '#10b981';
+        iconSymbol = `🛑 ${idx + 1}`;
+      } else if (pt.type === 'hazard') {
+        bgColor = '#f59e0b';
+        iconSymbol = `⚠️ ${idx + 1}`;
+      }
+
+      const pointIcon = L.divIcon({
+        className: 'custom-pdf-measure-marker',
+        html: `
+          <div style="position: relative; display: flex; flex-direction: column; align-items: center; cursor: pointer;">
+            <div style="
+              min-width: 26px;
+              height: 26px;
+              padding: 0 4px;
+              border-radius: 13px;
+              background-color: ${bgColor};
+              border: 2px solid #ffffff;
+              box-shadow: 0 4px 10px rgba(0,0,0,0.6);
+              color: white;
+              font-weight: 800;
+              font-size: 10px;
+              display: flex;
+              align-items: center;
+              justify-content: center;
+            ">
+              ${iconSymbol}
+            </div>
+            <div style="
+              margin-top: 2px;
+              background: rgba(15, 23, 42, 0.85);
+              border: 1px solid rgba(255, 255, 255, 0.2);
+              color: #f1f5f9;
+              font-size: 9px;
+              font-weight: 600;
+              padding: 1px 4px;
+              border-radius: 4px;
+              white-space: nowrap;
+            ">
+              ${pt.label || `Ponto ${idx + 1}`}
+            </div>
+          </div>
+        `,
+        iconSize: [26, 38],
+        iconAnchor: [13, 13],
+      });
+
+      const marker = L.marker([pt.pdfX, pt.pdfY], { icon: pointIcon, zIndexOffset: 500 });
+      marker.on('click', (e) => {
+        L.DomEvent.stopPropagation(e);
+        setSelectedMeasurePointForEdit({ point: pt, index: idx });
+      });
+
+      marker.addTo(group);
+    });
+  }, [measurementPoints]);
 
   // Render Active Drawing Track
   useEffect(() => {
@@ -1652,6 +1881,24 @@ export const PdfMapNavigator: React.FC = () => {
         </div>
       )}
 
+      {/* Measurement Active Floating HUD */}
+      {activeTool === 'measure' && (
+        <MeasurementControlBar
+          points={measurementPoints}
+          currentType={currentMeasureType}
+          setCurrentType={setCurrentMeasureType}
+          totalDistanceMeters={totalMeasureDistanceMeters}
+          onAddCurrentGpsPoint={handleAddGpsToPdfMeasurement}
+          onUndoLastPoint={() => setMeasurementPoints((prev) => prev.slice(0, -1))}
+          onClearMeasurement={() => {
+            setMeasurementPoints([]);
+            notifyInfo('Medição Limpa', 'Todos os pontos foram removidos.');
+          }}
+          onFinishMeasurement={() => setIsMeasureSummaryOpen(true)}
+          onClose={() => setActiveTool('pan')}
+        />
+      )}
+
       {/* Main Map Canvas Area */}
       <div className="flex-1 w-full h-full relative bg-[#0f172a] overflow-hidden">
         {/* Leaflet Map DOM Node - Always mounted */}
@@ -1928,6 +2175,32 @@ export const PdfMapNavigator: React.FC = () => {
               >
                 <Footprints className="w-5 h-5 text-rose-400 mb-0.5" />
                 <span className="text-[10px] font-extrabold tracking-tight">Gravar</span>
+              </button>
+
+              {/* Medir Distância / Régua */}
+              <button
+                onClick={() => {
+                  if (activeTool === 'measure' && measurementPoints.length > 0) {
+                    setIsMeasureSummaryOpen(true);
+                  } else {
+                    setActiveTool('measure');
+                    setCurrentTrackPoints([]);
+                  }
+                }}
+                title="Régua Geodésica de Medição na Folha PDF"
+                className={`flex flex-col items-center justify-center p-2.5 rounded-xl transition-all active:scale-95 relative ${
+                  activeTool === 'measure'
+                    ? 'bg-rose-600 text-white shadow-lg shadow-rose-950/60 ring-2 ring-rose-400'
+                    : 'text-slate-400 hover:text-rose-400 hover:bg-slate-800/60'
+                }`}
+              >
+                <Ruler className="w-5 h-5 text-rose-400 mb-0.5" />
+                <span className="text-[10px] font-extrabold tracking-tight">Medir</span>
+                {measurementPoints.length > 0 && (
+                  <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-amber-500 text-slate-950 text-[9px] font-black flex items-center justify-center">
+                    {measurementPoints.length}
+                  </span>
+                )}
               </button>
 
               <div className="w-full h-px bg-slate-800 my-0.5" />
@@ -2676,6 +2949,34 @@ export const PdfMapNavigator: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* Measurement Point Detail Modal */}
+      <PointDetailModal
+        isOpen={selectedMeasurePointForEdit !== null}
+        point={selectedMeasurePointForEdit?.point || null}
+        pointIndex={selectedMeasurePointForEdit?.index ?? 0}
+        onClose={() => setSelectedMeasurePointForEdit(null)}
+        onSave={(updated) => {
+          setMeasurementPoints((prev) =>
+            prev.map((pt) => (pt.id === updated.id ? updated : pt))
+          );
+          notifySuccess('Ponto Atualizado', `Informações de ${updated.label} foram salvas.`);
+        }}
+        onDeletePoint={(id) => setMeasurementPoints((prev) => prev.filter((p) => p.id !== id))}
+      />
+
+      {/* Measurement Summary & PDF Dossier Modal */}
+      <MeasurementSummaryModal
+        isOpen={isMeasureSummaryOpen}
+        onClose={() => setIsMeasureSummaryOpen(false)}
+        points={measurementPoints}
+        totalDistanceMeters={totalMeasureDistanceMeters}
+        onEditPoint={(pt, idx) => {
+          setIsMeasureSummaryOpen(false);
+          setSelectedMeasurePointForEdit({ point: pt, index: idx });
+        }}
+        onResetMeasurement={() => setMeasurementPoints([])}
+      />
 
     </div>
   );

@@ -275,3 +275,31 @@ export interface AppSettings {
   photoQuality: 'high' | 'medium' | 'low';
 }
 
+export type MeasurementPointType = 'standard' | 'stop' | 'hazard';
+
+export interface MeasurementPoint {
+  id: string;
+  lat: number;
+  lng: number;
+  pdfX?: number;
+  pdfY?: number;
+  altitude?: number;
+  type: MeasurementPointType;
+  label: string;
+  notes?: string;
+  photos: string[];
+  timestamp: number;
+}
+
+export interface MeasurementSession {
+  id: string;
+  name: string;
+  points: MeasurementPoint[];
+  totalDistanceMeters: number;
+  segmentDistancesMeters: number[];
+  createdAt: string;
+  technicianName: string;
+  projectName: string;
+}
+
+
