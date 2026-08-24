@@ -557,6 +557,12 @@ export const PdfMapNavigator: React.FC = () => {
         currentPage: 0,
         width: sample.width,
         height: sample.height,
+        calibration: createCenteredCalibration(
+          { id: '', name: '', fileName: '', fileSize: '', dataUrls: [], pageCount: 1, currentPage: 0, width: sample.width, height: sample.height, markers: [], tracks: [], uploadedAt: '' },
+          currentGps?.lat || -20.2541,
+          currentGps?.lng || -46.5823,
+          0.75
+        ),
         markers: [],
         tracks: [],
         uploadedAt: new Date().toLocaleDateString('pt-BR'),

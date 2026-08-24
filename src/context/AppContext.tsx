@@ -93,6 +93,7 @@ interface AppContextType {
   hasGpsLock: boolean;
   setIsGpsSimulated: (sim: boolean) => void;
   requestCurrentLocation: () => Promise<GeoCoordinate | null>;
+  setManualGpsLocation: (coord: GeoCoordinate) => void;
   isRecordingTrack: boolean;
   isRecordingPaused: boolean;
   activeTrack: Track | null;
@@ -456,13 +457,33 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   }, [activeProject]);
 
   // Real or Simulated GPS Position loop
-  const requestCurrentLocation = useCallback((): Promise<GeoCoordinate | null> => {
-    return new Promise((resolve) => {
-      if (!navigator.geolocation) {
-        resolve(null);
-        return;
-      }
+  const setManualGpsLocation = useCallback(
+    (coord: GeoCoordinate) => {
+      const updatedCoord: GeoCoordinate = {
+        lat: coord.lat,
+        lng: coord.lng,
+        altitude: coord.altitude || 1250,
+        accuracy: coord.accuracy || 1.0,
+        timestamp: Date.now(),
+      };
+      setCurrentGps(updatedCoord);
+      setHasGpsLock(true);
+      notifySuccess(
+        'Posição Calibrada',
+        `Coordenadas definidas para Lat: ${coord.lat.toFixed(5)}°, Lng: ${coord.lng.toFixed(5)}°`
+      );
+    },
+    [notifySuccess]
+  );
 
+  const requestCurrentLocation = useCallback(async (): Promise<GeoCoordinate | null> => {
+    if (!navigator.geolocation) {
+      notifyWarning('GPS Não Suportado', 'Geolocalização não é suportada neste navegador.');
+      return null;
+    }
+
+    return new Promise((resolve) => {
+      // 1. First try High Accuracy (GNSS/GPS sensor)
       navigator.geolocation.getCurrentPosition(
         (pos) => {
           const coord: GeoCoordinate = {
@@ -478,55 +499,86 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         },
         (err) => {
           console.warn('High accuracy location failed, attempting standard accuracy:', err);
+          // 2. Fallback to Standard Accuracy (Cell tower / Wi-Fi)
           navigator.geolocation.getCurrentPosition(
             (fallbackPos) => {
               const coord: GeoCoordinate = {
                 lat: fallbackPos.coords.latitude,
                 lng: fallbackPos.coords.longitude,
                 altitude: fallbackPos.coords.altitude || 1250,
-                accuracy: +(fallbackPos.coords.accuracy || 8.0).toFixed(1),
+                accuracy: +(fallbackPos.coords.accuracy || 10.0).toFixed(1),
                 timestamp: Date.now(),
               };
               setCurrentGps(coord);
               setHasGpsLock(true);
               resolve(coord);
             },
-            (finalErr) => {
-              console.warn('Final geolocation error:', finalErr);
+            async (finalErr) => {
+              console.warn('Standard geolocation error, trying IP fallback:', finalErr);
+              try {
+                // 3. Fallback to IP Geolocation API if browser GPS is blocked/unsupported on desktop
+                const res = await fetch('https://ipwho.is/');
+                if (res.ok) {
+                  const data = await res.json();
+                  if (data && data.success && typeof data.latitude === 'number' && typeof data.longitude === 'number') {
+                    const coord: GeoCoordinate = {
+                      lat: data.latitude,
+                      lng: data.longitude,
+                      altitude: 700,
+                      accuracy: 1500,
+                      timestamp: Date.now(),
+                    };
+                    setCurrentGps(coord);
+                    setHasGpsLock(true);
+                    resolve(coord);
+                    return;
+                  }
+                }
+              } catch (ipErr) {
+                console.warn('IP fallback failed:', ipErr);
+              }
               resolve(null);
             },
-            { enableHighAccuracy: false, timeout: 6000 }
+            { enableHighAccuracy: false, timeout: 8000, maximumAge: 60000 }
           );
         },
-        { enableHighAccuracy: true, timeout: 7000, maximumAge: 0 }
+        { enableHighAccuracy: true, timeout: 8000, maximumAge: 0 }
       );
     });
-  }, []);
+  }, [notifyWarning]);
 
   useEffect(() => {
     let watchId: number | null = null;
 
     if (!isGpsSimulated && navigator.geolocation) {
-      // 1. Kickstart immediately without waiting for watchPosition first interval
+      // 1. Kickstart immediately
       requestCurrentLocation();
 
-      // 2. Continuous watch position
-      watchId = navigator.geolocation.watchPosition(
-        (pos) => {
-          setCurrentGps({
-            lat: pos.coords.latitude,
-            lng: pos.coords.longitude,
-            altitude: pos.coords.altitude || 1250,
-            accuracy: +(pos.coords.accuracy || 2.0).toFixed(1),
-            timestamp: Date.now(),
-          });
-          setHasGpsLock(true);
-        },
-        (err) => {
-          console.warn('Geolocation watcher warning:', err);
-        },
-        { enableHighAccuracy: true, timeout: 15000, maximumAge: 3000 }
-      );
+      // 2. Continuous watch position with auto-reconnect fallback
+      const startWatch = (highAccuracy: boolean) => {
+        return navigator.geolocation.watchPosition(
+          (pos) => {
+            setCurrentGps({
+              lat: pos.coords.latitude,
+              lng: pos.coords.longitude,
+              altitude: pos.coords.altitude || 1250,
+              accuracy: +(pos.coords.accuracy || 2.0).toFixed(1),
+              timestamp: Date.now(),
+            });
+            setHasGpsLock(true);
+          },
+          (err) => {
+            console.warn(`Geolocation watcher warning (highAccuracy=${highAccuracy}):`, err);
+            if (highAccuracy && watchId !== null) {
+              navigator.geolocation.clearWatch(watchId);
+              watchId = startWatch(false);
+            }
+          },
+          { enableHighAccuracy: highAccuracy, timeout: 15000, maximumAge: highAccuracy ? 2000 : 10000 }
+        );
+      };
+
+      watchId = startWatch(true);
     } else if (isGpsSimulated) {
       // Gentle field surveyor wander simulation around active project
       const interval = setInterval(() => {
@@ -1066,6 +1118,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         hasGpsLock,
         setIsGpsSimulated,
         requestCurrentLocation,
+        setManualGpsLocation,
         isRecordingTrack,
         isRecordingPaused,
         activeTrack,

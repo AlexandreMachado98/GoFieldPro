@@ -25,6 +25,7 @@ import {
   Activity,
   Play,
   Square,
+  MapPin,
 } from 'lucide-react';
 import { MeasurementControlBar } from './MeasurementControlBar';
 import { PointDetailModal } from './PointDetailModal';
@@ -56,7 +57,9 @@ export const MapViewer: React.FC = () => {
     activeTrack,
     currentGps,
     hasGpsLock,
+    isGpsSimulated,
     requestCurrentLocation,
+    setManualGpsLocation,
     teamMembers,
     navigateToWaypoint,
     setIsAddWaypointModalOpen,
@@ -73,6 +76,8 @@ export const MapViewer: React.FC = () => {
     stopTrackRecording,
     notifySuccess,
     notifyInfo,
+    notifyWarning,
+    notifyError,
   } = useApp();
 
   const mapContainerRef = useRef<HTMLDivElement>(null);
@@ -87,6 +92,7 @@ export const MapViewer: React.FC = () => {
   const lastProjectIdRef = useRef<string>(activeProject.id);
 
   const [isLocating, setIsLocating] = useState<boolean>(false);
+  const [isCalibratingGps, setIsCalibratingGps] = useState<boolean>(false);
   const [measurementPoints, setMeasurementPoints] = useState<MeasurementPoint[]>([]);
   const [currentMeasureType, setCurrentMeasureType] = useState<MeasurementPointType>('standard');
   const [selectedPointForEdit, setSelectedPointForEdit] = useState<{
@@ -96,9 +102,12 @@ export const MapViewer: React.FC = () => {
   const [isSummaryModalOpen, setIsSummaryModalOpen] = useState<boolean>(false);
   const [isOfflineModalOpen, setIsOfflineModalOpen] = useState<boolean>(false);
 
-  // Ref to keep current measurement type accessible in Leaflet event listeners
+  // Ref to keep current measurement type and calibration state accessible in Leaflet event listeners
   const currentMeasureTypeRef = useRef<MeasurementPointType>(currentMeasureType);
   currentMeasureTypeRef.current = currentMeasureType;
+
+  const isCalibratingGpsRef = useRef<boolean>(isCalibratingGps);
+  isCalibratingGpsRef.current = isCalibratingGps;
 
   // Initialize Leaflet Map
   useEffect(() => {
@@ -161,11 +170,13 @@ export const MapViewer: React.FC = () => {
   useEffect(() => {
     if (!mapInstanceRef.current) return;
     if (!hasAutoCenteredRef.current && hasGpsLock && !userInteractedRef.current) {
-      const currentZoom = mapInstanceRef.current.getZoom() || 16;
-      mapInstanceRef.current.setView([currentGps.lat, currentGps.lng], Math.max(currentZoom, 16));
+      const currentZoom = mapInstanceRef.current.getZoom() || 17;
+      mapInstanceRef.current.flyTo([currentGps.lat, currentGps.lng], Math.max(currentZoom, 17), {
+        duration: 1.0,
+      });
       hasAutoCenteredRef.current = true;
     }
-  }, [hasGpsLock]);
+  }, [hasGpsLock, currentGps.lat, currentGps.lng]);
 
   // Update Basemap Tiles without altering view or zoom
   useEffect(() => {
@@ -424,17 +435,30 @@ export const MapViewer: React.FC = () => {
     if (!mapInstanceRef.current) return;
     const map = mapInstanceRef.current;
 
+    // Do NOT show fake user location marker if GPS lock is not acquired and simulation is off
+    if (!hasGpsLock && !isGpsSimulated) {
+      if (userMarkerRef.current) {
+        map.removeLayer(userMarkerRef.current);
+        userMarkerRef.current = null;
+      }
+      if (userAccuracyCircleRef.current) {
+        map.removeLayer(userAccuracyCircleRef.current);
+        userAccuracyCircleRef.current = null;
+      }
+      return;
+    }
+
     if (!userMarkerRef.current) {
       const userIcon = L.divIcon({
         className: 'custom-user-gps-dot',
         html: `
-          <div style="position: relative; width: 20px; height: 20px; display: flex; align-items: center; justify-content: center;">
-            <div style="position: absolute; width: 20px; height: 20px; border-radius: 50%; background-color: #38bdf8; opacity: 0.75; animation: ping 1.5s cubic-bezier(0, 0, 0.2, 1) infinite;"></div>
-            <div style="position: relative; width: 12px; height: 12px; border-radius: 50%; background-color: #0284c7; border: 2px solid white; box-shadow: 0 0 8px rgba(2, 132, 199, 0.8);"></div>
+          <div style="position: relative; width: 24px; height: 24px; display: flex; align-items: center; justify-content: center;">
+            <div style="position: absolute; width: 24px; height: 24px; border-radius: 50%; background-color: #38bdf8; opacity: 0.75; animation: ping 1.5s cubic-bezier(0, 0, 0.2, 1) infinite;"></div>
+            <div style="position: relative; width: 14px; height: 14px; border-radius: 50%; background-color: #0284c7; border: 2.5px solid white; box-shadow: 0 0 10px rgba(2, 132, 199, 0.9);"></div>
           </div>
         `,
-        iconSize: [20, 20],
-        iconAnchor: [10, 10],
+        iconSize: [24, 24],
+        iconAnchor: [12, 12],
       });
 
       userMarkerRef.current = L.marker([currentGps.lat, currentGps.lng], {
@@ -456,7 +480,7 @@ export const MapViewer: React.FC = () => {
         userAccuracyCircleRef.current.setRadius(currentGps.accuracy || 5);
       }
     }
-  }, [currentGps, hasGpsLock]);
+  }, [currentGps, hasGpsLock, isGpsSimulated]);
 
   // Calculate Total Measurement Distance
   const totalDistanceMeters = useMemo(() => {
@@ -479,6 +503,20 @@ export const MapViewer: React.FC = () => {
     const map = mapInstanceRef.current;
 
     const handleMapClick = (e: L.LeafletMouseEvent) => {
+      // 1. If in GPS Calibration Mode, pin user location exactly where clicked
+      if (isCalibratingGpsRef.current) {
+        setManualGpsLocation({
+          lat: e.latlng.lat,
+          lng: e.latlng.lng,
+          altitude: currentGps.altitude || 1250,
+          accuracy: 1.0,
+          timestamp: Date.now(),
+        });
+        setIsCalibratingGps(false);
+        map.flyTo([e.latlng.lat, e.latlng.lng], Math.max(map.getZoom(), 17));
+        return;
+      }
+
       if (!isMeasuring) return;
 
       // If user has >= 2 points and clicks near the starting point (< 25m), snap directly to close loop
@@ -704,7 +742,20 @@ export const MapViewer: React.FC = () => {
     setMeasurementPoints((prev) => [...prev, closePt]);
     notifySuccess('Perímetro Fechado', 'Traçado conectado com precisão cirúrgica ao ponto inicial.');
   };
-  const handleAddCurrentGpsPoint = () => {
+  const handleAddCurrentGpsPoint = async () => {
+    if (!hasGpsLock && !isGpsSimulated) {
+      setIsLocating(true);
+      const loc = await requestCurrentLocation();
+      setIsLocating(false);
+      if (!loc) {
+        notifyWarning(
+          'GPS Não Fixado',
+          'Permita o GPS no navegador ou clique no botão de calibrar para definir sua posição no mapa.'
+        );
+        return;
+      }
+    }
+
     const type = currentMeasureType;
     const pointIndex = measurementPoints.length;
     let label = `Ponto GPS ${pointIndex + 1}`;
@@ -752,9 +803,10 @@ export const MapViewer: React.FC = () => {
     setIsLocating(true);
     userInteractedRef.current = true;
 
-    const currentZoom = Math.max(mapInstanceRef.current.getZoom(), 16);
+    const currentZoom = Math.max(mapInstanceRef.current.getZoom(), 17);
 
-    if (currentGps && currentGps.lat) {
+    // If we ALREADY have a real GPS lock, fly there immediately
+    if (hasGpsLock && currentGps && currentGps.lat) {
       mapInstanceRef.current.flyTo([currentGps.lat, currentGps.lng], currentZoom, {
         duration: 0.8,
       });
@@ -764,9 +816,16 @@ export const MapViewer: React.FC = () => {
       const loc = await requestCurrentLocation();
       if (loc && mapInstanceRef.current) {
         mapInstanceRef.current.flyTo([loc.lat, loc.lng], currentZoom, { duration: 0.8 });
+        notifySuccess('GPS Localizado', `Posição fixada com precisão de ±${loc.accuracy || 2}m.`);
+      } else {
+        notifyWarning(
+          'Permissão de GPS Necessária',
+          'Permita o acesso à localização no navegador ou use o botão 📍 para calibrar sua posição manualmente no mapa.'
+        );
       }
     } catch (err) {
       console.warn('Center GPS error:', err);
+      notifyError('Erro de GPS', 'Não foi possível obter sinal de satélite.');
     } finally {
       setIsLocating(false);
     }
@@ -861,12 +920,26 @@ export const MapViewer: React.FC = () => {
         </div>
       </div>
 
+      {/* Active GPS Manual Calibration Overlay Banner */}
+      {isCalibratingGps && (
+        <div className="absolute top-16 left-1/2 -translate-x-1/2 z-30 bg-amber-500 text-slate-950 font-black px-4 py-2 rounded-2xl shadow-2xl flex items-center gap-3 border-2 border-amber-300 animate-pulse pointer-events-auto">
+          <MapPin className="w-5 h-5 text-slate-950 animate-bounce" />
+          <span className="text-xs sm:text-sm">Clique no mapa no ponto exato da sua posição real para calibrar</span>
+          <button
+            onClick={() => setIsCalibratingGps(false)}
+            className="px-2.5 py-1 bg-slate-950 text-white rounded-lg text-xs font-bold hover:bg-slate-800 transition-colors"
+          >
+            Cancelar
+          </button>
+        </div>
+      )}
+
       {/* Floating Tactical Map Controls (Right Side) */}
       <div className="absolute top-3 right-3 z-10 flex flex-col gap-2 pointer-events-auto">
         <button
           id="btn-center-gps"
           onClick={centerOnGps}
-          title="Centralizar no GPS"
+          title="Centralizar no GPS (Minha Localização)"
           className="w-10 h-10 rounded-lg bg-slate-900/90 hover:bg-slate-800 text-sky-400 border border-slate-800 shadow-xl flex items-center justify-center transition-all hover:scale-105 active:scale-95"
         >
           {isLocating ? (
@@ -874,6 +947,19 @@ export const MapViewer: React.FC = () => {
           ) : (
             <Crosshair className="w-5 h-5" />
           )}
+        </button>
+
+        <button
+          id="btn-calibrate-gps"
+          onClick={() => setIsCalibratingGps(!isCalibratingGps)}
+          title={isCalibratingGps ? 'Cancelar Calibração' : 'Calibrar Posição Manualmente no Mapa'}
+          className={`w-10 h-10 rounded-lg border shadow-xl flex items-center justify-center transition-all hover:scale-105 active:scale-95 ${
+            isCalibratingGps
+              ? 'bg-amber-500 text-slate-950 border-amber-400 shadow-amber-900/50 animate-bounce'
+              : 'bg-slate-900/90 hover:bg-slate-800 text-amber-400 border-slate-800'
+          }`}
+        >
+          <MapPin className="w-5 h-5" />
         </button>
 
         <button
