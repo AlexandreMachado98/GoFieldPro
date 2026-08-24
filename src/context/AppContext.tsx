@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef, ReactNode, useCallback } from 'react';
 import { saveAppState, loadAppState } from '../utils/stateStorage';
 import {
   ProjectFolder,
@@ -91,9 +91,11 @@ interface AppContextType {
   currentGps: GeoCoordinate;
   isGpsSimulated: boolean;
   hasGpsLock: boolean;
+  isManualGpsLocked: boolean;
   setIsGpsSimulated: (sim: boolean) => void;
   requestCurrentLocation: () => Promise<GeoCoordinate | null>;
   setManualGpsLocation: (coord: GeoCoordinate) => void;
+  unlockDeviceGps: () => void;
   isRecordingTrack: boolean;
   isRecordingPaused: boolean;
   activeTrack: Track | null;
@@ -208,16 +210,44 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const [waypoints, setWaypoints] = useState<Waypoint[]>(initialWaypoints);
   const [savedTracks, setSavedTracks] = useState<Track[]>(initialTracks);
 
+  const [isManualGpsLocked, setIsManualGpsLocked] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem('geofield_manual_gps_locked') === 'true';
+    } catch {
+      return false;
+    }
+  });
+  const isManualGpsLockedRef = useRef<boolean>(isManualGpsLocked);
+  isManualGpsLockedRef.current = isManualGpsLocked;
+
   // Live GPS Tracking & Simulation
-  const [currentGps, setCurrentGps] = useState<GeoCoordinate>({
-    lat: -20.2541,
-    lng: -46.5823,
-    altitude: 1280,
-    accuracy: 1.8,
-    timestamp: Date.now(),
+  const [currentGps, setCurrentGps] = useState<GeoCoordinate>(() => {
+    try {
+      const isLocked = localStorage.getItem('geofield_manual_gps_locked') === 'true';
+      const savedCoord = localStorage.getItem('geofield_manual_gps_coord');
+      if (isLocked && savedCoord) {
+        const parsed = JSON.parse(savedCoord);
+        if (typeof parsed.lat === 'number' && typeof parsed.lng === 'number') {
+          return parsed;
+        }
+      }
+    } catch {}
+    return {
+      lat: -20.2541,
+      lng: -46.5823,
+      altitude: 1280,
+      accuracy: 1.8,
+      timestamp: Date.now(),
+    };
   });
   const [isGpsSimulated, setIsGpsSimulated] = useState<boolean>(false);
-  const [hasGpsLock, setHasGpsLock] = useState<boolean>(false);
+  const [hasGpsLock, setHasGpsLock] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem('geofield_manual_gps_locked') === 'true';
+    } catch {
+      return false;
+    }
+  });
 
   // Track Recording
   const [isRecordingTrack, setIsRecordingTrack] = useState<boolean>(false);
@@ -468,9 +498,17 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       };
       setCurrentGps(updatedCoord);
       setHasGpsLock(true);
+      setIsManualGpsLocked(true);
+      isManualGpsLockedRef.current = true;
+      try {
+        localStorage.setItem('geofield_manual_gps_locked', 'true');
+        localStorage.setItem('geofield_manual_gps_coord', JSON.stringify(updatedCoord));
+      } catch (e) {
+        console.warn('Failed to save manual GPS to localStorage', e);
+      }
       notifySuccess(
-        'Posição Calibrada',
-        `Coordenadas definidas para Lat: ${coord.lat.toFixed(5)}°, Lng: ${coord.lng.toFixed(5)}°`
+        'Posição Calibrada e Fixada',
+        `GPS travado manualmente em Lat: ${coord.lat.toFixed(5)}°, Lng: ${coord.lng.toFixed(5)}°`
       );
     },
     [notifySuccess]
@@ -482,10 +520,16 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       return null;
     }
 
+    // If manual GPS is locked, return the user's calibrated coordinate
+    if (isManualGpsLockedRef.current) {
+      return currentGps;
+    }
+
     return new Promise((resolve) => {
       // 1. First try High Accuracy (GNSS/GPS sensor)
       navigator.geolocation.getCurrentPosition(
         (pos) => {
+          if (isManualGpsLockedRef.current) return;
           const coord: GeoCoordinate = {
             lat: pos.coords.latitude,
             lng: pos.coords.longitude,
@@ -502,6 +546,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
           // 2. Fallback to Standard Accuracy (Cell tower / Wi-Fi)
           navigator.geolocation.getCurrentPosition(
             (fallbackPos) => {
+              if (isManualGpsLockedRef.current) return;
               const coord: GeoCoordinate = {
                 lat: fallbackPos.coords.latitude,
                 lng: fallbackPos.coords.longitude,
@@ -515,12 +560,14 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
             },
             async (finalErr) => {
               console.warn('Standard geolocation error, trying IP fallback:', finalErr);
+              if (isManualGpsLockedRef.current) return;
               try {
                 // 3. Fallback to IP Geolocation API if browser GPS is blocked/unsupported on desktop
                 const res = await fetch('https://ipwho.is/');
                 if (res.ok) {
                   const data = await res.json();
                   if (data && data.success && typeof data.latitude === 'number' && typeof data.longitude === 'number') {
+                    if (isManualGpsLockedRef.current) return;
                     const coord: GeoCoordinate = {
                       lat: data.latitude,
                       lng: data.longitude,
@@ -545,19 +592,35 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         { enableHighAccuracy: true, timeout: 8000, maximumAge: 0 }
       );
     });
-  }, [notifyWarning]);
+  }, [notifyWarning, currentGps]);
+
+  const unlockDeviceGps = useCallback(() => {
+    setIsManualGpsLocked(false);
+    isManualGpsLockedRef.current = false;
+    try {
+      localStorage.removeItem('geofield_manual_gps_locked');
+      localStorage.removeItem('geofield_manual_gps_coord');
+    } catch {}
+    notifyInfo('GPS em Tempo Real', 'Reconectando aos satélites do seu aparelho...');
+    requestCurrentLocation();
+  }, [notifyInfo, requestCurrentLocation]);
 
   useEffect(() => {
     let watchId: number | null = null;
 
     if (!isGpsSimulated && navigator.geolocation) {
-      // 1. Kickstart immediately
-      requestCurrentLocation();
+      // 1. Kickstart immediately if not manually locked
+      if (!isManualGpsLockedRef.current) {
+        requestCurrentLocation();
+      }
 
       // 2. Continuous watch position with auto-reconnect fallback
       const startWatch = (highAccuracy: boolean) => {
         return navigator.geolocation.watchPosition(
           (pos) => {
+            // If the user locked their position manually, do NOT overwrite it!
+            if (isManualGpsLockedRef.current) return;
+
             setCurrentGps({
               lat: pos.coords.latitude,
               lng: pos.coords.longitude,
@@ -569,7 +632,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
           },
           (err) => {
             console.warn(`Geolocation watcher warning (highAccuracy=${highAccuracy}):`, err);
-            if (highAccuracy && watchId !== null) {
+            if (highAccuracy && watchId !== null && !isManualGpsLockedRef.current) {
               navigator.geolocation.clearWatch(watchId);
               watchId = startWatch(false);
             }
@@ -582,6 +645,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     } else if (isGpsSimulated) {
       // Gentle field surveyor wander simulation around active project
       const interval = setInterval(() => {
+        if (isManualGpsLockedRef.current) return;
+
         setCurrentGps((prev) => {
           const deltaLat = (Math.random() - 0.5) * 0.00015;
           const deltaLng = (Math.random() - 0.5) * 0.00015;
@@ -1116,9 +1181,11 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         currentGps,
         isGpsSimulated,
         hasGpsLock,
+        isManualGpsLocked,
         setIsGpsSimulated,
         requestCurrentLocation,
         setManualGpsLocation,
+        unlockDeviceGps,
         isRecordingTrack,
         isRecordingPaused,
         activeTrack,

@@ -57,9 +57,11 @@ export const MapViewer: React.FC = () => {
     activeTrack,
     currentGps,
     hasGpsLock,
+    isManualGpsLocked,
     isGpsSimulated,
     requestCurrentLocation,
     setManualGpsLocation,
+    unlockDeviceGps,
     teamMembers,
     navigateToWaypoint,
     setIsAddWaypointModalOpen,
@@ -805,6 +807,16 @@ export const MapViewer: React.FC = () => {
 
     const currentZoom = Math.max(mapInstanceRef.current.getZoom(), 17);
 
+    // If GPS is manually calibrated and locked, fly directly there without querying browser IP
+    if (isManualGpsLocked && currentGps && currentGps.lat) {
+      mapInstanceRef.current.flyTo([currentGps.lat, currentGps.lng], currentZoom, {
+        duration: 0.8,
+      });
+      notifySuccess('GPS Calibrado', `Centralizado na posição fixada: ${currentGps.lat.toFixed(5)}°, ${currentGps.lng.toFixed(5)}°`);
+      setIsLocating(false);
+      return;
+    }
+
     // If we ALREADY have a real GPS lock, fly there immediately
     if (hasGpsLock && currentGps && currentGps.lat) {
       mapInstanceRef.current.flyTo([currentGps.lat, currentGps.lng], currentZoom, {
@@ -868,12 +880,16 @@ export const MapViewer: React.FC = () => {
           <div className="flex items-center gap-2">
             <div
               className={`w-2.5 h-2.5 rounded-full ${
-                hasGpsLock ? 'bg-emerald-500 animate-pulse' : 'bg-amber-500 animate-ping'
+                isManualGpsLocked
+                  ? 'bg-amber-400'
+                  : hasGpsLock
+                  ? 'bg-emerald-500 animate-pulse'
+                  : 'bg-amber-500 animate-ping'
               }`}
             ></div>
             <div>
-              <div className="text-[10px] text-slate-400 uppercase font-semibold">
-                Posição GPS Atual
+              <div className="text-[10px] text-slate-400 uppercase font-semibold flex items-center gap-1.5">
+                {isManualGpsLocked ? '📌 Posição Calibrada' : 'Posição GPS Atual'}
               </div>
               {hasGpsLock ? (
                 <div className="font-mono font-bold text-slate-100">
@@ -886,6 +902,16 @@ export const MapViewer: React.FC = () => {
               )}
             </div>
           </div>
+
+          {isManualGpsLocked && (
+            <button
+              onClick={unlockDeviceGps}
+              title="Alternar para GPS Automático do Dispositivo"
+              className="text-[10px] bg-slate-800 hover:bg-slate-700 text-sky-400 font-bold px-2 py-1 rounded border border-slate-700 transition-colors flex items-center gap-1"
+            >
+              <span>🛰️ Usar GPS Automático</span>
+            </button>
+          )}
 
           <div className="h-6 w-px bg-slate-800"></div>
 
