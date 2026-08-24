@@ -56,9 +56,10 @@ export const NavigationHUD: React.FC = () => {
                 id="btn-nav-cancel"
                 onClick={cancelNavigation}
                 title={t.cancelNav}
-                className="p-1 rounded bg-rose-500/20 hover:bg-rose-500/30 text-rose-300 text-xs transition-colors ml-2"
+                className="px-3 py-1.5 rounded-lg bg-rose-500 hover:bg-rose-600 text-white font-extrabold text-[10px] uppercase tracking-wider flex items-center gap-1.5 transition-all shadow-md active:scale-95 ml-2"
               >
-                <X className="w-4 h-4" />
+                <X className="w-3.5 h-3.5" />
+                <span>Parar</span>
               </button>
             </div>
           </div>

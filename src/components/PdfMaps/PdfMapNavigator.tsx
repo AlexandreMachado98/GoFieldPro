@@ -1622,10 +1622,11 @@ export const PdfMapNavigator: React.FC = () => {
 
           <button
             onClick={() => setActiveNavPoint(null)}
-            className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800"
+            className="ml-2 px-3 py-1.5 rounded-lg bg-rose-500 hover:bg-rose-600 text-white flex items-center gap-1.5 shadow-md active:scale-95 transition-all"
             title="Encerrar Navegação"
           >
-            <X className="w-4 h-4" />
+            <X className="w-3.5 h-3.5" />
+            <span className="uppercase tracking-wider font-extrabold text-[10px]">Parar</span>
           </button>
         </div>
       )}
@@ -2450,17 +2451,30 @@ export const PdfMapNavigator: React.FC = () => {
               </button>
 
               <div className="flex items-center gap-2">
-                <button
-                  onClick={() => {
-                    setActiveNavPoint(selectedMarker);
-                    setSelectedMarker(null);
-                    if (!isGpsActive) toggleGps(true);
-                  }}
-                  className="px-4 py-2.5 bg-sky-600 hover:bg-sky-500 text-white font-extrabold text-xs rounded-xl shadow flex items-center gap-1.5 active:scale-95"
-                >
-                  <Navigation className="w-4 h-4" />
-                  Navegar até Ponto
-                </button>
+                {activeNavPoint?.id === selectedMarker.id ? (
+                  <button
+                    onClick={() => {
+                      setActiveNavPoint(null);
+                      setSelectedMarker(null);
+                    }}
+                    className="px-4 py-2.5 bg-rose-600 hover:bg-rose-500 text-white font-extrabold text-xs rounded-xl shadow flex items-center gap-1.5 active:scale-95 transition-all"
+                  >
+                    <X className="w-4 h-4" />
+                    Parar Navegação
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => {
+                      setActiveNavPoint(selectedMarker);
+                      setSelectedMarker(null);
+                      if (!isGpsActive) toggleGps(true);
+                    }}
+                    className="px-4 py-2.5 bg-sky-600 hover:bg-sky-500 text-white font-extrabold text-xs rounded-xl shadow flex items-center gap-1.5 active:scale-95 transition-all"
+                  >
+                    <Navigation className="w-4 h-4" />
+                    Navegar até Ponto
+                  </button>
+                )}
               </div>
             </div>
 
