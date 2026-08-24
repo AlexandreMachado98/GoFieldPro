@@ -1,0 +1,6 @@
+const fs = require('fs');
+let mapViewer = fs.readFileSync('src/components/Map/MapViewer.tsx', 'utf8');
+mapViewer = mapViewer.replace('<div className="font-mono font-bold text-slate-100">{currentGps.lat.toFixed(5)}°, {currentGps.lng.toFixed(5)}°</div>', '{hasGpsLock ? <div className="font-mono font-bold text-slate-100">{currentGps.lat.toFixed(5)}°, {currentGps.lng.toFixed(5)}°</div> : <div className="text-xs text-slate-400 font-mono">Buscando sinal...</div>}');
+mapViewer = mapViewer.replace('<div className="font-mono text-slate-200">E: {currentUtm.easting} N: {currentUtm.northing}</div>', '{hasGpsLock ? <div className="font-mono text-slate-200">E: {currentUtm.easting} N: {currentUtm.northing}</div> : <div className="text-xs text-slate-400">---</div>}');
+mapViewer = mapViewer.replace('<div className="font-mono text-sky-400 font-bold">{currentGps.altitude}m <span className="text-[10px] text-slate-400 font-normal">±{currentGps.accuracy}m</span></div>', '{hasGpsLock ? <div className="font-mono text-sky-400 font-bold">{currentGps.altitude}m <span className="text-[10px] text-slate-400 font-normal">±{currentGps.accuracy}m</span></div> : <div className="text-xs text-slate-400">---</div>}');
+fs.writeFileSync('src/components/Map/MapViewer.tsx', mapViewer);

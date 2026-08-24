@@ -1,0 +1,2668 @@
+import React, { useState, useRef, useEffect, useCallback } from 'react';
+import { useApp } from '../../context/AppContext';
+import { 
+  UploadCloud, 
+  FileText, 
+  Trash2, 
+  ZoomIn, 
+  ZoomOut, 
+  MapPin, 
+  ChevronLeft, 
+  ChevronRight, 
+  Plus, 
+  Check, 
+  AlertTriangle, 
+  Maximize2,
+  Minimize2,
+  Activity,
+  Navigation,
+  MousePointer,
+  Camera,
+  Image as ImageIcon,
+  Play,
+  Pause,
+  Square,
+  Compass,
+  X,
+  Layers,
+  Sparkles,
+  ArrowRight,
+  Eye,
+  RotateCcw,
+  Footprints,
+  FolderOpen,
+  Undo2,
+  Info,
+  Share2,
+  Crosshair,
+  LocateFixed,
+  Sliders,
+  Radio,
+  Download,
+  Gauge
+} from 'lucide-react';
+import L from 'leaflet';
+import * as pdfjsLib from 'pdfjs-dist';
+import pdfWorker from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
+import 'leaflet/dist/leaflet.css';
+import { 
+  PdfDocument, 
+  PdfMarker, 
+  PdfTrack, 
+  PdfTrackPoint,
+  getAllPdfDocuments,
+  savePdfDocument,
+  deletePdfDocument
+} from '../../utils/pdfStorage';
+import { 
+  gpsToPdf, 
+  pdfToGps, 
+  createCenteredCalibration, 
+  calculateNavigationToMarker,
+  getDocumentCalibration 
+} from '../../utils/geoTransform';
+import { calculateDistanceMeters } from '../../utils/geoUtils';
+import { PdfExportModal } from './PdfExportModal';
+
+// Configure PDF.js worker safely
+if (typeof window !== 'undefined') {
+  try {
+    if (!pdfjsLib.GlobalWorkerOptions.workerSrc) {
+      pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorker || `https://unpkg.com/pdfjs-dist@${pdfjsLib.version || '6.2.108'}/build/pdf.worker.min.mjs`;
+    }
+  } catch (err) {
+    console.warn('PDF.js worker setup fallback:', err);
+  }
+}
+
+const CATEGORIES = [
+  { id: 'checkpoint', label: 'Ponto de Navegação', color: '#0284c7' },
+  { id: 'inspection', label: 'Inspeção / Vistoria', color: '#10b981' },
+  { id: 'hazard', label: 'Obstáculo / Risco', color: '#ef4444' },
+  { id: 'boundary', label: 'Marco / Vértice', color: '#8b5cf6' },
+  { id: 'sample', label: 'Amostra / Solo', color: '#ec4899' },
+  { id: 'note', label: 'Anotação Geral', color: '#f59e0b' },
+] as const;
+
+// Generate ultra high resolution cartographic topographic demo map
+function generateSampleTopoMap(): { dataUrl: string; width: number; height: number } {
+  const width = 1600;
+  const height = 1200;
+  const canvas = document.createElement('canvas');
+  canvas.width = width;
+  canvas.height = height;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return { dataUrl: '', width, height };
+
+  // Background - Cartographic cream/topographic paper
+  ctx.fillStyle = '#f8f9fa';
+  ctx.fillRect(0, 0, width, height);
+
+  // Soft relief gradient
+  const reliefGrad = ctx.createRadialGradient(800, 600, 50, 800, 600, 700);
+  reliefGrad.addColorStop(0, '#e2f0d9');
+  reliefGrad.addColorStop(0.5, '#f0f4c3');
+  reliefGrad.addColorStop(0.8, '#ffe0b2');
+  reliefGrad.addColorStop(1, '#f5f5f5');
+  ctx.fillStyle = reliefGrad;
+  ctx.fillRect(40, 40, width - 80, height - 80);
+
+  // Border & Neatline
+  ctx.lineWidth = 3;
+  ctx.strokeStyle = '#1e293b';
+  ctx.strokeRect(30, 30, width - 60, height - 60);
+  ctx.lineWidth = 1;
+  ctx.strokeRect(40, 40, width - 80, height - 80);
+
+  // Grid lines & UTM ticks
+  ctx.strokeStyle = 'rgba(100, 116, 139, 0.25)';
+  ctx.lineWidth = 1;
+  ctx.setLineDash([4, 4]);
+  for (let x = 120; x < width - 60; x += 160) {
+    ctx.beginPath();
+    ctx.moveTo(x, 40);
+    ctx.lineTo(x, height - 40);
+    ctx.stroke();
+    // UTM Label
+    ctx.font = '10px monospace';
+    ctx.fillStyle = '#475569';
+    ctx.fillText(`${(680000 + x * 50).toLocaleString('pt-BR')}m E`, x - 30, 36);
+    ctx.fillText(`${(680000 + x * 50).toLocaleString('pt-BR')}m E`, x - 30, height - 25);
+  }
+  for (let y = 120; y < height - 60; y += 160) {
+    ctx.beginPath();
+    ctx.moveTo(40, y);
+    ctx.lineTo(width - 40, y);
+    ctx.stroke();
+    ctx.font = '10px monospace';
+    ctx.fillStyle = '#475569';
+    ctx.fillText(`${(7450000 - y * 50).toLocaleString('pt-BR')}m N`, 4, y + 3);
+  }
+  ctx.setLineDash([]);
+
+  // Topographic Contour Lines (Curvas de Nível)
+  const drawContour = (centerX: number, centerY: number, rx: number, ry: number, elevation: number, isIndex: boolean) => {
+    ctx.beginPath();
+    ctx.ellipse(centerX, centerY, rx, ry, Math.PI / 12, 0, Math.PI * 2);
+    ctx.strokeStyle = isIndex ? '#854d0e' : '#b45309';
+    ctx.lineWidth = isIndex ? 2 : 1;
+    ctx.stroke();
+
+    if (isIndex) {
+      ctx.fillStyle = '#854d0e';
+      ctx.font = 'bold 11px sans-serif';
+      ctx.fillText(`${elevation} m`, centerX + rx - 35, centerY - 5);
+    }
+  };
+
+  // Multiple elevation peaks
+  for (let i = 1; i <= 8; i++) {
+    drawContour(650, 500, i * 45, i * 35, 800 - i * 20, i % 3 === 0);
+    drawContour(1100, 750, i * 38, i * 30, 720 - i * 20, i % 2 === 0);
+  }
+
+  // River / Drainage line
+  ctx.beginPath();
+  ctx.moveTo(60, 200);
+  ctx.bezierCurveTo(400, 300, 700, 150, 950, 450);
+  ctx.bezierCurveTo(1100, 650, 1300, 800, 1540, 950);
+  ctx.strokeStyle = '#0284c7';
+  ctx.lineWidth = 5;
+  ctx.lineCap = 'round';
+  ctx.stroke();
+
+  // River Label
+  ctx.fillStyle = '#0369a1';
+  ctx.font = 'italic bold 13px sans-serif';
+  ctx.fillText('Rio das Pedras (Drenagem Principal)', 720, 260);
+
+  // Map Title Box & Legend
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(60, 60, 440, 160);
+  ctx.strokeStyle = '#1e293b';
+  ctx.lineWidth = 2;
+  ctx.strokeRect(60, 60, 440, 160);
+
+  ctx.fillStyle = '#0f172a';
+  ctx.font = 'bold 18px sans-serif';
+  ctx.fillText('CARTA TOPOGRÁFICA / PLANTA PILOTO', 80, 95);
+  ctx.font = 'bold 12px sans-serif';
+  ctx.fillStyle = '#059669';
+  ctx.fillText('SETOR SUL - FAZENDA MONTE VERDE (ESCALA 1:10.000)', 80, 120);
+  ctx.font = '11px sans-serif';
+  ctx.fillStyle = '#64748b';
+  ctx.fillText('Datum: SIRGAS 2000 / UTM Fuso 23S | Curvas de Nível: Equidistância 20m', 80, 145);
+  ctx.fillText('Sistema Offline GeoField Pro | Navegação e Coleta Georreferenciada', 80, 165);
+  ctx.fillText('Pronto para Anotações de Campo, Vistorias e Traçado de Rota', 80, 185);
+
+  // North Arrow
+  ctx.fillStyle = '#1e293b';
+  ctx.beginPath();
+  ctx.moveTo(width - 100, 80);
+  ctx.lineTo(width - 110, 125);
+  ctx.lineTo(width - 100, 115);
+  ctx.lineTo(width - 90, 125);
+  ctx.closePath();
+  ctx.fill();
+  ctx.font = 'bold 16px sans-serif';
+  ctx.fillText('N', width - 106, 70);
+
+  // Scale Bar
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(width - 260, height - 90, 200, 40);
+  ctx.strokeRect(width - 260, height - 90, 200, 40);
+  ctx.fillStyle = '#000000';
+  ctx.fillRect(width - 240, height - 72, 80, 8);
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(width - 160, height - 72, 80, 8);
+  ctx.strokeRect(width - 240, height - 72, 160, 8);
+  ctx.font = 'bold 10px monospace';
+  ctx.fillStyle = '#0f172a';
+  ctx.fillText('0', width - 244, height - 76);
+  ctx.fillText('500m', width - 170, height - 76);
+  ctx.fillText('1.000m', width - 95, height - 76);
+
+  return {
+    dataUrl: canvas.toDataURL('image/jpeg', 0.9),
+    width,
+    height,
+  };
+}
+
+// Compress image file to lightweight Base64 to save storage and keep UI fast
+const compressImageFile = (file: File, maxDim = 800, quality = 0.7): Promise<string> => {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const img = new Image();
+      img.onload = () => {
+        let { width, height } = img;
+        if (width > maxDim || height > maxDim) {
+          if (width > height) {
+            height = Math.round((height * maxDim) / width);
+            width = maxDim;
+          } else {
+            width = Math.round((width * maxDim) / height);
+            height = maxDim;
+          }
+        }
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) {
+          resolve(e.target?.result as string);
+          return;
+        }
+        ctx.drawImage(img, 0, 0, width, height);
+        resolve(canvas.toDataURL('image/jpeg', quality));
+      };
+      img.onerror = () => reject(new Error('Falha ao processar foto'));
+      img.src = e.target?.result as string;
+    };
+    reader.onerror = () => reject(new Error('Falha ao ler arquivo de foto'));
+    reader.readAsDataURL(file);
+  });
+};
+
+export const PdfMapNavigator: React.FC = () => {
+  const {
+    addPdfFile,
+    notifySuccess,
+    notifyError,
+    notifyWarning,
+    notifyInfo,
+    showConfirm,
+  } = useApp();
+  
+  // Storage state
+  const [documents, setDocuments] = useState<PdfDocument[]>([]);
+  const [activeDocId, setActiveDocId] = useState<string | null>(null);
+  const [isLoadingDocs, setIsLoadingDocs] = useState(true);
+
+  // Tools mode: 'pan', 'add_point', 'draw_track', 'record_track'
+  const [activeTool, setActiveTool] = useState<'pan' | 'add_point' | 'draw_track' | 'record_track'>('pan');
+  const activeToolRef = useRef<'pan' | 'add_point' | 'draw_track' | 'record_track'>('pan');
+
+  // Fullscreen state
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  
+  // Drawer / Bottom sheet for map list
+  const [isDrawerOpen, setIsDrawerOpen] = useState(false);
+
+  // Manual track drawing
+  const [currentTrackPoints, setCurrentTrackPoints] = useState<PdfTrackPoint[]>([]);
+  const [isTrackModalOpen, setIsTrackModalOpen] = useState(false);
+  const [trackName, setTrackName] = useState('');
+  const [trackColor, setTrackColor] = useState('#0284c7');
+
+  // Live Track Recording
+  const [isRecordingLive, setIsRecordingLive] = useState(false);
+  const [isRecordingPaused, setIsRecordingPaused] = useState(false);
+  const [recordedPoints, setRecordedPoints] = useState<PdfTrackPoint[]>([]);
+  const [recordDuration, setRecordDuration] = useState(0);
+  const recordTimerRef = useRef<number | null>(null);
+
+  // PDF processing state
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [processingProgress, setProcessingProgress] = useState<string>('');
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
+  // Marker creation modal
+  const [pendingMarkerPos, setPendingMarkerPos] = useState<{ x: number; y: number } | null>(null);
+  const [markerTitle, setMarkerTitle] = useState('');
+  const [markerNotes, setMarkerNotes] = useState('');
+  const [markerCategory, setMarkerCategory] = useState<PdfMarker['category']>('checkpoint');
+  const [markerPhotos, setMarkerPhotos] = useState<string[]>([]);
+  const [isCompressingPhoto, setIsCompressingPhoto] = useState(false);
+  
+  // Selected marker details modal
+  const [selectedMarker, setSelectedMarker] = useState<PdfMarker | null>(null);
+  const [activeLightboxPhoto, setActiveLightboxPhoto] = useState<string | null>(null);
+
+  // Target navigation in PDF
+  const [activeNavPoint, setActiveNavPoint] = useState<PdfMarker | null>(null);
+
+  // Real-time GPS Location & Compass state
+  const [isGpsActive, setIsGpsActive] = useState(false);
+  const [userGps, setUserGps] = useState<{
+    lat: number;
+    lng: number;
+    accuracy: number;
+    speed: number | null;
+    altitude: number | null;
+    heading: number | null;
+    timestamp: number;
+  } | null>(null);
+  const [isSimulatedGps, setIsSimulatedGps] = useState(false);
+  const [gpsError, setGpsError] = useState<string | null>(null);
+
+  // Export Modal state
+  const [isExportModalOpen, setIsExportModalOpen] = useState(false);
+
+  // Calibration Modal state
+  const [isCalibrationModalOpen, setIsCalibrationModalOpen] = useState(false);
+  const [calibScale, setCalibScale] = useState(0.85);
+
+  // Save Live Recorded Route Modal state
+  const [isSaveRecordedModalOpen, setIsSaveRecordedModalOpen] = useState(false);
+  const [recordedRouteName, setRecordedRouteName] = useState('');
+  const [recordedRouteColor, setRecordedRouteColor] = useState('#ef4444');
+
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const markerPhotoInputRef = useRef<HTMLInputElement>(null);
+  const markerCameraInputRef = useRef<HTMLInputElement>(null);
+  const editPhotoInputRef = useRef<HTMLInputElement>(null);
+  const mapContainerRef = useRef<HTMLDivElement>(null);
+  const mapInstanceRef = useRef<L.Map | null>(null);
+  const imageOverlayRef = useRef<L.ImageOverlay | null>(null);
+  const markersLayerRef = useRef<L.LayerGroup | null>(null);
+  const tracksLayerRef = useRef<L.LayerGroup | null>(null);
+  const activeDrawPolylineRef = useRef<L.Polyline | null>(null);
+  const liveRecordPolylineRef = useRef<L.Polyline | null>(null);
+  const targetGuideLineRef = useRef<L.Polyline | null>(null);
+  const gpsUserMarkerRef = useRef<L.Marker | null>(null);
+  const gpsAccuracyCircleRef = useRef<L.Circle | null>(null);
+  const gpsWatchIdRef = useRef<number | null>(null);
+  const lastLoadedDocPageRef = useRef<string>('');
+
+  // Keep ref in sync
+  useEffect(() => {
+    activeToolRef.current = activeTool;
+  }, [activeTool]);
+
+  // Initialize Map and keep instances robust
+  const initializeMap = useCallback(() => {
+    if (!mapContainerRef.current || mapInstanceRef.current) return;
+
+    try {
+      const map = L.map(mapContainerRef.current, {
+        crs: L.CRS.Simple,
+        minZoom: -4,
+        maxZoom: 5,
+        zoomSnap: 0.25,
+        zoomDelta: 0.5,
+        wheelPxPerZoomLevel: 60,
+        zoomControl: false,
+        attributionControl: false,
+        touchZoom: true,
+        dragging: true,
+        scrollWheelZoom: true,
+        doubleClickZoom: true,
+        boxZoom: true,
+      });
+
+      mapInstanceRef.current = map;
+
+      const tracksGroup = L.layerGroup().addTo(map);
+      tracksLayerRef.current = tracksGroup;
+
+      const markersGroup = L.layerGroup().addTo(map);
+      markersLayerRef.current = markersGroup;
+
+      // Click listener uses activeToolRef to prevent stale closures
+      map.on('click', (e: L.LeafletMouseEvent) => {
+        const currentTool = activeToolRef.current;
+
+        if (currentTool === 'add_point') {
+          setPendingMarkerPos({ x: e.latlng.lat, y: e.latlng.lng });
+          setMarkerTitle(`Ponto ${Date.now().toString().slice(-4)}`);
+          setMarkerNotes('');
+          setMarkerPhotos([]);
+          setSelectedMarker(null);
+        } else if (currentTool === 'draw_track') {
+          setCurrentTrackPoints((prev) => [...prev, { x: e.latlng.lat, y: e.latlng.lng }]);
+        } else if (currentTool === 'record_track') {
+          setRecordedPoints((prev) => [
+            ...prev,
+            { x: e.latlng.lat, y: e.latlng.lng, time: new Date().toLocaleTimeString('pt-BR') }
+          ]);
+        }
+      });
+    } catch (err) {
+      console.warn('Map initialization error:', err);
+    }
+  }, []);
+
+  // Initialize Map on mount
+  useEffect(() => {
+    initializeMap();
+
+    // Resize observer to keep map viewport crisp
+    const container = mapContainerRef.current;
+    let resizeObserver: ResizeObserver | null = null;
+    if (container && typeof ResizeObserver !== 'undefined') {
+      resizeObserver = new ResizeObserver(() => {
+        if (mapInstanceRef.current) {
+          mapInstanceRef.current.invalidateSize();
+        }
+      });
+      resizeObserver.observe(container);
+    }
+
+    return () => {
+      if (resizeObserver) resizeObserver.disconnect();
+      if (mapInstanceRef.current) {
+        mapInstanceRef.current.remove();
+        mapInstanceRef.current = null;
+        imageOverlayRef.current = null;
+        markersLayerRef.current = null;
+        tracksLayerRef.current = null;
+      }
+    };
+  }, [initializeMap]);
+
+  // Handle Load Sample Topographic Demo Map
+  const handleLoadSampleDemoMap = useCallback(async () => {
+    setIsProcessing(true);
+    setProcessingProgress('Gerando Planta Topográfica Demonstrativa...');
+    try {
+      const sample = generateSampleTopoMap();
+      const sampleDoc: PdfDocument = {
+        id: `topo-demo-${Date.now()}`,
+        name: 'Planta Topográfica Base',
+        fileName: 'Planta_Topografica_Base.pdf',
+        fileSize: '1.8 MB',
+        dataUrls: [sample.dataUrl],
+        pageCount: 1,
+        currentPage: 0,
+        width: sample.width,
+        height: sample.height,
+        markers: [],
+        tracks: [],
+        uploadedAt: new Date().toLocaleDateString('pt-BR'),
+      };
+
+      await savePdfDocument(sampleDoc);
+      setDocuments((prev) => [sampleDoc, ...prev]);
+      setActiveDocId(sampleDoc.id);
+      setIsDrawerOpen(false);
+      addPdfFile({
+        id: sampleDoc.id,
+        name: sampleDoc.name,
+        dataUrl: sample.dataUrl,
+        width: sampleDoc.width,
+        height: sampleDoc.height,
+      });
+    } catch (err: any) {
+      console.error('Error generating demo map:', err);
+      setErrorMsg('Erro ao gerar mapa demonstrativo');
+    } finally {
+      setIsProcessing(false);
+      setProcessingProgress('');
+    }
+  }, [addPdfFile]);
+
+  // Load documents from IndexedDB on mount & auto-seed demo if empty
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        const docs = await getAllPdfDocuments();
+        if (mounted) {
+          if (docs.length > 0) {
+            setDocuments(docs);
+            const requested = localStorage.getItem('geofield_selected_pdf_id');
+            if (requested) {
+              localStorage.removeItem('geofield_selected_pdf_id');
+              setActiveDocId(requested);
+            } else {
+              setActiveDocId(docs[0].id);
+            }
+          } else {
+            // Automatically initialize with demo topo map so user can test immediately
+            handleLoadSampleDemoMap();
+          }
+        }
+      } catch (e) {
+        console.error('Error loading documents from IndexedDB', e);
+      } finally {
+        if (mounted) setIsLoadingDocs(false);
+      }
+    })();
+    return () => {
+      mounted = false;
+    };
+  }, [handleLoadSampleDemoMap]);
+
+  const activeDoc = documents.find((d) => d.id === activeDocId) || null;
+
+  // Persist updated doc into IndexedDB asynchronously
+  const updateDocumentInStore = useCallback((updatedDoc: PdfDocument) => {
+    setDocuments((prev) => prev.map((d) => (d.id === updatedDoc.id ? updatedDoc : d)));
+    savePdfDocument(updatedDoc).catch((e) => console.warn('Failed to persist doc', e));
+  }, []);
+
+  // Timer for live track recording
+  useEffect(() => {
+    if (isRecordingLive && !isRecordingPaused) {
+      recordTimerRef.current = window.setInterval(() => {
+        setRecordDuration((prev) => prev + 1);
+      }, 1000);
+    } else {
+      if (recordTimerRef.current) {
+        clearInterval(recordTimerRef.current);
+      }
+    }
+    return () => {
+      if (recordTimerRef.current) clearInterval(recordTimerRef.current);
+    };
+  }, [isRecordingLive, isRecordingPaused]);
+
+  // Handle Fullscreen Toggle
+  const toggleFullscreen = () => {
+    if (!document.fullscreenElement) {
+      document.documentElement.requestFullscreen().then(() => setIsFullscreen(true)).catch(() => {});
+    } else {
+      document.exitFullscreen().then(() => setIsFullscreen(false)).catch(() => {});
+    }
+  };
+
+  useEffect(() => {
+    const handleFsChange = () => {
+      setIsFullscreen(!!document.fullscreenElement);
+      if (mapInstanceRef.current) {
+        setTimeout(() => mapInstanceRef.current?.invalidateSize(), 200);
+      }
+    };
+    document.addEventListener('fullscreenchange', handleFsChange);
+    return () => document.removeEventListener('fullscreenchange', handleFsChange);
+  }, []);
+
+  // Update Image Overlay when active doc or page changes
+  useEffect(() => {
+    // Ensure map is initialized
+    initializeMap();
+
+    const map = mapInstanceRef.current;
+    if (!map) return;
+
+    if (!activeDoc) {
+      if (imageOverlayRef.current) {
+        map.removeLayer(imageOverlayRef.current);
+        imageOverlayRef.current = null;
+      }
+      if (markersLayerRef.current) markersLayerRef.current.clearLayers();
+      if (tracksLayerRef.current) tracksLayerRef.current.clearLayers();
+      lastLoadedDocPageRef.current = '';
+      return;
+    }
+
+    const pageIdx = activeDoc.currentPage || 0;
+    const currentDataUrl = activeDoc.dataUrls[pageIdx] || activeDoc.dataUrls[0];
+    const docPageKey = `${activeDoc.id}_p${pageIdx}`;
+
+    // Only update image overlay and fitBounds if the document ID or page has actually changed
+    if (lastLoadedDocPageRef.current !== docPageKey) {
+      lastLoadedDocPageRef.current = docPageKey;
+
+      const h = activeDoc.height || 1000;
+      const w = activeDoc.width || 1000;
+      const bounds = new L.LatLngBounds([0, 0], [h, w]);
+
+      if (imageOverlayRef.current) {
+        map.removeLayer(imageOverlayRef.current);
+        imageOverlayRef.current = null;
+      }
+
+      if (currentDataUrl) {
+        imageOverlayRef.current = L.imageOverlay(currentDataUrl, bounds).addTo(map);
+        map.fitBounds(bounds, { padding: [15, 15] });
+      }
+
+      const timer = setTimeout(() => {
+        if (mapInstanceRef.current) {
+          mapInstanceRef.current.invalidateSize();
+        }
+      }, 120);
+
+      return () => clearTimeout(timer);
+    }
+  }, [activeDocId, activeDoc?.currentPage, initializeMap]);
+
+  // Render Markers on Map
+  useEffect(() => {
+    if (!markersLayerRef.current || !activeDoc) return;
+    
+    markersLayerRef.current.clearLayers();
+
+    activeDoc.markers.forEach((marker) => {
+      const categoryObj = CATEGORIES.find((c) => c.id === marker.category) || CATEGORIES[0];
+      const isTarget = activeNavPoint?.id === marker.id;
+      const hasPhotos = marker.photos && marker.photos.length > 0;
+      const color = marker.color || categoryObj.color;
+      
+      const pinHtml = `
+        <div class="tactical-pin-wrap" style="transform: translate(-50%, -100%);">
+          <div style="position: relative; display: flex; flex-direction: column; align-items: center;">
+            <div style="
+              width: ${isTarget ? '32px' : '26px'};
+              height: ${isTarget ? '32px' : '26px'};
+              border-radius: 50% 50% 50% 0;
+              transform: rotate(-45deg);
+              background-color: ${color};
+              border: 2px solid #ffffff;
+              box-shadow: 0 4px 12px rgba(0,0,0,0.6);
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              ${isTarget ? 'animation: bounce 1.5s infinite;' : ''}
+            ">
+              <div style="
+                transform: rotate(45deg);
+                color: #ffffff;
+                font-size: 11px;
+                font-weight: 900;
+                line-height: 1;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+              ">
+                ${isTarget ? '🎯' : '📍'}
+              </div>
+            </div>
+            ${hasPhotos ? `
+              <div style="
+                margin-top: 2px;
+                background: rgba(15,23,42,0.9);
+                color: #38bdf8;
+                font-size: 9px;
+                font-weight: 700;
+                padding: 1px 4px;
+                border-radius: 4px;
+                border: 1px solid rgba(56,189,248,0.4);
+                white-space: nowrap;
+                box-shadow: 0 2px 4px rgba(0,0,0,0.4);
+              ">📷 ${marker.photos!.length}</div>
+            ` : ''}
+          </div>
+        </div>
+      `;
+
+      const divIcon = L.divIcon({
+        className: 'custom-pdf-pin',
+        html: pinHtml,
+        iconSize: [26, 32],
+        iconAnchor: [13, 32],
+      });
+
+      const leafletMarker = L.marker([marker.x, marker.y], { icon: divIcon });
+      
+      leafletMarker.on('click', (e) => {
+        L.DomEvent.stopPropagation(e);
+        setSelectedMarker(marker);
+        setPendingMarkerPos(null);
+      });
+
+      leafletMarker.addTo(markersLayerRef.current!);
+    });
+  }, [activeDoc?.markers, activeNavPoint]);
+
+  // Render Saved Tracks on Map
+  useEffect(() => {
+    if (!tracksLayerRef.current || !activeDoc) return;
+    
+    tracksLayerRef.current.clearLayers();
+
+    if (activeDoc.tracks) {
+      activeDoc.tracks.forEach((track) => {
+        if (track.points.length > 1) {
+          const latLngs = track.points.map((p) => [p.x, p.y] as [number, number]);
+          const line = L.polyline(latLngs, {
+            color: track.color || '#0284c7',
+            weight: 4,
+            opacity: 0.9,
+            lineCap: 'round',
+            lineJoin: 'round',
+            dashArray: track.isRecorded ? '6, 6' : undefined,
+          });
+
+          line.bindPopup(`
+            <div style="font-family: sans-serif; padding: 4px;">
+              <b style="color: #0f172a; font-size: 13px;">${track.name}</b>
+              <div style="font-size: 11px; color: #64748b; margin-top: 2px;">
+                ${track.isRecorded ? '🔴 Trilha Gravada' : '✏️ Rota Traçada'}<br/>
+                Pontos: ${track.points.length}<br/>
+                Data: ${track.createdAt}
+              </div>
+            </div>
+          `);
+
+          line.addTo(tracksLayerRef.current!);
+        }
+      });
+    }
+  }, [activeDoc?.tracks]);
+
+  // Render Active Drawing Track
+  useEffect(() => {
+    if (!mapInstanceRef.current) return;
+    const map = mapInstanceRef.current;
+
+    if (activeDrawPolylineRef.current) {
+      map.removeLayer(activeDrawPolylineRef.current);
+      activeDrawPolylineRef.current = null;
+    }
+
+    if (currentTrackPoints.length > 0) {
+      const latLngs = currentTrackPoints.map((p) => [p.x, p.y] as [number, number]);
+      activeDrawPolylineRef.current = L.polyline(latLngs, {
+        color: '#f59e0b',
+        weight: 4,
+        dashArray: '6, 8',
+      }).addTo(map);
+    }
+  }, [currentTrackPoints]);
+
+  // Render Live Recording Track
+  useEffect(() => {
+    if (!mapInstanceRef.current) return;
+    const map = mapInstanceRef.current;
+
+    if (liveRecordPolylineRef.current) {
+      map.removeLayer(liveRecordPolylineRef.current);
+      liveRecordPolylineRef.current = null;
+    }
+
+    if (recordedPoints.length > 0) {
+      const latLngs = recordedPoints.map((p) => [p.x, p.y] as [number, number]);
+      liveRecordPolylineRef.current = L.polyline(latLngs, {
+        color: '#ef4444',
+        weight: 5,
+        opacity: 0.95,
+        lineCap: 'round',
+        lineJoin: 'round',
+      }).addTo(map);
+    }
+  }, [recordedPoints]);
+
+  // Target Navigation Line and live user-to-target updates
+  useEffect(() => {
+    if (!mapInstanceRef.current || !activeDoc) return;
+    const map = mapInstanceRef.current;
+
+    if (targetGuideLineRef.current) {
+      map.removeLayer(targetGuideLineRef.current);
+      targetGuideLineRef.current = null;
+    }
+
+    if (activeNavPoint) {
+      let startPoint: [number, number];
+      if (userGps) {
+        const userPdf = gpsToPdf(userGps.lat, userGps.lng, activeDoc);
+        startPoint = [userPdf.x, userPdf.y];
+      } else {
+        const center = map.getCenter();
+        startPoint = [center.lat, center.lng];
+      }
+
+      targetGuideLineRef.current = L.polyline([startPoint, [activeNavPoint.x, activeNavPoint.y]], {
+        color: '#38bdf8',
+        weight: 3,
+        dashArray: '6, 6',
+        opacity: 0.85,
+      }).addTo(map);
+    }
+  }, [activeNavPoint, userGps, activeDoc]);
+
+  // Real-time GPS Location Tracker & PDF Coordinate Projection Engine
+  const updateUserGpsPosition = useCallback((pos: GeolocationPosition) => {
+    const { latitude, longitude, accuracy, speed, altitude, heading } = pos.coords;
+    setUserGps({
+      lat: latitude,
+      lng: longitude,
+      accuracy,
+      speed,
+      altitude,
+      heading,
+      timestamp: pos.timestamp,
+    });
+    setGpsError(null);
+
+    if (!mapInstanceRef.current || !activeDoc) return;
+    const map = mapInstanceRef.current;
+
+    // Convert GPS (Lat, Lng) to PDF Pixel Coordinates (x, y)
+    const pdfCoords = gpsToPdf(latitude, longitude, activeDoc);
+
+    // Update or Create Leaflet User GPS Marker
+    const headingDeg = heading !== null && !isNaN(heading) ? heading : 0;
+    const userMarkerHtml = `
+      <div class="user-gps-pulse-wrapper" style="position: relative; width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; transform: translate(-50%, -50%);">
+        <div style="position: absolute; inset: 0; border-radius: 50%; background: rgba(14, 165, 233, 0.35); animation: ping 2s cubic-bezier(0, 0, 0.2, 1) infinite;"></div>
+        <div style="width: 20px; height: 20px; border-radius: 50%; background: #0284c7; border: 3px solid #ffffff; box-shadow: 0 0 14px rgba(2, 132, 199, 0.9); display: flex; align-items: center; justify-content: center;">
+          <div style="width: 6px; height: 6px; border-radius: 50%; background: #ffffff;"></div>
+        </div>
+        ${heading !== null ? `
+          <div style="position: absolute; top: -8px; width: 0; height: 0; border-left: 5px solid transparent; border-right: 5px solid transparent; border-bottom: 8px solid #38bdf8; transform: rotate(${headingDeg}deg); transform-origin: 50% 26px;"></div>
+        ` : ''}
+      </div>
+    `;
+
+    const userIcon = L.divIcon({
+      className: 'custom-user-gps-marker',
+      html: userMarkerHtml,
+      iconSize: [36, 36],
+      iconAnchor: [18, 18],
+    });
+
+    if (gpsUserMarkerRef.current) {
+      gpsUserMarkerRef.current.setLatLng([pdfCoords.x, pdfCoords.y]);
+      gpsUserMarkerRef.current.setIcon(userIcon);
+    } else {
+      gpsUserMarkerRef.current = L.marker([pdfCoords.x, pdfCoords.y], {
+        icon: userIcon,
+        zIndexOffset: 10000,
+      }).addTo(map);
+    }
+
+    // Update or Create Accuracy Circle
+    const accuracyRadiusPx = Math.max(15, Math.min(120, accuracy * 0.8));
+    if (gpsAccuracyCircleRef.current) {
+      gpsAccuracyCircleRef.current.setLatLng([pdfCoords.x, pdfCoords.y]);
+      gpsAccuracyCircleRef.current.setRadius(accuracyRadiusPx);
+    } else {
+      gpsAccuracyCircleRef.current = L.circle([pdfCoords.x, pdfCoords.y], {
+        radius: accuracyRadiusPx,
+        color: '#0284c7',
+        fillColor: '#38bdf8',
+        fillOpacity: 0.12,
+        weight: 1,
+        dashArray: '4, 4',
+      }).addTo(map);
+    }
+
+    // Auto-record waypoint if currently in recording mode
+    if (activeToolRef.current === 'record_track' && !isRecordingPaused) {
+      setRecordedPoints((prev) => {
+        const lastPt = prev[prev.length - 1];
+        if (!lastPt) {
+          return [{
+            x: pdfCoords.x,
+            y: pdfCoords.y,
+            lat: latitude,
+            lng: longitude,
+            speed: speed !== null ? speed : undefined,
+            altitude: altitude !== null ? altitude : undefined,
+            time: new Date().toLocaleTimeString('pt-BR'),
+          }];
+        }
+
+        // Add point if moved at least 2 pixels or 1.5 meters
+        const distPx = Math.hypot(pdfCoords.x - lastPt.x, pdfCoords.y - lastPt.y);
+        if (distPx >= 3) {
+          return [
+            ...prev,
+            {
+              x: pdfCoords.x,
+              y: pdfCoords.y,
+              lat: latitude,
+              lng: longitude,
+              speed: speed !== null ? speed : undefined,
+              altitude: altitude !== null ? altitude : undefined,
+              time: new Date().toLocaleTimeString('pt-BR'),
+            },
+          ];
+        }
+        return prev;
+      });
+    }
+  }, [activeDoc, isRecordingPaused]);
+
+  // Handle GPS start / stop watcher
+  const toggleGps = useCallback((forceState?: boolean) => {
+    const nextState = forceState !== undefined ? forceState : !isGpsActive;
+
+    if (nextState) {
+      if (!('geolocation' in navigator)) {
+        notifyError('GPS Não Suportado', 'Seu navegador ou dispositivo não possui suporte a geolocalização.');
+        return;
+      }
+
+      setIsGpsActive(true);
+      notifyInfo('GPS Ativado', 'Obtendo localização de satélite em tempo real...');
+
+      gpsWatchIdRef.current = navigator.geolocation.watchPosition(
+        (pos) => {
+          updateUserGpsPosition(pos);
+        },
+        (err) => {
+          console.warn('Geolocation watch error:', err);
+          let errText = 'Não foi possível obter a localização do dispositivo.';
+          if (err.code === err.PERMISSION_DENIED) {
+            errText = 'Permissão de localização negada pelo usuário.';
+          } else if (err.code === err.POSITION_UNAVAILABLE) {
+            errText = 'Sinal de GPS indisponível no momento.';
+          } else if (err.code === err.TIMEOUT) {
+            errText = 'Tempo limite esgotado ao buscar satélites.';
+          }
+          setGpsError(errText);
+        },
+        {
+          enableHighAccuracy: true,
+          timeout: 12000,
+          maximumAge: 1000,
+        }
+      );
+    } else {
+      setIsGpsActive(false);
+      if (gpsWatchIdRef.current !== null) {
+        navigator.geolocation.clearWatch(gpsWatchIdRef.current);
+        gpsWatchIdRef.current = null;
+      }
+      if (gpsUserMarkerRef.current && mapInstanceRef.current) {
+        mapInstanceRef.current.removeLayer(gpsUserMarkerRef.current);
+        gpsUserMarkerRef.current = null;
+      }
+      if (gpsAccuracyCircleRef.current && mapInstanceRef.current) {
+        mapInstanceRef.current.removeLayer(gpsAccuracyCircleRef.current);
+        gpsAccuracyCircleRef.current = null;
+      }
+      setUserGps(null);
+      notifyInfo('GPS Desativado', 'Rastreio de posição pausado.');
+    }
+  }, [isGpsActive, notifyError, notifyInfo, updateUserGpsPosition]);
+
+  // Clean up GPS watcher on unmount
+  useEffect(() => {
+    return () => {
+      if (gpsWatchIdRef.current !== null) {
+        navigator.geolocation.clearWatch(gpsWatchIdRef.current);
+      }
+    };
+  }, []);
+
+  // Center map on user's current GPS position on PDF
+  const centerOnUserGps = useCallback(() => {
+    if (!userGps) {
+      toggleGps(true);
+      return;
+    }
+
+    if (!mapInstanceRef.current || !activeDoc) return;
+    const pdfCoords = gpsToPdf(userGps.lat, userGps.lng, activeDoc);
+    mapInstanceRef.current.panTo([pdfCoords.x, pdfCoords.y], { animate: true, duration: 0.6 });
+    notifySuccess('Localização Centralizada', `Lat: ${userGps.lat.toFixed(5)} | Lng: ${userGps.lng.toFixed(5)}`);
+  }, [userGps, activeDoc, toggleGps, notifySuccess]);
+
+  // Calibrate map with user's current GPS position
+  const handleCalibrateCurrentGps = useCallback(() => {
+    if (!activeDoc) return;
+    if (!userGps) {
+      notifyWarning('GPS Necessário', 'Ative o GPS primeiro para calibrar a folha com a sua posição.');
+      toggleGps(true);
+      return;
+    }
+
+    const newCalibration = createCenteredCalibration(activeDoc, userGps.lat, userGps.lng, calibScale);
+    const updatedDoc: PdfDocument = {
+      ...activeDoc,
+      calibration: newCalibration,
+    };
+
+    updateDocumentInStore(updatedDoc);
+    setIsCalibrationModalOpen(false);
+    notifySuccess('Planta Calibrada', 'A folha do PDF foi ancorada na sua posição geográfica atual.');
+  }, [activeDoc, userGps, calibScale, updateDocumentInStore, toggleGps, notifySuccess, notifyWarning]);
+
+  // Calculate live navigation metrics to active target marker
+  const navMetrics = activeDoc && activeNavPoint && userGps
+    ? calculateNavigationToMarker(userGps, activeNavPoint, activeDoc)
+    : null;
+
+  // Calculate total recorded distance in meters
+  const totalRecordedDistanceMeters = recordedPoints.reduce((acc, pt, idx, arr) => {
+    if (idx === 0) return 0;
+    const prev = arr[idx - 1];
+    if (pt.lat !== undefined && pt.lng !== undefined && prev.lat !== undefined && prev.lng !== undefined) {
+      return acc + calculateDistanceMeters(prev.lat, prev.lng, pt.lat, pt.lng);
+    }
+    // Fallback: estimate using pixel distance
+    const distPx = Math.hypot(pt.x - prev.x, pt.y - prev.y);
+    return acc + distPx * 0.85;
+  }, 0);
+
+  // Process and Render PDF / Image File
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsProcessing(true);
+    setErrorMsg(null);
+    setProcessingProgress('Lendo arquivo...');
+
+    try {
+      const isPdf = file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf');
+
+      if (isPdf) {
+        setProcessingProgress('Decodificando páginas do PDF...');
+        const arrayBuffer = await file.arrayBuffer();
+        
+        const loadingTask = pdfjsLib.getDocument({
+          data: new Uint8Array(arrayBuffer),
+          cMapUrl: 'https://unpkg.com/pdfjs-dist@6.2.108/cmaps/',
+          cMapPacked: true,
+        });
+
+        const pdf = await loadingTask.promise;
+        const totalPages = Math.min(pdf.numPages, 8);
+        const renderedPages: string[] = [];
+        let baseWidth = 1200;
+        let baseHeight = 1200;
+
+        for (let pageNum = 1; pageNum <= totalPages; pageNum++) {
+          setProcessingProgress(`Renderizando folha ${pageNum} de ${totalPages}...`);
+          const page = await pdf.getPage(pageNum);
+
+          const unscaledViewport = page.getViewport({ scale: 1.0 });
+          const maxDim = Math.max(unscaledViewport.width, unscaledViewport.height);
+          const scale = Math.min(2.0, Math.max(1.0, 2000 / maxDim));
+          const viewport = page.getViewport({ scale });
+
+          if (pageNum === 1) {
+            baseWidth = viewport.width;
+            baseHeight = viewport.height;
+          }
+
+          const canvas = document.createElement('canvas');
+          const context = canvas.getContext('2d', { alpha: false });
+          if (!context) throw new Error('Falha ao instanciar renderizador');
+
+          canvas.height = viewport.height;
+          canvas.width = viewport.width;
+
+          context.fillStyle = '#ffffff';
+          context.fillRect(0, 0, canvas.width, canvas.height);
+
+          await page.render({
+            canvasContext: context,
+            viewport: viewport,
+            canvas: canvas,
+          } as any).promise;
+
+          const dataUrl = canvas.toDataURL('image/jpeg', 0.82);
+          renderedPages.push(dataUrl);
+        }
+
+        const newDoc: PdfDocument = {
+          id: `pdf-doc-${Date.now()}`,
+          name: file.name.replace(/\.[^/.]+$/, ''),
+          fileName: file.name,
+          fileSize: `${(file.size / (1024 * 1024)).toFixed(1)} MB`,
+          dataUrls: renderedPages,
+          pageCount: totalPages,
+          currentPage: 0,
+          width: baseWidth,
+          height: baseHeight,
+          markers: [],
+          tracks: [],
+          uploadedAt: new Date().toLocaleDateString('pt-BR'),
+        };
+
+        await savePdfDocument(newDoc);
+        setDocuments((prev) => [newDoc, ...prev]);
+        setActiveDocId(newDoc.id);
+        setIsDrawerOpen(false);
+        
+        addPdfFile({
+          id: newDoc.id,
+          name: newDoc.name,
+          dataUrl: renderedPages[0],
+          width: baseWidth,
+          height: baseHeight,
+        });
+        notifySuccess('Planta PDF Carregada', `"${newDoc.name}" (${newDoc.pageCount} ${newDoc.pageCount === 1 ? 'página' : 'páginas'}) pronta para anotações.`);
+
+      } else {
+        // Direct Image Upload
+        setProcessingProgress('Processando imagem...');
+        const reader = new FileReader();
+        reader.onload = async (loadEvent) => {
+          const dataUrl = loadEvent.target?.result as string;
+          const img = new Image();
+          img.onload = async () => {
+            const newDoc: PdfDocument = {
+              id: `img-doc-${Date.now()}`,
+              name: file.name.replace(/\.[^/.]+$/, ''),
+              fileName: file.name,
+              fileSize: `${(file.size / (1024 * 1024)).toFixed(1)} MB`,
+              dataUrls: [dataUrl],
+              pageCount: 1,
+              currentPage: 0,
+              width: img.naturalWidth || 1500,
+              height: img.naturalHeight || 1000,
+              markers: [],
+              tracks: [],
+              uploadedAt: new Date().toLocaleDateString('pt-BR'),
+            };
+            await savePdfDocument(newDoc);
+            setDocuments((prev) => [newDoc, ...prev]);
+            setActiveDocId(newDoc.id);
+            setIsDrawerOpen(false);
+            addPdfFile({
+              id: newDoc.id,
+              name: newDoc.name,
+              dataUrl: dataUrl,
+              width: newDoc.width,
+              height: newDoc.height,
+            });
+            notifySuccess('Imagem do Mapa Carregada', `"${newDoc.name}" importada com sucesso.`);
+            setIsProcessing(false);
+          };
+          img.src = dataUrl;
+        };
+        reader.readAsDataURL(file);
+        return;
+      }
+    } catch (err: any) {
+      console.error('Error rendering PDF:', err);
+      const msg = `Erro ao processar o arquivo: ${err.message || 'Arquivo corrompido'}`;
+      setErrorMsg(msg);
+      notifyError('Erro de Leitura', msg);
+    } finally {
+      setIsProcessing(false);
+      setProcessingProgress('');
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    }
+  };
+
+  // Handle Photo Capture for New Marker
+  const handleCaptureMarkerPhoto = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+
+    setIsCompressingPhoto(true);
+    try {
+      const compressedList: string[] = [];
+      for (let i = 0; i < files.length; i++) {
+        const compressed = await compressImageFile(files[i]);
+        compressedList.push(compressed);
+      }
+      setMarkerPhotos((prev) => [...prev, ...compressedList]);
+      notifySuccess('Foto Anexada', `${compressedList.length} ${compressedList.length === 1 ? 'imagem adicionada' : 'imagens adicionadas'} ao ponto.`);
+    } catch (err) {
+      console.error('Error compressing photos:', err);
+      notifyError('Erro ao Anexar Foto', 'Não foi possível processar a imagem selecionada.');
+    } finally {
+      setIsCompressingPhoto(false);
+      if (markerPhotoInputRef.current) markerPhotoInputRef.current.value = '';
+      if (markerCameraInputRef.current) markerCameraInputRef.current.value = '';
+    }
+  };
+
+  // Handle adding photos to an already existing marker
+  const handleAddPhotosToExisting = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!selectedMarker || !activeDoc) return;
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+
+    try {
+      const compressedList: string[] = [];
+      for (let i = 0; i < files.length; i++) {
+        const compressed = await compressImageFile(files[i]);
+        compressedList.push(compressed);
+      }
+
+      const updatedMarker: PdfMarker = {
+        ...selectedMarker,
+        photos: [...(selectedMarker.photos || []), ...compressedList],
+      };
+
+      const updatedDoc: PdfDocument = {
+        ...activeDoc,
+        markers: activeDoc.markers.map((m) => (m.id === selectedMarker.id ? updatedMarker : m)),
+      };
+
+      updateDocumentInStore(updatedDoc);
+      setSelectedMarker(updatedMarker);
+      notifySuccess('Fotos Adicionadas', 'Imagens vinculadas ao registro existente.');
+    } catch (err) {
+      console.error('Error adding photos to marker:', err);
+      notifyError('Erro ao Anexar Foto', 'Falha ao salvar fotos adicionais.');
+    } finally {
+      if (editPhotoInputRef.current) editPhotoInputRef.current.value = '';
+    }
+  };
+
+  // Save new marker
+  const handleSaveMarker = () => {
+    if (!pendingMarkerPos || !activeDoc) return;
+    if (!markerTitle.trim()) {
+      notifyWarning('Identificador Obrigatório', 'Por favor, informe um identificador para o ponto de campo.');
+      return;
+    }
+
+    const categoryObj = CATEGORIES.find((c) => c.id === markerCategory) || CATEGORIES[0];
+    const newMarker: PdfMarker = {
+      id: `m-${Date.now()}`,
+      x: pendingMarkerPos.x,
+      y: pendingMarkerPos.y,
+      title: markerTitle.trim(),
+      notes: markerNotes.trim(),
+      category: markerCategory,
+      color: categoryObj.color,
+      photos: markerPhotos,
+      createdAt: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
+    };
+
+    const updatedDoc: PdfDocument = {
+      ...activeDoc,
+      markers: [...activeDoc.markers, newMarker],
+    };
+
+    updateDocumentInStore(updatedDoc);
+    notifySuccess('Ponto Registrado', `Ponto "${newMarker.title}" adicionado à folha da planta.`);
+
+    setPendingMarkerPos(null);
+    setMarkerTitle('');
+    setMarkerNotes('');
+    setMarkerPhotos([]);
+    setActiveTool('pan');
+  };
+
+  // Save Drawn Track
+  const handleSaveTrack = () => {
+    if (!activeDoc || currentTrackPoints.length < 2) {
+      notifyWarning('Pontos Insuficientes', 'Adicione pelo menos 2 pontos na folha para salvar a rota.');
+      return;
+    }
+
+    const newTrack: PdfTrack = {
+      id: `trk-${Date.now()}`,
+      name: trackName.trim() || `Rota ${activeDoc.tracks?.length ? activeDoc.tracks.length + 1 : 1}`,
+      points: currentTrackPoints,
+      color: trackColor,
+      isRecorded: false,
+      createdAt: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
+    };
+
+    const updatedDoc: PdfDocument = {
+      ...activeDoc,
+      tracks: [...(activeDoc.tracks || []), newTrack],
+    };
+
+    updateDocumentInStore(updatedDoc);
+    notifySuccess('Rota Salva', `Rota "${newTrack.name}" cadastrada com sucesso.`);
+
+    setCurrentTrackPoints([]);
+    setIsTrackModalOpen(false);
+    setTrackName('');
+    setActiveTool('pan');
+  };
+
+  // Live Track Recording controls
+  const handleStartLiveRecording = () => {
+    setActiveTool('record_track');
+    setIsRecordingLive(true);
+    setIsRecordingPaused(false);
+    setRecordedPoints([]);
+    setRecordDuration(0);
+
+    // Auto-enable GPS if not yet active
+    if (!isGpsActive) {
+      toggleGps(true);
+    }
+
+    if (userGps && activeDoc) {
+      const p = gpsToPdf(userGps.lat, userGps.lng, activeDoc);
+      setRecordedPoints([{ 
+        x: p.x, 
+        y: p.y, 
+        lat: userGps.lat, 
+        lng: userGps.lng, 
+        time: new Date().toLocaleTimeString('pt-BR'),
+        speed: userGps.speed !== null ? userGps.speed : undefined,
+        altitude: userGps.altitude !== null ? userGps.altitude : undefined
+      }]);
+    } else if (mapInstanceRef.current) {
+      const center = mapInstanceRef.current.getCenter();
+      setRecordedPoints([{ x: center.lat, y: center.lng, time: new Date().toLocaleTimeString('pt-BR') }]);
+    }
+    notifyInfo('Gravação Iniciada', 'Rastreio do trajeto exato em tempo real ativado.');
+  };
+
+  const handleStopAndSaveLiveRecording = () => {
+    if (!activeDoc) return;
+    if (recordedPoints.length < 2) {
+      showConfirm({
+        title: 'Gravação Muito Curta',
+        message: 'A gravação contém menos de 2 pontos. Deseja descartar esta trilha?',
+        type: 'warning',
+        confirmText: 'Descartar',
+        cancelText: 'Continuar Gravando',
+        onConfirm: () => {
+          setIsRecordingLive(false);
+          setRecordedPoints([]);
+          setActiveTool('pan');
+          notifyInfo('Gravação Descartada', 'O rastreio foi finalizado sem salvar.');
+        },
+      });
+      return;
+    }
+
+    setRecordedRouteName(`Trilha de Campo ${new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`);
+    setRecordedRouteColor('#ef4444');
+    setIsSaveRecordedModalOpen(true);
+  };
+
+  const handleConfirmSaveRecordedRoute = () => {
+    if (!activeDoc) return;
+
+    const formattedDist = totalRecordedDistanceMeters >= 1000
+      ? `${(totalRecordedDistanceMeters / 1000).toFixed(2)} km`
+      : `${Math.round(totalRecordedDistanceMeters)} m`;
+
+    const newTrack: PdfTrack = {
+      id: `rec-trk-${Date.now()}`,
+      name: recordedRouteName.trim() || `Trilha de Campo ${new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`,
+      points: recordedPoints,
+      color: recordedRouteColor,
+      isRecorded: true,
+      distance: formattedDist,
+      duration: formatTimer(recordDuration),
+      createdAt: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
+    };
+
+    const updatedDoc: PdfDocument = {
+      ...activeDoc,
+      tracks: [...(activeDoc.tracks || []), newTrack],
+    };
+
+    updateDocumentInStore(updatedDoc);
+    notifySuccess('Trilha Salva', `Trilha "${newTrack.name}" salva com ${recordedPoints.length} pontos e extensão de ${formattedDist}.`);
+
+    setIsSaveRecordedModalOpen(false);
+    setIsRecordingLive(false);
+    setIsRecordingPaused(false);
+    setRecordedPoints([]);
+    setRecordDuration(0);
+    setActiveTool('pan');
+  };
+
+  // Delete marker
+  const handleDeleteMarker = (markerId: string) => {
+    if (!activeDoc) return;
+    const markerToDelete = activeDoc.markers.find((m) => m.id === markerId);
+    showConfirm({
+      title: 'Excluir Ponto',
+      message: `Deseja realmente excluir o ponto "${markerToDelete?.title || 'selecionado'}" desta folha?`,
+      type: 'danger',
+      confirmText: 'Excluir Ponto',
+      onConfirm: () => {
+        const updatedDoc: PdfDocument = {
+          ...activeDoc,
+          markers: activeDoc.markers.filter((m) => m.id !== markerId),
+        };
+        updateDocumentInStore(updatedDoc);
+        if (activeNavPoint?.id === markerId) {
+          setActiveNavPoint(null);
+        }
+        setSelectedMarker(null);
+        notifyInfo('Ponto Excluído', 'O ponto de campo foi removido da folha.');
+      },
+    });
+  };
+
+  // Delete track
+  const handleDeleteTrack = (trackId: string) => {
+    if (!activeDoc) return;
+    const trackToDelete = (activeDoc.tracks || []).find((t) => t.id === trackId);
+    showConfirm({
+      title: 'Excluir Rota',
+      message: `Deseja remover a rota "${trackToDelete?.name || 'selecionada'}"?`,
+      type: 'danger',
+      confirmText: 'Excluir Rota',
+      onConfirm: () => {
+        const updatedDoc: PdfDocument = {
+          ...activeDoc,
+          tracks: (activeDoc.tracks || []).filter((t) => t.id !== trackId),
+        };
+        updateDocumentInStore(updatedDoc);
+        notifyInfo('Rota Excluída', 'A rota foi descarregada da planta.');
+      },
+    });
+  };
+
+  // Delete document
+  const handleDeleteDoc = (docId: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    const docToDelete = documents.find((d) => d.id === docId);
+    showConfirm({
+      title: 'Excluir Planta / Mapa',
+      message: `Tem certeza que deseja excluir "${docToDelete?.name || 'este documento'}" e todas as suas feições e fotos?`,
+      type: 'danger',
+      confirmText: 'Excluir Planta',
+      onConfirm: async () => {
+        await deletePdfDocument(docId);
+        const remaining = documents.filter((d) => d.id !== docId);
+        setDocuments(remaining);
+        if (activeDocId === docId) {
+          setActiveDocId(remaining.length > 0 ? remaining[0].id : null);
+        }
+        notifySuccess('Planta Excluída', 'Documento removido do armazenamento local.');
+      },
+    });
+  };
+
+  // Page switcher
+  const handlePageChange = (newPage: number) => {
+    if (!activeDoc) return;
+    if (newPage < 0 || newPage >= activeDoc.pageCount) return;
+    const updatedDoc: PdfDocument = { ...activeDoc, currentPage: newPage };
+    updateDocumentInStore(updatedDoc);
+  };
+
+  // Map Controls
+  const handleZoomIn = () => mapInstanceRef.current?.zoomIn();
+  const handleZoomOut = () => mapInstanceRef.current?.zoomOut();
+  const handleFitBounds = () => {
+    if (activeDoc && mapInstanceRef.current) {
+      const bounds = new L.LatLngBounds([0, 0], [activeDoc.height, activeDoc.width]);
+      mapInstanceRef.current.fitBounds(bounds, { padding: [10, 10] });
+    }
+  };
+
+  // Format record timer
+  const formatTimer = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+  };
+
+  return (
+    <div className="flex-1 w-full h-full bg-slate-950 flex flex-col relative overflow-hidden select-none">
+      
+      {/* Top Floating App Bar */}
+      <div className="absolute top-2.5 left-2.5 right-2.5 z-[1000] flex items-center justify-between pointer-events-none gap-2">
+        
+        {/* Left: Document Info, Drawer Opener & Page Navigation */}
+        <div className="bg-slate-900/95 backdrop-blur-md border border-slate-700/80 rounded-2xl px-3 py-1.5 shadow-2xl flex items-center gap-2 pointer-events-auto">
+          <button
+            onClick={() => setIsDrawerOpen(true)}
+            className="flex items-center gap-1.5 text-xs font-extrabold text-white hover:text-emerald-400 transition-colors"
+            title="Abrir Lista de Mapas, Pontos e Rotas"
+          >
+            <FolderOpen className="w-4 h-4 text-emerald-400 shrink-0" />
+            <span className="truncate max-w-[110px] sm:max-w-[180px]">
+              {activeDoc ? activeDoc.name : 'Nenhum Mapa'}
+            </span>
+          </button>
+
+          {activeDoc && activeDoc.pageCount > 1 && (
+            <div className="flex items-center gap-1 border-l border-slate-700 pl-2">
+              <button
+                onClick={() => handlePageChange(activeDoc.currentPage - 1)}
+                disabled={activeDoc.currentPage === 0}
+                className="p-1 rounded-lg bg-slate-800 text-slate-300 hover:text-white disabled:opacity-30"
+              >
+                <ChevronLeft className="w-3.5 h-3.5" />
+              </button>
+              <span className="text-[11px] font-bold text-slate-300">
+                {activeDoc.currentPage + 1}/{activeDoc.pageCount}
+              </span>
+              <button
+                onClick={() => handlePageChange(activeDoc.currentPage + 1)}
+                disabled={activeDoc.currentPage >= activeDoc.pageCount - 1}
+                className="p-1 rounded-lg bg-slate-800 text-slate-300 hover:text-white disabled:opacity-30"
+              >
+                <ChevronRight className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          )}
+        </div>
+
+        {/* Center / Right Tactical Toolbar (GPS, Calibration, Export & Zoom Controls) */}
+        <div className="flex items-center gap-1.5 pointer-events-auto">
+          
+          {/* GPS Live Tracking Toggle Button */}
+          <button
+            onClick={() => toggleGps()}
+            className={`px-3 py-1.5 rounded-2xl border text-xs font-extrabold flex items-center gap-1.5 shadow-2xl transition-all active:scale-95 ${
+              isGpsActive
+                ? 'bg-sky-600 border-sky-400 text-white shadow-sky-900/60 ring-2 ring-sky-400/40'
+                : 'bg-slate-900/95 backdrop-blur-md border-slate-700/80 text-slate-300 hover:text-white hover:bg-slate-800'
+            }`}
+            title={isGpsActive ? 'Desativar GPS' : 'Ativar Minha Localização GPS no Mapa'}
+          >
+            <LocateFixed className={`w-4 h-4 ${isGpsActive ? 'animate-spin' : 'text-sky-400'}`} style={{ animationDuration: '4s' }} />
+            <span className="hidden sm:inline">{isGpsActive ? 'GPS Ativo' : 'Meu GPS'}</span>
+          </button>
+
+          {/* Quick Center on GPS button (when GPS is active) */}
+          {isGpsActive && userGps && (
+            <button
+              onClick={centerOnUserGps}
+              className="p-2 bg-sky-950/90 hover:bg-sky-900 border border-sky-500/80 text-sky-200 rounded-2xl shadow-xl active:scale-95"
+              title="Centralizar na Minha Posição"
+            >
+              <Crosshair className="w-4 h-4 text-sky-400" />
+            </button>
+          )}
+
+          {/* Export & Share Modal Opener */}
+          {activeDoc && (
+            <button
+              onClick={() => setIsExportModalOpen(true)}
+              className="px-3 py-1.5 rounded-2xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white border border-emerald-400/60 text-xs font-extrabold flex items-center gap-1.5 shadow-2xl transition-all active:scale-95"
+              title="Exportar e Compartilhar Mapa com Marcações (KML, GPX, GeoJSON, PDF)"
+            >
+              <Share2 className="w-4 h-4" />
+              <span className="hidden md:inline">Exportar</span>
+            </button>
+          )}
+
+          {/* Calibrate GPS Coordinates */}
+          {activeDoc && (
+            <button
+              onClick={() => setIsCalibrationModalOpen(true)}
+              className="p-2 bg-slate-900/95 backdrop-blur-md border border-slate-700/80 text-slate-300 hover:text-amber-400 hover:bg-slate-800 rounded-2xl shadow-2xl active:scale-95"
+              title="Calibrar Georreferenciamento da Folha"
+            >
+              <Sliders className="w-4 h-4" />
+            </button>
+          )}
+
+          {/* Zoom / Fullscreen Group */}
+          <div className="flex items-center gap-0.5 bg-slate-900/95 backdrop-blur-md border border-slate-700/80 rounded-2xl p-1 shadow-2xl">
+            <button
+              onClick={handleZoomIn}
+              className="p-1.5 text-slate-300 hover:text-white hover:bg-slate-800 rounded-xl transition-colors"
+              title="Aproximar Zoom"
+            >
+              <ZoomIn className="w-4 h-4" />
+            </button>
+            <button
+              onClick={handleZoomOut}
+              className="p-1.5 text-slate-300 hover:text-white hover:bg-slate-800 rounded-xl transition-colors"
+              title="Afastar Zoom"
+            >
+              <ZoomOut className="w-4 h-4" />
+            </button>
+            <button
+              onClick={handleFitBounds}
+              className="p-1.5 text-slate-300 hover:text-white hover:bg-slate-800 rounded-xl transition-colors"
+              title="Ajustar à Tela"
+            >
+              <Maximize2 className="w-4 h-4" />
+            </button>
+            <button
+              onClick={toggleFullscreen}
+              className={`p-1.5 rounded-xl transition-colors ${
+                isFullscreen ? 'bg-sky-600 text-white' : 'text-slate-300 hover:text-white hover:bg-slate-800'
+              }`}
+              title="Modo Tela Cheia"
+            >
+              {isFullscreen ? <Minimize2 className="w-4 h-4" /> : <Sparkles className="w-4 h-4" />}
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Target Navigation Live HUD */}
+      {activeNavPoint && navMetrics && (
+        <div className="absolute top-14 left-1/2 -translate-x-1/2 z-[1000] bg-slate-900/95 backdrop-blur-md border border-sky-500 rounded-2xl px-4 py-2 shadow-2xl flex items-center gap-3 text-xs font-bold text-white pointer-events-auto animate-in fade-in">
+          <div className="flex items-center gap-2">
+            <div className="w-6 h-6 rounded-lg bg-sky-500/20 border border-sky-500 flex items-center justify-center text-sky-400">
+              <Navigation className="w-3.5 h-3.5 transform rotate-45" />
+            </div>
+            <div>
+              <div className="text-[10px] text-sky-300 font-normal">Navegando até</div>
+              <div className="font-extrabold text-white truncate max-w-[130px]">{activeNavPoint.title}</div>
+            </div>
+          </div>
+
+          <div className="border-l border-slate-700 pl-3 flex items-center gap-2">
+            <span className="text-emerald-400 font-black text-sm">{navMetrics.formattedDistance}</span>
+            <span className="text-[11px] text-slate-400 font-mono">
+              {navMetrics.cardinal} ({navMetrics.bearingDegrees.toFixed(0)}°)
+            </span>
+          </div>
+
+          <button
+            onClick={() => setActiveNavPoint(null)}
+            className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800"
+            title="Encerrar Navegação"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      )}
+
+      {/* Helper Banner for Active Tool */}
+      {activeTool === 'add_point' && (
+        <div className="absolute top-14 left-1/2 -translate-x-1/2 z-[1000] bg-emerald-600 text-white px-4 py-2 rounded-full shadow-2xl flex items-center gap-2 text-xs font-black animate-bounce pointer-events-auto">
+          <Camera className="w-4 h-4" />
+          <span>Toque na folha do PDF onde deseja marcar o ponto</span>
+          <button
+            onClick={() => setActiveTool('pan')}
+            className="ml-2 bg-emerald-800/80 hover:bg-emerald-900 rounded-full px-2 py-0.5 text-[10px]"
+          >
+            Cancelar
+          </button>
+        </div>
+      )}
+
+      {activeTool === 'draw_track' && (
+        <div className="absolute top-14 left-1/2 -translate-x-1/2 z-[1000] bg-amber-600 text-slate-950 px-4 py-2 rounded-full shadow-2xl flex items-center gap-2 text-xs font-black pointer-events-auto">
+          <Activity className="w-4 h-4" />
+          <span>Toque na folha para adicionar os vértices da rota ({currentTrackPoints.length} marcados)</span>
+        </div>
+      )}
+
+      {/* Main Map Canvas Area */}
+      <div className="flex-1 w-full h-full relative bg-[#0f172a] overflow-hidden">
+        {/* Leaflet Map DOM Node - Always mounted */}
+        <div ref={mapContainerRef} className="w-full h-full absolute inset-0 z-0" />
+
+        {/* Loading Overlay */}
+        {isLoadingDocs && (
+          <div className="absolute inset-0 flex items-center justify-center bg-slate-950/80 backdrop-blur-sm z-20">
+            <div className="flex flex-col items-center gap-3">
+              <div className="w-8 h-8 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin" />
+              <span className="text-xs font-bold text-slate-300">Carregando plantas salvas...</span>
+            </div>
+          </div>
+        )}
+
+        {/* Processing Spinner Overlay */}
+        {isProcessing && (
+          <div className="absolute inset-0 flex items-center justify-center bg-slate-950/85 backdrop-blur-sm z-30 animate-in fade-in">
+            <div className="bg-slate-900 border border-slate-700/80 rounded-2xl p-6 shadow-2xl flex flex-col items-center gap-4 max-w-xs text-center">
+              <div className="w-10 h-10 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin" />
+              <div>
+                <h4 className="text-sm font-extrabold text-white">Processando Arquivo</h4>
+                <p className="text-xs text-slate-400 mt-1">{processingProgress || 'Renderizando páginas...'}</p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Error Alert Toast */}
+        {errorMsg && (
+          <div className="absolute top-16 left-1/2 -translate-x-1/2 z-[1100] bg-rose-950/95 border border-rose-500/80 text-rose-200 px-4 py-2.5 rounded-2xl shadow-2xl flex items-center gap-2.5 text-xs font-bold animate-in slide-in-from-top">
+            <AlertTriangle className="w-4 h-4 text-rose-400 shrink-0" />
+            <span>{errorMsg}</span>
+            <button
+              onClick={() => setErrorMsg(null)}
+              className="ml-2 bg-rose-900/60 hover:bg-rose-800 text-white rounded-full p-1 text-[10px]"
+            >
+              <X className="w-3 h-3" />
+            </button>
+          </div>
+        )}
+
+        {/* Empty State Overlay */}
+        {!isLoadingDocs && !activeDoc && (
+          <div className="absolute inset-0 flex flex-col items-center justify-center p-6 text-center z-10 bg-slate-950/90 backdrop-blur-xs">
+            <div className="w-16 h-16 rounded-3xl bg-slate-900 border border-slate-800 flex items-center justify-center text-emerald-400 mb-4 shadow-2xl">
+              <FileText className="w-8 h-8" />
+            </div>
+            <h3 className="text-lg font-extrabold text-white">Nenhum mapa em PDF carregado</h3>
+            <p className="text-xs text-slate-400 max-w-sm mt-1 mb-5">
+              Importe suas plantas e cartas topográficas em PDF para navegar em tela cheia, marcar pontos com foto e traçar trajetos.
+            </p>
+            <div className="flex flex-col sm:flex-row items-center gap-3">
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                className="flex items-center gap-2 px-5 py-3 rounded-2xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-extrabold text-sm shadow-xl shadow-emerald-900/30 transition-all active:scale-95"
+              >
+                <UploadCloud className="w-5 h-5" />
+                <span>Importar Mapa PDF</span>
+              </button>
+              <button
+                onClick={handleLoadSampleDemoMap}
+                className="flex items-center gap-2 px-4 py-3 rounded-2xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs border border-slate-700 transition-all active:scale-95"
+              >
+                <Sparkles className="w-4 h-4 text-emerald-400" />
+                <span>Carregar Planta Demonstrativa</span>
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Live Track Recording Indicator Banner & Telemetry */}
+        {isRecordingLive && (
+          <div className="absolute top-14 left-1/2 -translate-x-1/2 z-[1000] bg-rose-950/95 backdrop-blur-md border border-rose-500 rounded-2xl px-4 py-2 shadow-2xl flex items-center gap-3 animate-in fade-in pointer-events-auto">
+            <div className="flex items-center gap-2">
+              <span className="w-3 h-3 rounded-full bg-rose-500 animate-ping" />
+              <span className="text-xs font-black text-rose-200">
+                {isRecordingPaused ? 'PAUSADO' : 'GRAVANDO TRILHA'}
+              </span>
+            </div>
+            <div className="font-mono text-xs font-bold text-white bg-slate-950/90 px-2 py-0.5 rounded-lg border border-slate-800">
+              ⏱️ {formatTimer(recordDuration)}
+            </div>
+            <div className="text-xs font-bold text-amber-300 bg-slate-950/90 px-2 py-0.5 rounded-lg border border-slate-800">
+              📏 {totalRecordedDistanceMeters >= 1000 ? `${(totalRecordedDistanceMeters / 1000).toFixed(2)} km` : `${Math.round(totalRecordedDistanceMeters)} m`}
+            </div>
+            <span className="text-[11px] text-rose-300 font-semibold hidden sm:inline">
+              📍 {recordedPoints.length} pts
+            </span>
+          </div>
+        )}
+
+        {/* Live GPS Telemetry Overlay Badge (Bottom Left) */}
+        {isGpsActive && userGps && (
+          <div className="absolute bottom-2 left-2 z-10 pointer-events-auto bg-slate-900/95 backdrop-blur-md border border-sky-500/80 rounded-2xl px-3 py-2 shadow-2xl flex items-center gap-3 text-xs text-slate-200">
+            <div className="flex items-center gap-1.5">
+              <span className="w-2.5 h-2.5 rounded-full bg-sky-400 animate-ping" />
+              <span className="font-mono font-black text-sky-300">
+                {userGps.lat.toFixed(5)}, {userGps.lng.toFixed(5)}
+              </span>
+            </div>
+            <div className="border-l border-slate-700 pl-2 text-[11px] text-slate-400 flex items-center gap-2">
+              <span>±{userGps.accuracy.toFixed(1)}m</span>
+              {userGps.speed !== null && userGps.speed !== undefined && (
+                <span className="text-emerald-400 font-bold">{(userGps.speed * 3.6).toFixed(1)} km/h</span>
+              )}
+            </div>
+            <button
+              onClick={centerOnUserGps}
+              className="p-1 text-sky-400 hover:text-white rounded-lg hover:bg-slate-800"
+              title="Centralizar na Posição"
+            >
+              <Crosshair className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        )}
+
+        {/* Lateral Tactical Action Dock (Right Side - Thumb Ergonomic, z-[1000]) */}
+        {activeDoc && (
+          <div className="absolute right-2.5 top-1/2 -translate-y-1/2 z-[1000] flex flex-col items-end gap-2 pointer-events-none max-h-[calc(100dvh-5rem)]">
+            
+            {/* Context Sub-Tool Bar (Drawing Actions - positioned to the left of the dock) */}
+            {activeTool === 'draw_track' && currentTrackPoints.length > 0 && (
+              <div className="bg-slate-900/95 backdrop-blur-md border border-amber-500/80 rounded-2xl p-2 shadow-2xl flex flex-col sm:flex-row items-center gap-1.5 pointer-events-auto animate-in slide-in-from-right duration-200">
+                <div className="flex items-center gap-1">
+                  <span className="text-xs font-bold text-amber-400 px-2">
+                    {currentTrackPoints.length} pts
+                  </span>
+                  <button
+                    onClick={() => setCurrentTrackPoints((prev) => prev.slice(0, -1))}
+                    className="p-2 bg-slate-800 text-slate-200 rounded-xl hover:bg-slate-700 active:scale-95"
+                    title="Desfazer último vértice"
+                  >
+                    <Undo2 className="w-4 h-4" />
+                  </button>
+                </div>
+                <div className="flex items-center gap-1">
+                  <button
+                    onClick={() => setIsTrackModalOpen(true)}
+                    className="px-3 py-2 bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs rounded-xl shadow flex items-center gap-1 active:scale-95"
+                  >
+                    <Check className="w-4 h-4" />
+                    Salvar
+                  </button>
+                  <button
+                    onClick={() => {
+                      setCurrentTrackPoints([]);
+                      setActiveTool('pan');
+                    }}
+                    className="px-2.5 py-2 bg-slate-800 text-slate-300 font-bold text-xs rounded-xl hover:bg-slate-700 active:scale-95"
+                  >
+                    Cancelar
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Context Sub-Tool Bar (Live Recording Actions - positioned to the left of the dock) */}
+            {activeTool === 'record_track' && isRecordingLive && (
+              <div className="bg-slate-900/95 backdrop-blur-md border border-rose-500/80 rounded-2xl p-2 shadow-2xl flex flex-col sm:flex-row items-center gap-1.5 pointer-events-auto animate-in slide-in-from-right duration-200">
+                <button
+                  onClick={() => {
+                    if (userGps && activeDoc) {
+                      const p = gpsToPdf(userGps.lat, userGps.lng, activeDoc);
+                      setRecordedPoints((prev) => [
+                        ...prev,
+                        { 
+                          x: p.x, 
+                          y: p.y, 
+                          lat: userGps.lat, 
+                          lng: userGps.lng, 
+                          time: new Date().toLocaleTimeString('pt-BR'),
+                          speed: userGps.speed !== null ? userGps.speed : undefined,
+                          altitude: userGps.altitude !== null ? userGps.altitude : undefined
+                        }
+                      ]);
+                    } else if (mapInstanceRef.current) {
+                      const center = mapInstanceRef.current.getCenter();
+                      setRecordedPoints((prev) => [
+                        ...prev,
+                        { x: center.lat, y: center.lng, time: new Date().toLocaleTimeString('pt-BR') }
+                      ]);
+                    }
+                  }}
+                  className="w-full sm:w-auto px-3 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-xl flex items-center justify-center gap-1 active:scale-95"
+                >
+                  <Plus className="w-4 h-4" />
+                  + Ponto
+                </button>
+
+                <div className="flex items-center gap-1 w-full sm:w-auto justify-between">
+                  <button
+                    onClick={() => setIsRecordingPaused(!isRecordingPaused)}
+                    className="p-2 bg-slate-800 text-slate-200 rounded-xl active:scale-95"
+                    title={isRecordingPaused ? 'Retomar' : 'Pausar'}
+                  >
+                    {isRecordingPaused ? <Play className="w-4 h-4 text-emerald-400" /> : <Pause className="w-4 h-4 text-amber-400" />}
+                  </button>
+
+                  <button
+                    onClick={handleStopAndSaveLiveRecording}
+                    className="px-3 py-2 bg-rose-600 hover:bg-rose-500 text-white font-black text-xs rounded-xl shadow flex items-center gap-1 active:scale-95"
+                  >
+                    <Square className="w-4 h-4" />
+                    Finalizar
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Main Lateral Vertical Navigation Rail */}
+            <div className="bg-slate-900/95 backdrop-blur-md border border-slate-700/90 rounded-2xl p-1.5 shadow-2xl flex flex-col gap-1.5 pointer-events-auto">
+              
+              {/* Navegar */}
+              <button
+                onClick={() => {
+                  setActiveTool('pan');
+                  setCurrentTrackPoints([]);
+                }}
+                title="Modo Navegação Livre"
+                className={`flex flex-col items-center justify-center p-2.5 rounded-xl transition-all active:scale-95 ${
+                  activeTool === 'pan'
+                    ? 'bg-slate-800 text-white ring-1 ring-slate-600 shadow-md'
+                    : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
+                }`}
+              >
+                <MousePointer className="w-5 h-5 text-sky-400 mb-0.5" />
+                <span className="text-[10px] font-extrabold tracking-tight">Navegar</span>
+              </button>
+
+              {/* Marcar Ponto com Foto */}
+              <button
+                onClick={() => {
+                  setActiveTool('add_point');
+                  setCurrentTrackPoints([]);
+                }}
+                title="Adicionar Ponto com Foto"
+                className={`flex flex-col items-center justify-center p-2.5 rounded-xl transition-all active:scale-95 ${
+                  activeTool === 'add_point'
+                    ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-950/60 ring-2 ring-emerald-400'
+                    : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
+                }`}
+              >
+                <Camera className="w-5 h-5 text-emerald-400 mb-0.5" />
+                <span className="text-[10px] font-extrabold tracking-tight">+ Ponto</span>
+              </button>
+
+              {/* Traçar Rota */}
+              <button
+                onClick={() => {
+                  setActiveTool('draw_track');
+                  setCurrentTrackPoints([]);
+                }}
+                title="Traçar Rota na Folha"
+                className={`flex flex-col items-center justify-center p-2.5 rounded-xl transition-all active:scale-95 ${
+                  activeTool === 'draw_track'
+                    ? 'bg-amber-600 text-white shadow-lg shadow-amber-950/60 ring-2 ring-amber-400'
+                    : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
+                }`}
+              >
+                <Activity className="w-5 h-5 text-amber-400 mb-0.5" />
+                <span className="text-[10px] font-extrabold tracking-tight">Traçar</span>
+              </button>
+
+              {/* Gravar Rota */}
+              <button
+                onClick={handleStartLiveRecording}
+                title="Gravar Trilha em Tempo Real via GPS"
+                className={`flex flex-col items-center justify-center p-2.5 rounded-xl transition-all active:scale-95 ${
+                  activeTool === 'record_track'
+                    ? 'bg-rose-600 text-white shadow-lg shadow-rose-950/60 ring-2 ring-rose-400'
+                    : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
+                }`}
+              >
+                <Footprints className="w-5 h-5 text-rose-400 mb-0.5" />
+                <span className="text-[10px] font-extrabold tracking-tight">Gravar</span>
+              </button>
+
+              <div className="w-full h-px bg-slate-800 my-0.5" />
+
+              {/* Exportar & Compartilhar */}
+              <button
+                onClick={() => setIsExportModalOpen(true)}
+                title="Exportar Dados do Mapa (KML, GPX, GeoJSON, PDF)"
+                className="flex flex-col items-center justify-center p-2.5 rounded-xl text-slate-400 hover:text-emerald-400 hover:bg-slate-800 transition-all active:scale-95"
+              >
+                <Share2 className="w-5 h-5 text-emerald-400 mb-0.5" />
+                <span className="text-[10px] font-extrabold tracking-tight">Exportar</span>
+              </button>
+
+              {/* Mapas / Gaveta */}
+              <button
+                onClick={() => setIsDrawerOpen(true)}
+                title="Abrir Lista de Mapas"
+                className="flex flex-col items-center justify-center p-2.5 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition-all active:scale-95"
+              >
+                <Layers className="w-5 h-5 text-teal-400 mb-0.5" />
+                <span className="text-[10px] font-extrabold tracking-tight">Mapas</span>
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Bottom Status Badge */}
+        {!isGpsActive && (
+          <div className="hidden sm:flex absolute bottom-2 left-2 z-10 pointer-events-auto bg-slate-950/90 backdrop-blur-xs px-2.5 py-1 rounded-md text-[10px] text-slate-400 border border-slate-800/80 items-center gap-1.5 shadow-md">
+            <span className="font-semibold text-slate-300">GoField Pro</span>
+            <span>•</span>
+            <span>Navegação e Mapas Offline</span>
+          </div>
+        )}
+      </div>
+
+      {/* Hidden File Inputs */}
+      <input
+        type="file"
+        ref={fileInputRef}
+        onChange={handleFileUpload}
+        accept="application/pdf,image/png,image/jpeg,image/webp"
+        className="hidden"
+      />
+      {/* File input for gallery photo upload */}
+      <input
+        type="file"
+        ref={markerPhotoInputRef}
+        onChange={handleCaptureMarkerPhoto}
+        accept="image/*"
+        multiple
+        className="hidden"
+      />
+      {/* File input for camera capture */}
+      <input
+        type="file"
+        ref={markerCameraInputRef}
+        onChange={handleCaptureMarkerPhoto}
+        accept="image/*"
+        capture="environment"
+        className="hidden"
+      />
+      {/* Additional photos for existing marker */}
+      <input
+        type="file"
+        ref={editPhotoInputRef}
+        onChange={handleAddPhotosToExisting}
+        accept="image/*"
+        multiple
+        className="hidden"
+      />
+
+      {/* MODAL: Adicionar Novo Ponto com Foto (z-[9999]) */}
+      {pendingMarkerPos && (
+        <div className="fixed inset-0 z-[9999] bg-black/80 backdrop-blur-sm flex items-center justify-center p-3 animate-in fade-in">
+          <div className="bg-slate-900 border border-slate-800 w-full max-w-md rounded-2xl shadow-2xl flex flex-col max-h-[85dvh] overflow-hidden">
+            
+            <div className="p-4 border-b border-slate-800 flex items-center justify-between bg-slate-950 shrink-0">
+              <div className="flex items-center gap-2">
+                <MapPin className="w-5 h-5 text-emerald-400" />
+                <h3 className="text-sm font-extrabold text-white">Novo Ponto de Campo</h3>
+              </div>
+              <button
+                onClick={() => setPendingMarkerPos(null)}
+                className="p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-4 overflow-y-auto space-y-4 text-xs">
+              <div>
+                <label className="block text-slate-300 font-bold mb-1">Identificador / Nome do Ponto *</label>
+                <input
+                  type="text"
+                  value={markerTitle}
+                  onChange={(e) => setMarkerTitle(e.target.value)}
+                  placeholder="Ex: Marco P1 / Vistoria Vala"
+                  className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2.5 text-white font-bold text-xs focus:outline-none focus:border-emerald-500"
+                  autoFocus
+                />
+              </div>
+
+              <div>
+                <label className="block text-slate-300 font-bold mb-1">Categoria de Campo</label>
+                <div className="grid grid-cols-2 gap-1.5">
+                  {CATEGORIES.map((cat) => (
+                    <button
+                      key={cat.id}
+                      type="button"
+                      onClick={() => setMarkerCategory(cat.id)}
+                      className={`p-2 rounded-xl text-left border flex items-center gap-2 transition-all ${
+                        markerCategory === cat.id
+                          ? 'border-emerald-500 bg-emerald-950/50 text-white font-bold'
+                          : 'border-slate-800 bg-slate-950/60 text-slate-400 hover:bg-slate-800'
+                      }`}
+                    >
+                      <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: cat.color }} />
+                      <span className="truncate">{cat.label}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-slate-300 font-bold mb-1">Anotações / Descrição</label>
+                <textarea
+                  value={markerNotes}
+                  onChange={(e) => setMarkerNotes(e.target.value)}
+                  placeholder="Observações técnicas, condições do local, etc."
+                  rows={2}
+                  className="w-full bg-slate-800 border border-slate-700 rounded-xl p-2.5 text-white text-xs focus:outline-none focus:border-emerald-500 resize-none"
+                />
+              </div>
+
+              {/* Photos Section */}
+              <div>
+                <label className="block text-slate-300 font-bold mb-1.5 flex items-center justify-between">
+                  <span>Fotos de Campo ({markerPhotos.length})</span>
+                  {isCompressingPhoto && <span className="text-emerald-400 font-normal">Processando foto...</span>}
+                </label>
+
+                {/* Photo Previews */}
+                {markerPhotos.length > 0 && (
+                  <div className="grid grid-cols-3 gap-2 mb-2">
+                    {markerPhotos.map((photo, idx) => (
+                      <div key={idx} className="relative aspect-video rounded-lg overflow-hidden border border-slate-700 bg-slate-950 group">
+                        <img src={photo} alt={`Foto ${idx}`} className="w-full h-full object-cover" />
+                        <button
+                          type="button"
+                          onClick={() => setMarkerPhotos((prev) => prev.filter((_, i) => i !== idx))}
+                          className="absolute top-1 right-1 p-1 bg-rose-600 text-white rounded-md shadow"
+                        >
+                          <X className="w-3 h-3" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Camera / Upload buttons */}
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => markerCameraInputRef.current?.click()}
+                    className="flex items-center justify-center gap-1.5 p-2.5 rounded-xl bg-slate-800 hover:bg-slate-750 border border-slate-700 text-emerald-400 font-bold text-xs active:scale-95"
+                  >
+                    <Camera className="w-4 h-4" />
+                    <span>Tirar Foto</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => markerPhotoInputRef.current?.click()}
+                    className="flex items-center justify-center gap-1.5 p-2.5 rounded-xl bg-slate-800 hover:bg-slate-750 border border-slate-700 text-sky-400 font-bold text-xs active:scale-95"
+                  >
+                    <ImageIcon className="w-4 h-4" />
+                    <span>Galeria</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <div className="p-4 border-t border-slate-800 bg-slate-950 flex items-center justify-end gap-2 shrink-0">
+              <button
+                type="button"
+                onClick={() => setPendingMarkerPos(null)}
+                className="px-4 py-2.5 text-slate-300 hover:text-white font-bold text-xs"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={handleSaveMarker}
+                className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs rounded-xl shadow-lg flex items-center gap-1.5 active:scale-95"
+              >
+                <Check className="w-4 h-4" />
+                Salvar Ponto
+              </button>
+            </div>
+
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: Salvar Rota Traçada (z-[9999]) */}
+      {isTrackModalOpen && (
+        <div className="fixed inset-0 z-[9999] bg-black/80 backdrop-blur-sm flex items-center justify-center p-3 animate-in fade-in">
+          <div className="bg-slate-900 border border-slate-800 w-full max-w-sm rounded-2xl shadow-2xl p-4 space-y-4 max-h-[85dvh] overflow-y-auto">
+            <h3 className="text-sm font-extrabold text-white flex items-center gap-2">
+              <Activity className="w-4 h-4 text-amber-400" />
+              Salvar Traçado de Rota
+            </h3>
+
+            <div>
+              <label className="block text-xs text-slate-300 font-bold mb-1">Nome da Rota</label>
+              <input
+                type="text"
+                value={trackName}
+                onChange={(e) => setTrackName(e.target.value)}
+                placeholder="Ex: Alinhamento Cerca / Percurso 01"
+                className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-white text-xs font-bold focus:outline-none focus:border-amber-500"
+                autoFocus
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs text-slate-300 font-bold mb-1">Cor do Traço</label>
+              <div className="flex gap-2">
+                {['#0284c7', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899'].map((c) => (
+                  <button
+                    key={c}
+                    type="button"
+                    onClick={() => setTrackColor(c)}
+                    className={`w-7 h-7 rounded-full border-2 transition-transform ${
+                      trackColor === c ? 'scale-110 border-white' : 'border-transparent'
+                    }`}
+                    style={{ backgroundColor: c }}
+                  />
+                ))}
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-800">
+              <button
+                onClick={() => setIsTrackModalOpen(false)}
+                className="px-3 py-2 text-slate-400 hover:text-white font-bold text-xs"
+              >
+                Voltar
+              </button>
+              <button
+                onClick={handleSaveTrack}
+                className="px-4 py-2 bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs rounded-xl shadow"
+              >
+                Salvar Rota
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: Salvar Trilha Gravada em Tempo Real (z-[9999]) */}
+      {isSaveRecordedModalOpen && (
+        <div className="fixed inset-0 z-[9999] bg-black/80 backdrop-blur-sm flex items-center justify-center p-3 animate-in fade-in">
+          <div className="bg-slate-900 border border-slate-800 w-full max-w-sm rounded-2xl shadow-2xl p-5 space-y-4 max-h-[85dvh] overflow-y-auto">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+              <div className="flex items-center gap-2">
+                <Footprints className="w-5 h-5 text-rose-500" />
+                <h3 className="text-sm font-extrabold text-white">Salvar Trilha de Campo</h3>
+              </div>
+              <button
+                onClick={() => setIsSaveRecordedModalOpen(false)}
+                className="p-1 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Stats Summary Card */}
+            <div className="grid grid-cols-3 gap-2 bg-slate-950 p-3 rounded-xl border border-slate-800 text-center">
+              <div>
+                <div className="text-[10px] text-slate-400">Extensão</div>
+                <div className="text-xs font-black text-amber-400">
+                  {totalRecordedDistanceMeters >= 1000
+                    ? `${(totalRecordedDistanceMeters / 1000).toFixed(2)} km`
+                    : `${Math.round(totalRecordedDistanceMeters)} m`}
+                </div>
+              </div>
+              <div>
+                <div className="text-[10px] text-slate-400">Duração</div>
+                <div className="text-xs font-black text-sky-400">{formatTimer(recordDuration)}</div>
+              </div>
+              <div>
+                <div className="text-[10px] text-slate-400">Pontos</div>
+                <div className="text-xs font-black text-emerald-400">{recordedPoints.length} pts</div>
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-xs text-slate-300 font-bold mb-1">Nome da Trilha Gravada *</label>
+              <input
+                type="text"
+                value={recordedRouteName}
+                onChange={(e) => setRecordedRouteName(e.target.value)}
+                placeholder="Ex: Rastreio Perímetro / Inspeção Linha 01"
+                className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2.5 text-white text-xs font-bold focus:outline-none focus:border-rose-500"
+                autoFocus
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs text-slate-300 font-bold mb-1">Cor do Traçado Gravado</label>
+              <div className="flex gap-2">
+                {['#ef4444', '#f59e0b', '#10b981', '#0284c7', '#8b5cf6', '#ec4899'].map((c) => (
+                  <button
+                    key={c}
+                    type="button"
+                    onClick={() => setRecordedRouteColor(c)}
+                    className={`w-7 h-7 rounded-full border-2 transition-transform ${
+                      recordedRouteColor === c ? 'scale-110 border-white ring-2 ring-rose-500/50' : 'border-transparent'
+                    }`}
+                    style={{ backgroundColor: c }}
+                  />
+                ))}
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-800">
+              <button
+                onClick={() => setIsSaveRecordedModalOpen(false)}
+                className="px-3 py-2 text-slate-400 hover:text-white font-bold text-xs"
+              >
+                Voltar
+              </button>
+              <button
+                onClick={handleConfirmSaveRecordedRoute}
+                className="px-4 py-2.5 bg-rose-600 hover:bg-rose-500 text-white font-black text-xs rounded-xl shadow-lg flex items-center gap-1.5 active:scale-95"
+              >
+                <Check className="w-4 h-4" />
+                Salvar no Mapa
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: Calibração de Georreferenciamento (z-[9999]) */}
+      {isCalibrationModalOpen && activeDoc && (
+        <div className="fixed inset-0 z-[9999] bg-black/80 backdrop-blur-sm flex items-center justify-center p-3 animate-in fade-in">
+          <div className="bg-slate-900 border border-slate-800 w-full max-w-md rounded-2xl shadow-2xl p-5 space-y-4 max-h-[85dvh] overflow-y-auto">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+              <div className="flex items-center gap-2">
+                <Sliders className="w-5 h-5 text-amber-400" />
+                <h3 className="text-sm font-extrabold text-white">Calibrar Georreferenciamento</h3>
+              </div>
+              <button
+                onClick={() => setIsCalibrationModalOpen(false)}
+                className="p-1 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <p className="text-xs text-slate-400 leading-relaxed">
+              Vincule a folha desta planta às coordenadas do mundo real. Você pode ancorar a planta usando sua localização atual do GPS para que o rastreio e navegação fiquem alinhados.
+            </p>
+
+            <div className="bg-slate-950 p-3 rounded-xl border border-slate-800 space-y-2">
+              <div className="flex items-center justify-between text-xs">
+                <span className="text-slate-400">Status do GPS:</span>
+                <span className={`font-bold ${isGpsActive && userGps ? 'text-emerald-400' : 'text-amber-400'}`}>
+                  {isGpsActive && userGps ? `Conectado (±${userGps.accuracy.toFixed(0)}m)` : 'Desconectado'}
+                </span>
+              </div>
+              {userGps && (
+                <div className="text-xs font-mono text-slate-300">
+                  Posição: {userGps.lat.toFixed(5)}, {userGps.lng.toFixed(5)}
+                </div>
+              )}
+            </div>
+
+            <div>
+              <div className="flex items-center justify-between text-xs mb-1">
+                <label className="text-slate-300 font-bold">Escala Estimada (Metros por Pixel)</label>
+                <span className="font-mono font-bold text-amber-400">{calibScale.toFixed(2)} m/px</span>
+              </div>
+              <input
+                type="range"
+                min="0.1"
+                max="5.0"
+                step="0.05"
+                value={calibScale}
+                onChange={(e) => setCalibScale(parseFloat(e.target.value))}
+                className="w-full accent-amber-500"
+              />
+              <div className="flex justify-between text-[10px] text-slate-500 mt-1">
+                <span>0.1 m/px (Planta Detalhada)</span>
+                <span>5.0 m/px (Carta Regional)</span>
+              </div>
+            </div>
+
+            <div className="pt-2 border-t border-slate-800 flex flex-col gap-2">
+              <button
+                onClick={handleCalibrateCurrentGps}
+                className="w-full flex items-center justify-center gap-2 py-3 bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs rounded-xl shadow active:scale-95"
+              >
+                <LocateFixed className="w-4 h-4" />
+                <span>Ancorar na Minha Posição Atual</span>
+              </button>
+
+              <button
+                onClick={() => setIsCalibrationModalOpen(false)}
+                className="w-full py-2 text-slate-400 hover:text-white text-xs font-bold"
+              >
+                Fechar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: Exportar e Compartilhar Arquivo (z-[9999]) */}
+      {isExportModalOpen && activeDoc && (
+        <PdfExportModal
+          document={activeDoc}
+          isOpen={isExportModalOpen}
+          onClose={() => setIsExportModalOpen(false)}
+        />
+      )}
+
+      {/* MODAL / DRAWER: Detalhes do Ponto Selecionado (z-[9999]) */}
+      {selectedMarker && (
+        <div className="fixed inset-0 z-[9999] bg-black/80 backdrop-blur-sm flex items-center justify-center p-3 animate-in fade-in">
+          <div className="bg-slate-900 border border-slate-800 w-full max-w-md rounded-2xl shadow-2xl flex flex-col max-h-[85dvh] overflow-hidden">
+            
+            <div className="p-4 border-b border-slate-800 flex items-center justify-between bg-slate-950 shrink-0">
+              <div className="flex items-center gap-2">
+                <span className="w-3.5 h-3.5 rounded-full" style={{ backgroundColor: selectedMarker.color }} />
+                <h3 className="text-sm font-extrabold text-white">{selectedMarker.title}</h3>
+              </div>
+              <button
+                onClick={() => setSelectedMarker(null)}
+                className="p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-4 overflow-y-auto space-y-4 text-xs">
+              <div className="flex items-center justify-between text-slate-400 border-b border-slate-800 pb-2">
+                <span>Registrado às {selectedMarker.createdAt}</span>
+                <span className="font-bold text-slate-300 capitalize">{selectedMarker.category}</span>
+              </div>
+
+              {/* Geographic Coordinates info if available */}
+              {activeDoc && (
+                <div className="bg-slate-950 p-2.5 rounded-xl border border-slate-800 flex items-center justify-between text-[11px]">
+                  <span className="text-slate-400">Coordenadas Estimadas:</span>
+                  {(() => {
+                    const gps = pdfToGps(selectedMarker.x, selectedMarker.y, activeDoc);
+                    return (
+                      <span className="font-mono text-sky-400 font-bold">
+                        {gps.lat.toFixed(5)}, {gps.lng.toFixed(5)}
+                      </span>
+                    );
+                  })()}
+                </div>
+              )}
+
+              {selectedMarker.notes && (
+                <div className="bg-slate-950 p-3 rounded-xl border border-slate-800 text-slate-200">
+                  {selectedMarker.notes}
+                </div>
+              )}
+
+              {/* Photos Gallery */}
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <span className="font-bold text-slate-300">
+                    Fotos Anexadas ({selectedMarker.photos?.length || 0})
+                  </span>
+                  <button
+                    onClick={() => editPhotoInputRef.current?.click()}
+                    className="text-emerald-400 font-bold text-xs flex items-center gap-1 hover:underline"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    + Adicionar Foto
+                  </button>
+                </div>
+
+                {selectedMarker.photos && selectedMarker.photos.length > 0 ? (
+                  <div className="grid grid-cols-2 gap-2">
+                    {selectedMarker.photos.map((photo, i) => (
+                      <div
+                        key={i}
+                        onClick={() => setActiveLightboxPhoto(photo)}
+                        className="aspect-video rounded-xl overflow-hidden border border-slate-700 bg-slate-950 cursor-pointer relative group"
+                      >
+                        <img src={photo} alt={`Foto ${i}`} className="w-full h-full object-cover group-hover:scale-105 transition-transform" />
+                        <div className="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 flex items-center justify-center text-white transition-opacity">
+                          <Eye className="w-5 h-5" />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="p-4 rounded-xl border border-dashed border-slate-800 text-center text-slate-500">
+                    Nenhuma foto anexada a este ponto.
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="p-4 border-t border-slate-800 bg-slate-950 flex items-center justify-between shrink-0">
+              <button
+                onClick={() => handleDeleteMarker(selectedMarker.id)}
+                className="p-2 text-rose-400 hover:text-rose-300 font-bold text-xs flex items-center gap-1 rounded-xl hover:bg-rose-950/40"
+              >
+                <Trash2 className="w-4 h-4" />
+                Excluir
+              </button>
+
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => {
+                    setActiveNavPoint(selectedMarker);
+                    setSelectedMarker(null);
+                    if (!isGpsActive) toggleGps(true);
+                  }}
+                  className="px-4 py-2.5 bg-sky-600 hover:bg-sky-500 text-white font-extrabold text-xs rounded-xl shadow flex items-center gap-1.5 active:scale-95"
+                >
+                  <Navigation className="w-4 h-4" />
+                  Navegar até Ponto
+                </button>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      )}
+
+      {/* Lightbox for viewing photos (z-[99999]) */}
+      {activeLightboxPhoto && (
+        <div 
+          className="fixed inset-0 z-[99999] bg-black/95 flex items-center justify-center p-4"
+          onClick={() => setActiveLightboxPhoto(null)}
+        >
+          <button
+            onClick={() => setActiveLightboxPhoto(null)}
+            className="absolute top-4 right-4 p-3 text-white bg-slate-800/80 rounded-full"
+          >
+            <X className="w-6 h-6" />
+          </button>
+          <img
+            src={activeLightboxPhoto}
+            alt="Ampliação da Foto"
+            className="max-w-full max-h-full object-contain rounded-xl shadow-2xl"
+          />
+        </div>
+      )}
+
+      {/* Slide-over Drawer: Lista de Mapas & Pontos (z-[9999]) */}
+      {isDrawerOpen && (
+        <div className="fixed inset-0 z-[9999] bg-black/75 backdrop-blur-xs flex justify-end animate-in fade-in">
+          <div className="w-full sm:w-96 bg-slate-900 border-l border-slate-800 flex flex-col h-[100dvh] shadow-2xl animate-in slide-in-from-right">
+            
+            <div className="p-4 border-b border-slate-800 flex items-center justify-between bg-slate-950 shrink-0">
+              <div className="flex items-center gap-2">
+                <FileText className="w-5 h-5 text-emerald-400" />
+                <h3 className="text-sm font-extrabold text-white">Mapas em PDF & Pontos</h3>
+              </div>
+              <button
+                onClick={() => setIsDrawerOpen(false)}
+                className="p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-4 space-y-5 text-xs pb-32">
+              
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                disabled={isProcessing}
+                className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-extrabold rounded-xl shadow-lg transition-all active:scale-98"
+              >
+                {isProcessing ? (
+                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                ) : (
+                  <UploadCloud className="w-4 h-4" />
+                )}
+                <span>{isProcessing ? 'Renderizando...' : 'Importar Novo Mapa PDF'}</span>
+              </button>
+
+              {activeDoc && (
+                <button
+                  onClick={() => {
+                    setIsDrawerOpen(false);
+                    setIsExportModalOpen(true);
+                  }}
+                  className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-slate-800 hover:bg-slate-700 border border-emerald-500/40 text-emerald-400 font-extrabold rounded-xl shadow transition-all active:scale-98"
+                >
+                  <Share2 className="w-4 h-4" />
+                  <span>Exportar & Compartilhar Este Mapa</span>
+                </button>
+              )}
+
+              {isProcessing && (
+                <div className="p-3 rounded-xl bg-emerald-950/60 border border-emerald-800 text-emerald-200">
+                  {processingProgress}
+                </div>
+              )}
+
+              {errorMsg && (
+                <div className="p-3 rounded-xl bg-rose-950/80 border border-rose-800 text-rose-200 flex items-start gap-2">
+                  <AlertTriangle className="w-4 h-4 text-rose-400 shrink-0 mt-0.5" />
+                  <div>{errorMsg}</div>
+                </div>
+              )}
+
+              {/* List of Maps */}
+              <div>
+                <label className="text-[11px] font-extrabold text-slate-400 uppercase tracking-wider block mb-2">
+                  Mapas Salvos ({documents.length})
+                </label>
+                <div className="space-y-2">
+                  {documents.map((doc) => {
+                    const isActive = activeDocId === doc.id;
+                    return (
+                      <div
+                        key={doc.id}
+                        onClick={() => {
+                          setActiveDocId(doc.id);
+                          setIsDrawerOpen(false);
+                        }}
+                        className={`p-3 rounded-xl cursor-pointer transition-all flex items-center justify-between border ${
+                          isActive
+                            ? 'bg-emerald-950/60 border-emerald-500 text-white font-bold'
+                            : 'bg-slate-950/80 border-slate-800 text-slate-300 hover:bg-slate-800'
+                        }`}
+                      >
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          <FileText className={`w-4 h-4 shrink-0 ${isActive ? 'text-emerald-400' : 'text-slate-500'}`} />
+                          <div className="truncate">
+                            <div className="truncate font-bold">{doc.name}</div>
+                            <div className="text-[10px] text-slate-500 font-normal">
+                              {doc.pageCount} pág • {doc.markers.length} pontos • {doc.tracks?.length || 0} rotas
+                            </div>
+                          </div>
+                        </div>
+                        <button
+                          onClick={(e) => handleDeleteDoc(doc.id, e)}
+                          className="p-1.5 text-slate-500 hover:text-rose-400 rounded transition-colors"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Markers List */}
+              {activeDoc && (
+                <div>
+                  <label className="text-[11px] font-extrabold text-slate-400 uppercase tracking-wider block mb-2">
+                    Pontos nesta Folha ({activeDoc.markers.length})
+                  </label>
+                  <div className="space-y-1.5">
+                    {activeDoc.markers.map((marker) => (
+                      <div
+                        key={marker.id}
+                        onClick={() => {
+                          setSelectedMarker(marker);
+                          setIsDrawerOpen(false);
+                          if (mapInstanceRef.current) {
+                            mapInstanceRef.current.setView([marker.x, marker.y], 2);
+                          }
+                        }}
+                        className="p-2.5 rounded-xl bg-slate-950 border border-slate-800 flex items-center justify-between hover:border-slate-700 cursor-pointer"
+                      >
+                        <div className="flex items-center gap-2 min-w-0">
+                          <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: marker.color }} />
+                          <span className="font-bold text-white truncate">{marker.title}</span>
+                          {marker.photos && marker.photos.length > 0 && (
+                            <span className="text-[10px] text-emerald-400 bg-emerald-950/80 px-1.5 py-0.5 rounded">
+                              📷 {marker.photos.length}
+                            </span>
+                          )}
+                        </div>
+                        <span className="text-[10px] text-slate-500">{marker.createdAt}</span>
+                      </div>
+                    ))}
+                    {activeDoc.markers.length === 0 && (
+                      <div className="p-3 text-center text-slate-500 italic">
+                        Nenhum ponto marcado ainda.
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Tracks List */}
+              {activeDoc && activeDoc.tracks && activeDoc.tracks.length > 0 && (
+                <div>
+                  <label className="text-[11px] font-extrabold text-slate-400 uppercase tracking-wider block mb-2">
+                    Rotas e Traçados ({activeDoc.tracks.length})
+                  </label>
+                  <div className="space-y-1.5">
+                    {activeDoc.tracks.map((trk) => (
+                      <div
+                        key={trk.id}
+                        className="p-2.5 rounded-xl bg-slate-950 border border-slate-800 flex items-center justify-between"
+                      >
+                        <div className="flex items-center gap-2">
+                          <span className="w-3 h-1 rounded" style={{ backgroundColor: trk.color }} />
+                          <span className="font-bold text-slate-200">{trk.name}</span>
+                          <span className="text-[10px] text-slate-500">({trk.points.length} pts)</span>
+                        </div>
+                        <button
+                          onClick={() => handleDeleteTrack(trk.id)}
+                          className="p-1 text-slate-500 hover:text-rose-400"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+            </div>
+          </div>
+        </div>
+      )}
+
+    </div>
+  );
+};

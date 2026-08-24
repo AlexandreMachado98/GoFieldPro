@@ -1,0 +1,72 @@
+{
+  "project_name": "GeoField Pro",
+  "collections": [
+    {
+      "name": "users",
+      "description": "User profiles and RBAC roles",
+      "fields": [
+        { "name": "uid", "type": "string" },
+        { "name": "email", "type": "string" },
+        { "name": "name", "type": "string" },
+        { "name": "role", "type": "string" },
+        { "name": "avatar", "type": "string" },
+        { "name": "createdAt", "type": "timestamp" }
+      ],
+      "access_rules": [
+        { "action": "read", "role": "super_admin" },
+        { "action": "read", "condition": "request.auth.uid == resource.data.uid" },
+        { "action": "create", "condition": "request.auth.uid != null && request.resource.data.uid == request.auth.uid" },
+        { "action": "update", "role": "super_admin" }
+      ]
+    },
+    {
+      "name": "projects",
+      "description": "Project folders",
+      "fields": [
+        { "name": "name", "type": "string" },
+        { "name": "description", "type": "string" },
+        { "name": "locationName", "type": "string" }
+      ],
+      "access_rules": [
+        { "action": "read", "condition": "request.auth.uid != null" },
+        { "action": "write", "role": "super_admin" }
+      ]
+    },
+    {
+      "name": "waypoints",
+      "description": "Field waypoints",
+      "fields": [
+        { "name": "projectId", "type": "string" },
+        { "name": "name", "type": "string" },
+        { "name": "lat", "type": "number" },
+        { "name": "lng", "type": "number" }
+      ],
+      "access_rules": [
+        { "action": "read", "condition": "request.auth.uid != null" },
+        { "action": "create", "role": ["super_admin", "field_lead", "surveyor"] },
+        { "action": "update", "role": ["super_admin", "field_lead"] },
+        { "action": "delete", "role": "super_admin" }
+      ]
+    },
+    {
+      "name": "tracks",
+      "description": "GPS tracks recorded in the field",
+      "fields": [
+        { "name": "projectId", "type": "string" },
+        { "name": "name", "type": "string" }
+      ],
+      "access_rules": [
+        { "action": "read", "condition": "request.auth.uid != null" },
+        { "action": "create", "role": ["super_admin", "field_lead", "surveyor"] },
+        { "action": "update", "role": ["super_admin", "field_lead"] },
+        { "action": "delete", "role": "super_admin" }
+      ]
+    }
+  ],
+  "roles": [
+    { "name": "super_admin", "description": "Full access to manage users, projects, and all data" },
+    { "name": "field_lead", "description": "Can manage waypoints and tracks" },
+    { "name": "surveyor", "description": "Can create waypoints and tracks" },
+    { "name": "auditor", "description": "Read-only access to all data" }
+  ]
+}
