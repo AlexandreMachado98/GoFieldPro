@@ -117,7 +117,7 @@ export const PwaInstallModal: React.FC<PwaInstallModalProps> = ({
                   2
                 </span>
                 <div>
-                  Role as Opções para baixo e toque em <b className="text-white">"Adicionar à Tela de Início"</b> <PlusSquare className="w-3.5 h-3.5 inline text-emerald-400 mx-0.5" />.
+                  Role as opções para baixo e toque em <b className="text-white">"Adicionar à Tela de Início"</b> <PlusSquare className="w-3.5 h-3.5 inline text-emerald-400 mx-0.5" />.
                 </div>
               </li>
               <li className="flex items-start gap-3 bg-slate-800/50 p-2.5 rounded-xl border border-slate-700/50">

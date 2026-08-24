@@ -78,7 +78,7 @@ export const LoginScreen: React.FC = () => {
           role: isOwner ? 'super_admin' : requestedRole,
           status: isOwner ? 'active' : 'pending',
           avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(name.trim())}&background=0284c7&color=fff`,
-          createdAténew Date().toISOString(),
+          createdAt: new Date().toISOString(),
         }, { merge: true });
 
         setSuccess('Cadastro realizado! Sua solicitação foi enviada para liberação do Administrador.');
@@ -308,7 +308,7 @@ export const LoginScreen: React.FC = () => {
               }}
               className="text-xs font-semibold text-slate-400 hover:text-sky-400 transition-colors"
             >
-              {isLogin ? 'Não tem acesso ainda? Solicitar cadastro' : 'Jápossui cadastro aprovado? Fazer login'}
+              {isLogin ? 'Não tem acesso ainda? Solicitar cadastro' : 'Já possui cadastro aprovado? Fazer login'}
             </button>
 
             <PwaInstallButton variant="login" />

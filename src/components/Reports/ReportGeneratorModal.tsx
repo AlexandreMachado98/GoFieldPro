@@ -173,7 +173,7 @@ export const ReportGeneratorModal: React.FC = () => {
             </div>
             <h3 className="font-bold text-base text-white">{t.exportKml}</h3>
             <p className="text-xs text-slate-400 mt-1">
-              Arquivo vetorial XML Padrão OGC KML 2.2 compatível com QGIS, ArcGIS, Global Mapper e navegadores GPS.
+              Arquivo vetorial XML padrão OGC KML 2.2 compatível com QGIS, ArcGIS, Global Mapper e navegadores GPS.
             </p>
           </div>
 
@@ -239,7 +239,7 @@ export const ReportGeneratorModal: React.FC = () => {
             </div>
             <h3 className="font-bold text-base text-white">{t.exportGpx}</h3>
             <p className="text-xs text-slate-400 mt-1">
-              Formato GPS Exchange Padrão para importação direta em aparelhos Garmin, rádio comunicadores e relógios de expedição.
+              Formato GPS Exchange padrão para importação direta em aparelhos Garmin, rádio comunicadores e relógios de expedição.
             </p>
           </div>
 

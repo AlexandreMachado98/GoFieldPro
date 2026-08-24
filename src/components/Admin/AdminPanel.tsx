@@ -72,8 +72,8 @@ export const AdminPanel: React.FC = () => {
         phone: newUserPhone.trim(),
         requestedRole: newUserRole,
         avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(newUserName.trim() || emailClean)}&background=0284c7&color=fff`,
-        createdAtéexistingUser?.createdAténew Date().toISOString(),
-        approvedAténewUserStatus === 'active' ? new Date().toISOString() : undefined,
+        createdAt: existingUser?.createdAt || new Date().toISOString(),
+        approvedAt: newUserStatus === 'active' ? new Date().toISOString() : undefined,
         approvedBy: newUserStatus === 'active' ? (profile?.name || 'Administrador') : undefined,
       };
 
@@ -92,7 +92,7 @@ export const AdminPanel: React.FC = () => {
       manualSync();
     } catch (err: any) {
       console.error("Error creating user:", err);
-      notifyError("Erro ao Salvar", "Não foi possível registrar o Usuário no banco de dados.");
+      notifyError("Erro ao Salvar", "Não foi possível registrar o usuário no banco de dados.");
     } finally {
       setSavingUser(false);
     }
@@ -112,15 +112,16 @@ export const AdminPanel: React.FC = () => {
         phone: data.phone || '',
         requestedRole: data.requestedRole || data.role || 'surveyor',
         avatar: data.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(data.name || 'U')}&background=0284c7&color=fff`,
-        createdAtédata.createdAténew Date().toISOString(),
-        approvedAtédata.approvedAtéapprovedBy: data.approvedBy,
+        createdAt: data.createdAt || new Date().toISOString(),
+        approvedAt: data.approvedAt,
+        approvedBy: data.approvedBy,
       } as UserProfile;
     });
 
     usersData.sort((a, b) => {
       if (a.status === 'pending' && b.status !== 'pending') return -1;
       if (a.status !== 'pending' && b.status === 'pending') return 1;
-      return new Date(b.createdAtégetTime() - new Date(a.createdAtégetTime();
+      return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
     });
 
     return usersData;
@@ -134,10 +135,10 @@ export const AdminPanel: React.FC = () => {
       const list = parseUsersSnapshot(snapshot.docs);
       setUsers(list);
       setLastSyncTime(new Date().toLocaleTimeString('pt-BR'));
-      notifySuccess("Sincronização Concluída", `${list.length} Usuário(s) sincronizados com o banco de dados.`);
+      notifySuccess("Sincronização Concluída", `${list.length} usuário(s) sincronizados com o banco de dados.`);
     } catch (err: any) {
       console.error("Manual sync error:", err);
-      notifyError("Erro de Sincronização", "Não foi possível carregar a lista de Usuários.");
+      notifyError("Erro de Sincronização", "Não foi possível carregar a lista de usuários.");
     } finally {
       setRefreshing(false);
       setLoading(false);
@@ -176,13 +177,13 @@ export const AdminPanel: React.FC = () => {
       await updateDoc(userRef, {
         status: 'active',
         role: roleToSet,
-        approvedAténew Date().toISOString(),
+        approvedAt: new Date().toISOString(),
         approvedBy: profile?.name || 'Administrador',
       });
       notifySuccess("Acesso Liberado!", `${userToApprove.name} agora tem acesso ao GoField Pro.`);
     } catch (error) {
       console.error("Error approving user:", error);
-      notifyError("Falha na Liberação", "Não foi possível liberar o acesso do Usuário.");
+      notifyError("Falha na Liberação", "Não foi possível liberar o acesso do usuário.");
     }
   };
 
@@ -200,7 +201,7 @@ export const AdminPanel: React.FC = () => {
           notifySuccess("Usuário Bloqueado", `O acesso de ${userToBlock.name} foi bloqueado.`);
         } catch (error) {
           console.error("Error blocking user:", error);
-          notifyError("Erro ao bloquear", "Não foi possível alterar o status do Usuário.");
+          notifyError("Erro ao bloquear", "Não foi possível alterar o status do usuário.");
         }
       },
     });
@@ -231,7 +232,7 @@ export const AdminPanel: React.FC = () => {
           notifySuccess("Cadastro Removido", `O registro de ${userToDelete.name} foi apagado.`);
         } catch (error) {
           console.error("Error deleting user:", error);
-          notifyError("Erro ao excluir", "Não foi possível remover o registro do Usuário.");
+          notifyError("Erro ao excluir", "Não foi possível remover o registro do usuário.");
         }
       },
     });
@@ -244,7 +245,7 @@ export const AdminPanel: React.FC = () => {
           <Shield className="w-12 h-12 text-red-500 mx-auto mb-4" />
           <h2 className="text-xl font-bold text-white mb-2">Acesso Negado</h2>
           <p className="text-slate-400 text-sm">
-            Vocênão possui permissões de Administrador para acessar o painel de controle de Usuários.
+            Você não possui permissões de Administrador para acessar o painel de controle de usuários.
           </p>
         </div>
       </div>
@@ -297,7 +298,7 @@ export const AdminPanel: React.FC = () => {
             onClick={manualSync}
             disabled={refreshing}
             className="bg-slate-950 hover:bg-slate-800 border border-slate-700/80 hover:border-sky-500/60 px-3 py-1.5 rounded-xl flex items-center gap-2 text-xs font-bold text-sky-400 transition-all active:scale-95 shadow-md"
-            title="Forçar Sincronização imediata com o Firestore"
+            title="Forçar sincronização imediata com o Firestore"
           >
             <RefreshCw className={`w-3.5 h-3.5 ${refreshing ? 'animate-spin text-sky-300' : ''}`} />
             <span>{refreshing ? 'Sincronizando...' : 'Sincronizar Banco'}</span>
@@ -477,12 +478,12 @@ export const AdminPanel: React.FC = () => {
         {loading ? (
           <div className="bg-slate-900 border border-slate-800 p-12 rounded-2xl text-center text-slate-400 space-y-2">
             <div className="w-8 h-8 border-3 border-sky-500 border-t-transparent rounded-full animate-spin mx-auto"></div>
-            <p className="text-xs font-semibold">Carregando Usuários do Firebase em tempo real...</p>
+            <p className="text-xs font-semibold">Carregando usuários do Firebase em tempo real...</p>
           </div>
         ) : filteredUsers.length === 0 ? (
           <div className="bg-slate-900 border border-slate-800 p-12 rounded-2xl text-center text-slate-400 space-y-2">
             <Users className="w-10 h-10 text-slate-600 mx-auto mb-2" />
-            <h4 className="font-bold text-white text-sm">Nenhum Usuário encontrado</h4>
+            <h4 className="font-bold text-white text-sm">Nenhum usuário encontrado</h4>
             <p className="text-xs text-slate-500">
               {searchQuery ? 'Tente ajustar os termos da sua busca.' : 'Não há registros com o filtro selecionado.'}
             </p>
@@ -519,7 +520,8 @@ export const AdminPanel: React.FC = () => {
                             <span>{u.name}</span>
                             {isSelf && (
                               <span className="text-[10px] px-1.5 py-0.2 bg-sky-950 text-sky-400 border border-sky-800 rounded font-semibold">
-                                Vocêspan>
+                                Você
+                              </span>
                             )}
                           </div>
                           <div className="text-xs text-slate-400 flex items-center gap-1 mt-0.5">
@@ -564,7 +566,7 @@ export const AdminPanel: React.FC = () => {
                     <div className="pt-2 border-t border-slate-800/80 flex items-center justify-between gap-2">
                       <div className="text-[10px] text-slate-500 flex items-center gap-1">
                         <Calendar className="w-3 h-3" />
-                        <span>{new Date(u.createdAtétoLocaleDateString('pt-BR')}</span>
+                        <span>{new Date(u.createdAt).toLocaleDateString('pt-BR')}</span>
                       </div>
 
                       <div className="flex items-center gap-1.5">
@@ -586,7 +588,7 @@ export const AdminPanel: React.FC = () => {
                                 ? 'bg-emerald-950/60 border-emerald-800 text-emerald-300'
                                 : 'bg-slate-800 hover:bg-amber-950/60 border-slate-700 text-slate-400 hover:text-amber-300'
                             }`}
-                            title={isBlocked ? 'Desbloquear Usuário' : 'Suspender/Bloquear'}
+                            title={isBlocked ? 'Desbloquear usuário' : 'Suspender/Bloquear'}
                           >
                             {isBlocked ? <CheckCircle2 className="w-4 h-4" /> : <UserX className="w-4 h-4" />}
                           </button>
@@ -646,12 +648,13 @@ export const AdminPanel: React.FC = () => {
                                   <span>{u.name}</span>
                                   {isSelf && (
                                     <span className="text-[10px] px-1.5 py-0.2 bg-sky-950 text-sky-400 border border-sky-800 rounded font-semibold">
-                                      Vocêspan>
+                                      Você
+                                    </span>
                                   )}
                                 </div>
                                 <div className="text-[11px] text-slate-400 flex items-center gap-1">
                                   <Calendar className="w-3 h-3 text-slate-500" />
-                                  <span>Cadastrado em {new Date(u.createdAtétoLocaleDateString('pt-BR')}</span>
+                                  <span>Cadastrado em {new Date(u.createdAt).toLocaleDateString('pt-BR')}</span>
                                 </div>
                               </div>
                             </div>
@@ -730,7 +733,7 @@ export const AdminPanel: React.FC = () => {
                                         ? 'bg-emerald-950/60 border-emerald-800 text-emerald-300 hover:bg-emerald-900/80'
                                         : 'bg-slate-800 hover:bg-amber-950/60 border-slate-700 text-slate-300 hover:text-amber-300'
                                     }`}
-                                    title={isBlocked ? 'Desbloquear Usuário' : 'Suspender acesso'}
+                                    title={isBlocked ? 'Desbloquear usuário' : 'Suspender acesso'}
                                   >
                                     {isBlocked ? <CheckCircle2 className="w-3.5 h-3.5" /> : <UserX className="w-3.5 h-3.5" />}
                                     <span>{isBlocked ? 'Reativar' : 'Bloquear'}</span>
@@ -800,7 +803,7 @@ export const AdminPanel: React.FC = () => {
                   />
                 </div>
                 <span className="text-[10px] text-slate-500 mt-1 block">
-                  Se o Usuário já tentou se cadastrar com este e-mail, seu status será liberado instantaneamente.
+                  Se o usuário já tentou se cadastrar com este e-mail, seu status será liberado instantaneamente.
                 </span>
               </div>
 

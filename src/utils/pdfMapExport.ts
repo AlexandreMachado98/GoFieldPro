@@ -32,7 +32,7 @@ export function generateKML(doc: PdfDocument, projectName = 'GoField Pro'): stri
       <description><![CDATA[
         <div style="font-family: sans-serif;">
           <p><b>Categoria:</b> ${escapeXml(marker.category)}</p>
-          <p><b>Data/Hora:</b> ${escapeXml(marker.createdAtép>
+          <p><b>Data/Hora:</b> ${escapeXml(marker.createdAt)}</p>
           ${marker.notes ? `<p><b>Anotações de Campo:</b><br/>${escapeXml(marker.notes)}</p>` : ''}
           ${photosNote}
           <hr/>
@@ -73,7 +73,7 @@ export function generateKML(doc: PdfDocument, projectName = 'GoField Pro'): stri
         <div style="font-family: sans-serif;">
           <p><b>Tipo:</b> ${track.isRecorded ? 'Trilha Gravada em Campo' : 'Rota Planejada'}</p>
           <p><b>Vértices:</b> ${track.points.length} pontos</p>
-          <p><b>Data:</b> ${escapeXml(track.createdAtép>
+          <p><b>Data:</b> ${escapeXml(track.createdAt)}</p>
           <p><b>Distância:</b> ${escapeXml(track.distance || 'N/A')}</p>
           <hr/>
           <p style="font-size: 10px; color: #666;">GoField Pro • Sistema de Campo</p>
@@ -139,7 +139,8 @@ export function generateGeoJSON(doc: PdfDocument): string {
         notes: marker.notes || '',
         category: marker.category,
         color: marker.color,
-        createdAtémarker.createdAtéphotosCount: marker.photos ? marker.photos.length : 0,
+        createdAt: marker.createdAt,
+        photosCount: marker.photos ? marker.photos.length : 0,
         pdfPixelX: marker.x,
         pdfPixelY: marker.y,
         mapSource: doc.name,
@@ -169,7 +170,8 @@ export function generateGeoJSON(doc: PdfDocument): string {
         name: track.name,
         color: track.color,
         isRecorded: !!track.isRecorded,
-        createdAtétrack.createdAtédistance: track.distance || '',
+        createdAt: track.createdAt,
+        distance: track.distance || '',
         duration: track.duration || '',
         pointCount: track.points.length,
         mapSource: doc.name,
@@ -182,7 +184,7 @@ export function generateGeoJSON(doc: PdfDocument): string {
     type: 'FeatureCollection',
     name: `${doc.name}_Levantamento_Campo`,
     metadata: {
-      generatedAténew Date().toISOString(),
+      generatedAt: new Date().toISOString(),
       mapDocument: doc.name,
       pageCount: doc.pageCount,
       author: 'AM TST SAÚDE E SEGURANÇA DO TRABALHO',
@@ -216,7 +218,7 @@ export function generateGPX(doc: PdfDocument): string {
 
     return `  <wpt lat="${coords.lat}" lon="${coords.lng}">
     <name>${escapeXml(marker.title)}</name>
-    <desc>${escapeXml(marker.notes || marker.category)} - ${escapeXml(marker.createdAtédesc>
+    <desc>${escapeXml(marker.notes || marker.category)} - ${escapeXml(marker.createdAt)}</desc>
     <sym>Flag, Blue</sym>
     <type>${escapeXml(marker.category)}</type>
   </wpt>`;
@@ -531,7 +533,7 @@ export async function generateAnnotatedPdf(
       pdfDoc.setFont('helvetica', 'normal');
       pdfDoc.setFontSize(8);
       pdfDoc.setTextColor(71, 85, 105);
-      pdfDoc.text(`Horário: ${m.createdAtéCoordenadas: Lat ${coords.lat.toFixed(6)}, Lng ${coords.lng.toFixed(6)} | Fotos: ${m.photos?.length || 0}`, 14, curY + 11);
+      pdfDoc.text(`Horário: ${m.createdAt} | Coordenadas: Lat ${coords.lat.toFixed(6)}, Lng ${coords.lng.toFixed(6)} | Fotos: ${m.photos?.length || 0}`, 14, curY + 11);
 
       if (m.notes) {
         pdfDoc.text(`Obs: ${m.notes}`, 14, curY + 15);
@@ -573,7 +575,7 @@ export async function generateAnnotatedPdf(
         pdfDoc.setFont('helvetica', 'normal');
         pdfDoc.setFontSize(8);
         pdfDoc.setTextColor(71, 85, 105);
-        pdfDoc.text(`Data: ${trk.createdAtéPontos: ${trk.points.length} | Distância Estimada: ${trk.distance || 'N/A'}`, 14, curY + 11);
+        pdfDoc.text(`Data: ${trk.createdAt} | Pontos: ${trk.points.length} | Distância Estimada: ${trk.distance || 'N/A'}`, 14, curY + 11);
 
         curY += 17;
       });

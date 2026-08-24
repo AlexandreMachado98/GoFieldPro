@@ -470,7 +470,7 @@ export const PdfMapNavigator: React.FC = () => {
         height: sample.height,
         markers: [],
         tracks: [],
-        uploadedAténew Date().toLocaleDateString('pt-BR'),
+        uploadedAt: new Date().toLocaleDateString('pt-BR'),
       };
 
       await savePdfDocument(sampleDoc);
@@ -723,7 +723,8 @@ export const PdfMapNavigator: React.FC = () => {
               <div style="font-size: 11px; color: #64748b; margin-top: 2px;">
                 ${track.isRecorded ? '🔴 Trilha Gravada' : '✏️ Rota Traçada'}<br/>
                 Pontos: ${track.points.length}<br/>
-                Data: ${track.createdAtédiv>
+                Data: ${track.createdAt}
+              </div>
             </div>
           `);
 
@@ -929,7 +930,7 @@ export const PdfMapNavigator: React.FC = () => {
           console.warn('Geolocation watch error:', err);
           let errText = 'Não foi possível obter a localização do dispositivo.';
           if (err.code === err.PERMISSION_DENIED) {
-            errText = 'Permissão de localização negada pelo Usuário.';
+            errText = 'Permissão de localização negada pelo usuário.';
           } else if (err.code === err.POSITION_UNAVAILABLE) {
             errText = 'Sinal de GPS indisponível no momento.';
           } else if (err.code === err.TIMEOUT) {
@@ -958,7 +959,7 @@ export const PdfMapNavigator: React.FC = () => {
         gpsAccuracyCircleRef.current = null;
       }
       setUserGps(null);
-      notifyInfo('GPS Desativado', 'Rastreio de Posição pausado.');
+      notifyInfo('GPS Desativado', 'Rastreio de posição pausado.');
     }
   }, [isGpsActive, notifyError, notifyInfo, updateUserGpsPosition]);
 
@@ -988,7 +989,7 @@ export const PdfMapNavigator: React.FC = () => {
   const handleCalibrateCurrentGps = useCallback(() => {
     if (!activeDoc) return;
     if (!userGps) {
-      notifyWarning('GPS Necessário', 'Ative o GPS primeiro para calibrar a folha com a sua Posição.');
+      notifyWarning('GPS Necessário', 'Ative o GPS primeiro para calibrar a folha com a sua posição.');
       toggleGps(true);
       return;
     }
@@ -1001,7 +1002,7 @@ export const PdfMapNavigator: React.FC = () => {
 
     updateDocumentInStore(updatedDoc);
     setIsCalibrationModalOpen(false);
-    notifySuccess('Planta Calibrada', 'A folha do PDF foi ancorada na sua Posição geográfica atual.');
+    notifySuccess('Planta Calibrada', 'A folha do PDF foi ancorada na sua posição geográfica atual.');
   }, [activeDoc, userGps, calibScale, updateDocumentInStore, toggleGps, notifySuccess, notifyWarning]);
 
   // Calculate live navigation metrics to active target marker
@@ -1095,7 +1096,7 @@ export const PdfMapNavigator: React.FC = () => {
           height: baseHeight,
           markers: [],
           tracks: [],
-          uploadedAténew Date().toLocaleDateString('pt-BR'),
+          uploadedAt: new Date().toLocaleDateString('pt-BR'),
         };
 
         await savePdfDocument(newDoc);
@@ -1132,7 +1133,7 @@ export const PdfMapNavigator: React.FC = () => {
               height: img.naturalHeight || 1000,
               markers: [],
               tracks: [],
-              uploadedAténew Date().toLocaleDateString('pt-BR'),
+              uploadedAt: new Date().toLocaleDateString('pt-BR'),
             };
             await savePdfDocument(newDoc);
             setDocuments((prev) => [newDoc, ...prev]);
@@ -1243,7 +1244,7 @@ export const PdfMapNavigator: React.FC = () => {
       category: markerCategory,
       color: categoryObj.color,
       photos: markerPhotos,
-      createdAténew Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
+      createdAt: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
     };
 
     const updatedDoc: PdfDocument = {
@@ -1274,7 +1275,7 @@ export const PdfMapNavigator: React.FC = () => {
       points: currentTrackPoints,
       color: trackColor,
       isRecorded: false,
-      createdAténew Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
+      createdAt: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
     };
 
     const updatedDoc: PdfDocument = {
@@ -1361,7 +1362,7 @@ export const PdfMapNavigator: React.FC = () => {
       isRecorded: true,
       distance: formattedDist,
       duration: formatTimer(recordDuration),
-      createdAténew Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
+      createdAt: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
     };
 
     const updatedDoc: PdfDocument = {
@@ -2290,7 +2291,7 @@ export const PdfMapNavigator: React.FC = () => {
             </div>
 
             <p className="text-xs text-slate-400 leading-relaxed">
-              Vincule a folha desta planta às coordenadas do mundo real. Vocêpode ancorar a planta usando sua localização atual do GPS para que o rastreio e navegação fiquem alinhados.
+              Vincule a folha desta planta às coordenadas do mundo real. Você pode ancorar a planta usando sua localização atual do GPS para que o rastreio e navegação fiquem alinhados.
             </p>
 
             <div className="bg-slate-950 p-3 rounded-xl border border-slate-800 space-y-2">
@@ -2376,7 +2377,7 @@ export const PdfMapNavigator: React.FC = () => {
 
             <div className="p-4 overflow-y-auto space-y-4 text-xs">
               <div className="flex items-center justify-between text-slate-400 border-b border-slate-800 pb-2">
-                <span>Registrado às {selectedMarker.createdAtéspan>
+                <span>Registrado às {selectedMarker.createdAt}</span>
                 <span className="font-bold text-slate-300 capitalize">{selectedMarker.category}</span>
               </div>
 
@@ -2616,7 +2617,7 @@ export const PdfMapNavigator: React.FC = () => {
                             </span>
                           )}
                         </div>
-                        <span className="text-[10px] text-slate-500">{marker.createdAtéspan>
+                        <span className="text-[10px] text-slate-500">{marker.createdAt}</span>
                       </div>
                     ))}
                     {activeDoc.markers.length === 0 && (

@@ -53,7 +53,7 @@ interface AppContextType {
 
   // Field Trips / Rodada de Campo (Quilometragem)
   fieldRounds: FieldRound[];
-  addFieldRound: (round: Omit<FieldRound, 'id' | 'createdAtéupdatedAtétotalKm'>) => void;
+  addFieldRound: (round: Omit<FieldRound, 'id' | 'createdAt' | 'updatedAt' | 'totalKm'>) => void;
   updateFieldRound: (id: string, round: Partial<FieldRound>) => void;
   deleteFieldRound: (id: string) => void;
   addPhotoToFieldRound: (id: string, photoBase64: string) => void;
@@ -62,7 +62,7 @@ interface AppContextType {
   projects: ProjectFolder[];
   activeProject: ProjectFolder;
   setActiveProject: (proj: ProjectFolder) => void;
-  createProject: (newProj: Omit<ProjectFolder, 'id' | 'createdAtéupdatedAtéstats'>) => void;
+  createProject: (newProj: Omit<ProjectFolder, 'id' | 'createdAt' | 'updatedAt' | 'stats'>) => void;
 
   // Map Basemap & Center
   basemap: BasemapType;
@@ -82,7 +82,7 @@ interface AppContextType {
 
   // Waypoints
   waypoints: Waypoint[];
-  addWaypoint: (wp: Omit<Waypoint, 'id' | 'createdAtésynced' | 'encrypted'>) => void;
+  addWaypoint: (wp: Omit<Waypoint, 'id' | 'createdAt' | 'synced' | 'encrypted'>) => void;
   deleteWaypoint: (id: string) => void;
   updateWaypointStatus: (id: string, status: Waypoint['status']) => void;
 
@@ -313,7 +313,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         message,
         type,
         duration,
-        createdAtéDate.now(),
+        createdAt: Date.now(),
       };
 
       setToasts((prev) => [newToast, ...prev.slice(0, 4)]);
@@ -619,12 +619,12 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   };
 
   // Waypoint Operations
-  const addWaypoint = (wpData: Omit<Waypoint, 'id' | 'createdAtésynced' | 'encrypted'>) => {
+  const addWaypoint = (wpData: Omit<Waypoint, 'id' | 'createdAt' | 'synced' | 'encrypted'>) => {
     const newId = `wp-${Date.now()}`;
     const newWaypoint: Waypoint = {
       ...wpData,
       id: newId,
-      createdAténew Date().toISOString(),
+      createdAt: new Date().toISOString(),
       synced: !isOffline,
       encrypted: e2eeEnabled,
       signatureHash: `SHA256-${Math.random().toString(36).substring(2, 12)}`,
@@ -821,12 +821,12 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   };
 
   // Projects Operations
-  const createProject = (newProjData: Omit<ProjectFolder, 'id' | 'createdAtéupdatedAtéstats'>) => {
+  const createProject = (newProjData: Omit<ProjectFolder, 'id' | 'createdAt' | 'updatedAt' | 'stats'>) => {
     const newProj: ProjectFolder = {
       ...newProjData,
       id: `proj-${Date.now()}`,
-      createdAténew Date().toISOString(),
-      updatedAténew Date().toISOString(),
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
       stats: {
         waypointsCount: 0,
         tracksCount: 0,
@@ -887,14 +887,15 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     if (!text.trim()) return;
     const newMsg = {
       id: `rad-${Date.now()}`,
-      sender: 'Carlos Silva (Vocêtext,
+      sender: 'Carlos Silva (Você)',
+      text,
       time: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
     };
     setRadioMessages((prev) => [...prev, newMsg]);
   };
 
   // Field Rounds (Quilometragem Diária de Campo)
-  const addFieldRound = (roundData: Omit<FieldRound, 'id' | 'createdAtéupdatedAtétotalKm'>) => {
+  const addFieldRound = (roundData: Omit<FieldRound, 'id' | 'createdAt' | 'updatedAt' | 'totalKm'>) => {
     const finalKmNum = Number(roundData.finalKm) || 0;
     const initKmNum = Number(roundData.initialKm) || 0;
     const totalKm = finalKmNum > 0 ? Math.max(0, finalKmNum - initKmNum) : 0;
@@ -906,8 +907,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       finalKm: finalKmNum,
       totalKm,
       photos: roundData.photos || [],
-      createdAténew Date().toISOString(),
-      updatedAténew Date().toISOString(),
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
     };
 
     setFieldRounds((prev) => [newRound, ...prev]);
@@ -921,7 +922,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     setFieldRounds((prev) =>
       prev.map((r) => {
         if (r.id !== id) return r;
-        const updated = { ...r, ...roundData, updatedAténew Date().toISOString() };
+        const updated = { ...r, ...roundData, updatedAt: new Date().toISOString() };
         if (updated.finalKm && updated.initialKm) {
           updated.totalKm = Math.max(0, Number(updated.finalKm) - Number(updated.initialKm));
         }
@@ -944,7 +945,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         return {
           ...r,
           photos: [...(r.photos || []), photoBase64],
-          updatedAténew Date().toISOString(),
+          updatedAt: new Date().toISOString(),
         };
       })
     );

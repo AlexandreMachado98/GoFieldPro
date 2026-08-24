@@ -66,7 +66,7 @@ export const PdfExportModal: React.FC<PdfExportModalProps> = ({
         setGeneratingLabel('Gerando GeoJSON Universal...');
         const geojsonString = generateGeoJSON(doc);
         downloadFile(geojsonString, `GoField_${cleanDocName}_GeoJSON.geojson`, 'application/geo+json');
-        notifySuccess('Download GeoJSON Concluído', 'Estrutura Padrão RFC 7946 pronta para SIG.');
+        notifySuccess('Download GeoJSON Concluído', 'Estrutura padrão RFC 7946 pronta para SIG.');
       } else if (format === 'gpx') {
         setGeneratingLabel('Gerando arquivo GPX (Garmin & GPS)...');
         const gpxString = generateGPX(doc);

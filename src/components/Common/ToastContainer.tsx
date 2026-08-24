@@ -173,7 +173,7 @@ const ToastItem: React.FC<ToastItemProps> = ({ toast, onDismiss }) => {
           id={`btn-close-toast-${toast.id}`}
           onClick={() => onDismiss(toast.id)}
           className="p-1 rounded-md text-slate-400 hover:text-slate-100 hover:bg-slate-800/80 transition-colors shrink-0"
-          title="Fechar Notificação"
+          title="Fechar notificação"
         >
           <X className="w-4 h-4" />
         </button>

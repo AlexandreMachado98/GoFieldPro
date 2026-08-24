@@ -183,7 +183,7 @@ export const Topbar: React.FC = () => {
                         <button
                           onClick={clearAllNotifications}
                           className="text-[10px] text-slate-400 hover:text-rose-400 p-1 rounded hover:bg-slate-800"
-                          title="Limpar todas as Notificações"
+                          title="Limpar todas as notificações"
                         >
                           <Trash2 className="w-3.5 h-3.5" />
                         </button>
@@ -193,7 +193,7 @@ export const Topbar: React.FC = () => {
                   <div className="max-h-80 overflow-y-auto space-y-1.5 py-1.5">
                     {notifications.length === 0 ? (
                       <div className="p-6 text-center text-xs text-slate-500">
-                        Nenhuma Notificação no momento.
+                        Nenhuma notificação no momento.
                       </div>
                     ) : (
                       notifications.map((n) => (
