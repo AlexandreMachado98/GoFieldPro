@@ -703,13 +703,15 @@ export const PdfMapNavigator: React.FC = () => {
       if (currentDataUrl) {
         imageOverlayRef.current = L.imageOverlay(currentDataUrl, bounds).addTo(map);
         map.fitBounds(bounds, { padding: [15, 15] });
-        map.setMaxBounds(bounds.pad(0.5));
+        // Use a very large pad (1.5) to prevent Leaflet maxBounds infinite loop bug 
+        // when the user zooms out and the view becomes larger than the max bounds!
+        map.setMaxBounds(bounds.pad(1.5));
         
         // Prevent zooming out so far that the map becomes a tiny speck or gets lost
         // isFinite check is critical because if container is size 0 on mount, it returns Infinity, which crashes Leaflet!
         const baseZoom = map.getBoundsZoom(bounds);
         if (isFinite(baseZoom)) {
-          map.setMinZoom(baseZoom - 1.5);
+          map.setMinZoom(baseZoom - 1.2);
         } else {
           map.setMinZoom(-3);
         }
@@ -1379,7 +1381,8 @@ export const PdfMapNavigator: React.FC = () => {
 
           const unscaledViewport = page.getViewport({ scale: 1.0 });
           const maxDim = Math.max(unscaledViewport.width, unscaledViewport.height);
-          const scale = Math.min(2.0, Math.max(1.0, 2000 / maxDim));
+          // Strictly limit the maximum pixel dimension to 1800px to prevent mobile GPU OOM (black screen on pan/zoom)
+          const scale = Math.min(2.5, 1800 / maxDim);
           const viewport = page.getViewport({ scale });
 
           if (pageNum === 1) {
