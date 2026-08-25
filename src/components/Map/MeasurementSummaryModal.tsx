@@ -377,17 +377,20 @@ export const MeasurementSummaryModal: React.FC<MeasurementSummaryModalProps> = (
                           <td className="py-2 px-3">
                             <span
                               className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                                pt.type === 'stop'
+                                pt.type === 'woodpile'
+                                  ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
+                                  : pt.type === 'stop'
                                   ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
                                   : pt.type === 'hazard'
                                   ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
                                   : 'bg-sky-500/20 text-sky-400 border border-sky-500/30'
                               }`}
                             >
+                              {pt.type === 'woodpile' && <span>🪵</span>}
                               {pt.type === 'stop' && <Flag className="w-2.5 h-2.5" />}
                               {pt.type === 'hazard' && <AlertTriangle className="w-2.5 h-2.5" />}
                               {pt.type === 'standard' && <MapPin className="w-2.5 h-2.5" />}
-                              {pt.type === 'stop' ? 'Parada' : pt.type === 'hazard' ? 'Alerta' : 'Vértice'}
+                              {pt.type === 'woodpile' ? 'Pilha Madeira' : pt.type === 'stop' ? 'Parada' : pt.type === 'hazard' ? 'Alerta' : 'Vértice'}
                             </span>
                           </td>
                           <td className="py-2 px-3 font-mono text-[11px] text-slate-300">

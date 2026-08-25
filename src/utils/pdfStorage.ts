@@ -18,9 +18,19 @@ export interface PdfMarker {
   lng?: number;
   title: string;
   notes?: string;
-  category: 'checkpoint' | 'inspection' | 'hazard' | 'boundary' | 'sample' | 'note';
+  category: 'woodpile' | 'checkpoint' | 'inspection' | 'hazard' | 'boundary' | 'sample' | 'note';
   color: string;
   photos?: string[]; // compressed base64 images
+  woodpileData?: {
+    woodType?: string;
+    lengthMeters?: number;
+    heightMeters?: number;
+    widthMeters?: number;
+    stackFactor?: number;
+    estimatedStereoM3?: number;
+    estimatedSolidM3?: number;
+    status?: 'empilhada' | 'medida' | 'carregada' | 'transportada';
+  };
   createdAt: string;
 }
 

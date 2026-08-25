@@ -276,7 +276,7 @@ export interface AppSettings {
   photoQuality: 'high' | 'medium' | 'low';
 }
 
-export type MeasurementPointType = 'standard' | 'stop' | 'hazard';
+export type MeasurementPointType = 'standard' | 'stop' | 'hazard' | 'woodpile';
 
 export interface MeasurementPoint {
   id: string;
@@ -289,6 +289,15 @@ export interface MeasurementPoint {
   label: string;
   notes?: string;
   photos: string[];
+  woodpileData?: {
+    woodType?: string;
+    lengthMeters?: number;
+    heightMeters?: number;
+    widthMeters?: number;
+    stackFactor?: number;
+    estimatedStereoM3?: number;
+    estimatedSolidM3?: number;
+  };
   timestamp: number;
 }
 

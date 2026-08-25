@@ -119,7 +119,7 @@ export const PointDetailModal: React.FC<PointDetailModalProps> = ({
             <label className="block text-slate-400 font-bold uppercase tracking-wider mb-1.5 text-[10px]">
               Classificação do Ponto
             </label>
-            <div className="grid grid-cols-3 gap-2">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
               <button
                 type="button"
                 onClick={() => setType('standard')}
@@ -143,7 +143,7 @@ export const PointDetailModal: React.FC<PointDetailModalProps> = ({
                 }`}
               >
                 <Flag className="w-4 h-4" />
-                <span className="font-bold">Parada / Vistoria</span>
+                <span className="font-bold">Parada</span>
               </button>
 
               <button
@@ -156,7 +156,20 @@ export const PointDetailModal: React.FC<PointDetailModalProps> = ({
                 }`}
               >
                 <AlertTriangle className="w-4 h-4" />
-                <span className="font-bold">Atenção / Risco</span>
+                <span className="font-bold">Atenção</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setType('woodpile')}
+                className={`p-2.5 rounded-xl border flex flex-col items-center gap-1 transition-all ${
+                  type === 'woodpile'
+                    ? 'bg-amber-950/80 border-amber-500 text-amber-300'
+                    : 'bg-slate-950/40 border-slate-800 text-slate-400 hover:border-slate-700'
+                }`}
+              >
+                <span className="text-base leading-none">🪵</span>
+                <span className="font-bold">Pilha Madeira</span>
               </button>
             </div>
           </div>

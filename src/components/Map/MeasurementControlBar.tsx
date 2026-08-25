@@ -145,6 +145,18 @@ export const MeasurementControlBar: React.FC<MeasurementControlBarProps> = ({
               <AlertTriangle className="w-3.5 h-3.5 text-amber-300" />
               <span>Atenção / Risco</span>
             </button>
+
+            <button
+              onClick={() => setCurrentType('woodpile')}
+              className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg font-bold transition-all ${
+                currentType === 'woodpile'
+                  ? 'bg-amber-600 text-white shadow-md'
+                  : 'text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              <span className="text-xs">🪵</span>
+              <span>Pilha Madeira</span>
+            </button>
           </div>
 
           {/* Controls: Close Loop, Add GPS, Undo, Clear, Finish */}

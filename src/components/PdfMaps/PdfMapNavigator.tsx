@@ -72,13 +72,40 @@ if (typeof window !== 'undefined') {
   }
 }
 
+export const WoodpileIcon: React.FC<{ className?: string; size?: number }> = ({ className = 'w-5 h-5', size }) => (
+  <svg
+    viewBox="0 0 24 24"
+    width={size}
+    height={size}
+    className={className}
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
+    {/* Bottom Left Log */}
+    <circle cx="7" cy="16" r="3.5" fill="currentColor" fillOpacity="0.25" />
+    <circle cx="7" cy="16" r="1.2" />
+    {/* Bottom Right Log */}
+    <circle cx="17" cy="16" r="3.5" fill="currentColor" fillOpacity="0.25" />
+    <circle cx="17" cy="16" r="1.2" />
+    {/* Top Center Log */}
+    <circle cx="12" cy="7.5" r="3.5" fill="currentColor" fillOpacity="0.35" />
+    <circle cx="12" cy="7.5" r="1.2" />
+    {/* Supporting Stack Base Line */}
+    <path d="M3 21h18" />
+  </svg>
+);
+
 const CATEGORIES = [
-  { id: 'checkpoint', label: 'Ponto de Navegação', color: '#0284c7' },
-  { id: 'inspection', label: 'Inspeção / Vistoria', color: '#10b981' },
-  { id: 'hazard', label: 'Obstáculo / Risco', color: '#ef4444' },
-  { id: 'boundary', label: 'Marco / Vértice', color: '#8b5cf6' },
-  { id: 'sample', label: 'Amostra / Solo', color: '#ec4899' },
-  { id: 'note', label: 'Anotação Geral', color: '#f59e0b' },
+  { id: 'woodpile', label: 'Pilha de Madeira', color: '#d97706', icon: '🪵' },
+  { id: 'checkpoint', label: 'Ponto de Navegação', color: '#0284c7', icon: '📍' },
+  { id: 'inspection', label: 'Inspeção / Vistoria', color: '#10b981', icon: '🔍' },
+  { id: 'hazard', label: 'Obstáculo / Risco', color: '#ef4444', icon: '⚠️' },
+  { id: 'boundary', label: 'Marco / Vértice', color: '#8b5cf6', icon: '🚩' },
+  { id: 'sample', label: 'Amostra / Solo', color: '#ec4899', icon: '🧪' },
+  { id: 'note', label: 'Anotação Geral', color: '#f59e0b', icon: '📝' },
 ] as const;
 
 // Compress image file to lightweight Base64 to save storage and keep UI fast
@@ -141,8 +168,17 @@ export const PdfMapNavigator: React.FC = () => {
   const [activeDocId, setActiveDocId] = useState<string | null>(null);
   const [isLoadingDocs, setIsLoadingDocs] = useState(true);
 
-  // Tools mode: 'pan', 'add_point', 'draw_track', 'record_track', 'measure'
-  const [activeTool, setActiveTool] = useState<'pan' | 'add_point' | 'draw_track' | 'record_track' | 'measure'>('pan');
+  // Tools mode: 'pan', 'add_point', 'draw_track', 'record_track', 'measure', 'woodpile'
+  const [activeTool, setActiveTool] = useState<'pan' | 'add_point' | 'draw_track' | 'record_track' | 'measure' | 'woodpile'>('pan');
+
+  // Woodpile Specific Submode & Form State
+  const [woodpileSubMode, setWoodpileSubMode] = useState<'point' | 'measure'>('point');
+  const [woodType, setWoodType] = useState<string>('Eucalipto');
+  const [woodpileLength, setWoodpileLength] = useState<string>('');
+  const [woodpileHeight, setWoodpileHeight] = useState<string>('');
+  const [woodpileWidth, setWoodpileWidth] = useState<string>('1.0');
+  const [woodpileStackFactor, setWoodpileStackFactor] = useState<string>('0.67');
+  const [woodpileStatus, setWoodpileStatus] = useState<'empilhada' | 'medida' | 'carregada' | 'transportada'>('empilhada');
 
   // Measurement state on PDF sheet
   const [measurementPoints, setMeasurementPoints] = useState<MeasurementPoint[]>([]);
@@ -237,6 +273,9 @@ export const PdfMapNavigator: React.FC = () => {
   // Critical State Refs to prevent stale closures and React race conditions
   const activeToolRef = useRef(activeTool);
   activeToolRef.current = activeTool;
+
+  const woodpileSubModeRef = useRef(woodpileSubMode);
+  woodpileSubModeRef.current = woodpileSubMode;
 
   const currentMeasureTypeRef = useRef(currentMeasureType);
   currentMeasureTypeRef.current = currentMeasureType;
@@ -393,6 +432,48 @@ export const PdfMapNavigator: React.FC = () => {
             };
 
             setMeasurementPoints((prev) => [...prev, newPt]);
+          } else if (currentTool === 'woodpile') {
+            if (woodpileSubModeRef.current === 'measure') {
+              // Measure woodpile
+              const pts = measurementPointsRef.current;
+              const coords = currentDoc
+                ? pdfToGps(lat, lng, currentDoc)
+                : { lat: -23.542, lng: -46.638 };
+
+              const ptIndex = pts.length;
+              const label = `Pilha ${ptIndex + 1}`;
+
+              const newPt: MeasurementPoint = {
+                id: `pdf-woodpile-meas-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+                lat: coords.lat,
+                lng: coords.lng,
+                pdfX: lat,
+                pdfY: lng,
+                altitude: 1280,
+                type: 'woodpile',
+                label,
+                notes: 'Ponto de medição de pilha de madeira',
+                photos: [],
+                timestamp: Date.now(),
+              };
+
+              setMeasurementPoints((prev) => [...prev, newPt]);
+            } else {
+              // Point woodpile
+              const existingWoodpiles = currentDoc?.markers?.filter((m) => m.category === 'woodpile').length || 0;
+              setPendingMarkerPos({ x: lat, y: lng });
+              setMarkerTitle(`Pilha de Madeira #${existingWoodpiles + 1}`);
+              setMarkerCategory('woodpile');
+              setMarkerNotes('');
+              setMarkerPhotos([]);
+              setWoodType('Eucalipto');
+              setWoodpileLength('');
+              setWoodpileHeight('');
+              setWoodpileWidth('1.0');
+              setWoodpileStackFactor('0.67');
+              setWoodpileStatus('empilhada');
+              setSelectedMarker(null);
+            }
           }
         } catch (err) {
           console.error('Error handling map click:', err);
@@ -587,12 +668,60 @@ export const PdfMapNavigator: React.FC = () => {
           return;
         }
 
+        const isWoodpile = marker.category === 'woodpile';
         const categoryObj = CATEGORIES.find((c) => c.id === marker.category) || CATEGORIES[0];
         const isTarget = activeNavPoint?.id === marker.id;
         const hasPhotos = Array.isArray(marker.photos) && marker.photos.length > 0;
-        const color = marker.color || categoryObj.color;
+        const color = isWoodpile ? '#d97706' : (marker.color || categoryObj.color);
         
-        const pinHtml = `
+        const pinHtml = isWoodpile ? `
+          <div class="tactical-pin-wrap">
+            <div style="position: relative; display: flex; flex-direction: column; align-items: center;">
+              <div style="
+                width: ${isTarget ? '36px' : '30px'};
+                height: ${isTarget ? '36px' : '30px'};
+                border-radius: 8px;
+                background: linear-gradient(135deg, #d97706, #92400e);
+                border: 2px solid #ffffff;
+                box-shadow: 0 4px 14px rgba(217,119,6,0.7);
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                ${isTarget ? 'animation: bounce 1.5s infinite;' : ''}
+              ">
+                <span style="font-size: 15px; line-height: 1;">🪵</span>
+              </div>
+              <div style="
+                margin-top: 2px;
+                background: rgba(15,23,42,0.95);
+                color: #fbbf24;
+                font-size: 9px;
+                font-weight: 800;
+                padding: 1.5px 5px;
+                border-radius: 4px;
+                border: 1px solid rgba(245,158,11,0.6);
+                white-space: nowrap;
+                box-shadow: 0 2px 5px rgba(0,0,0,0.6);
+              ">
+                ${marker.title || 'Pilha'}
+                ${marker.woodpileData?.estimatedStereoM3 ? ` (${marker.woodpileData.estimatedStereoM3.toFixed(1)} st)` : ''}
+              </div>
+              ${hasPhotos ? `
+                <div style="
+                  margin-top: 1px;
+                  background: rgba(15,23,42,0.9);
+                  color: #38bdf8;
+                  font-size: 8px;
+                  font-weight: 700;
+                  padding: 0 3px;
+                  border-radius: 3px;
+                  border: 1px solid rgba(56,189,248,0.4);
+                  white-space: nowrap;
+                ">📷 ${marker.photos!.length}</div>
+              ` : ''}
+            </div>
+          </div>
+        ` : `
           <div class="tactical-pin-wrap">
             <div style="position: relative; display: flex; flex-direction: column; align-items: center;">
               <div style="
@@ -618,7 +747,7 @@ export const PdfMapNavigator: React.FC = () => {
                   align-items: center;
                   justify-content: center;
                 ">
-                  ${isTarget ? '🎯' : '📍'}
+                  ${isTarget ? '🎯' : (categoryObj as any).icon || '📍'}
                 </div>
               </div>
               ${hasPhotos ? `
@@ -809,9 +938,12 @@ export const PdfMapNavigator: React.FC = () => {
       if (validPts.length > 1) {
         const latLngs = validPts.map((p) => [p.pdfX!, p.pdfY!] as [number, number]);
 
+        const isAllWoodpile = validPts.every((p) => p.type === 'woodpile');
+        const polylineColor = isAllWoodpile ? '#d97706' : (isClosed ? '#10b981' : '#e11d48');
+
         L.polyline(latLngs, {
-          color: isClosed ? '#10b981' : '#e11d48',
-          weight: 3.5,
+          color: polylineColor,
+          weight: 4,
           dashArray: isClosed ? undefined : '6, 6',
           opacity: 0.95,
         }).addTo(group);
@@ -833,7 +965,7 @@ export const PdfMapNavigator: React.FC = () => {
                 html: `
                   <div style="
                     background: rgba(15, 23, 42, 0.9);
-                    border: 1.5px solid ${isClosed ? '#10b981' : '#f43f5e'};
+                    border: 1.5px solid ${isAllWoodpile ? '#d97706' : (isClosed ? '#10b981' : '#f43f5e')};
                     color: #ffffff;
                     font-weight: 800;
                     font-size: 10px;
@@ -868,6 +1000,9 @@ export const PdfMapNavigator: React.FC = () => {
         } else if (pt.type === 'hazard') {
           bgColor = '#f59e0b';
           iconSymbol = `⚠️ ${idx + 1}`;
+        } else if (pt.type === 'woodpile') {
+          bgColor = '#d97706';
+          iconSymbol = `🪵 ${idx + 1}`;
         }
 
         const isStartPoint = idx === 0;
@@ -1514,7 +1649,15 @@ export const PdfMapNavigator: React.FC = () => {
     }
 
     try {
+      const isWoodpile = markerCategory === 'woodpile';
       const categoryObj = CATEGORIES.find((c) => c.id === markerCategory) || CATEGORIES[0];
+      const len = parseFloat(woodpileLength.replace(',', '.')) || undefined;
+      const hgt = parseFloat(woodpileHeight.replace(',', '.')) || undefined;
+      const wdt = parseFloat(woodpileWidth.replace(',', '.')) || undefined;
+      const stFactor = parseFloat(woodpileStackFactor.replace(',', '.')) || 0.67;
+      const stereo = len && hgt && wdt ? Number((len * hgt * wdt).toFixed(2)) : undefined;
+      const solid = stereo ? Number((stereo * stFactor).toFixed(2)) : undefined;
+
       const newMarker: PdfMarker = {
         id: `m-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
         x: pendingMarkerPos.x,
@@ -1522,8 +1665,20 @@ export const PdfMapNavigator: React.FC = () => {
         title: markerTitle.trim(),
         notes: markerNotes.trim(),
         category: markerCategory,
-        color: categoryObj.color,
+        color: isWoodpile ? '#d97706' : categoryObj.color,
         photos: Array.isArray(markerPhotos) ? markerPhotos : [],
+        woodpileData: isWoodpile
+          ? {
+              woodType,
+              lengthMeters: len,
+              heightMeters: hgt,
+              widthMeters: wdt,
+              stackFactor: stFactor,
+              estimatedStereoM3: stereo,
+              estimatedSolidM3: solid,
+              status: woodpileStatus,
+            }
+          : undefined,
         createdAt: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
       };
 
@@ -1534,12 +1689,21 @@ export const PdfMapNavigator: React.FC = () => {
       };
 
       updateDocumentInStore(updatedDoc);
-      notifySuccess('Ponto Registrado', `Ponto "${newMarker.title}" adicionado à folha da planta.`);
+      notifySuccess(
+        isWoodpile ? 'Pilha de Madeira Registrada' : 'Ponto Registrado',
+        isWoodpile && stereo
+          ? `Pilha "${newMarker.title}" salva (${stereo} st / ${solid} m³).`
+          : `Ponto "${newMarker.title}" adicionado à folha da planta.`
+      );
 
       setPendingMarkerPos(null);
       setMarkerTitle('');
       setMarkerNotes('');
       setMarkerPhotos([]);
+      setWoodpileLength('');
+      setWoodpileHeight('');
+      setWoodpileWidth('1.0');
+      setWoodpileStackFactor('0.67');
       setActiveTool('pan');
     } catch (err) {
       console.error('Error saving marker:', err);
@@ -2005,6 +2169,95 @@ export const PdfMapNavigator: React.FC = () => {
         />
       )}
 
+      {/* Woodpile Active Floating HUD */}
+      {activeTool === 'woodpile' && (
+        <div className="absolute top-2 left-1/2 -translate-x-1/2 z-[1000] w-[95%] max-w-xl bg-slate-900/95 backdrop-blur-md border border-amber-500/80 rounded-2xl p-2.5 shadow-2xl flex flex-col sm:flex-row items-center justify-between gap-2.5 animate-in slide-in-from-top duration-200 pointer-events-auto">
+          {/* Title & Info */}
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 rounded-xl bg-amber-500/20 border border-amber-500/40 flex items-center justify-center text-amber-400 shrink-0">
+              <WoodpileIcon className="w-5 h-5" />
+            </div>
+            <div>
+              <div className="flex items-center gap-1.5">
+                <span className="text-xs font-black text-white">Pilha de Madeira</span>
+                <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-400 border border-amber-500/30">
+                  {woodpileSubMode === 'point' ? '📍 Apontamento' : '📏 Medição'}
+                </span>
+              </div>
+              <p className="text-[10px] text-slate-400">
+                {woodpileSubMode === 'point'
+                  ? 'Toque na folha para apontar local da pilha com foto e volume'
+                  : 'Toque para marcar os vértices e calcular o comprimento da pilha'}
+              </p>
+            </div>
+          </div>
+
+          {/* Submode Switcher & Actions */}
+          <div className="flex items-center gap-1.5 w-full sm:w-auto justify-end">
+            <div className="flex bg-slate-950 p-1 rounded-xl border border-slate-800">
+              <button
+                type="button"
+                onClick={() => {
+                  setWoodpileSubMode('point');
+                  woodpileSubModeRef.current = 'point';
+                }}
+                className={`px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1 ${
+                  woodpileSubMode === 'point'
+                    ? 'bg-amber-600 text-white shadow'
+                    : 'text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                <span>📍 Apontar</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setWoodpileSubMode('measure');
+                  woodpileSubModeRef.current = 'measure';
+                  setCurrentMeasureType('woodpile');
+                }}
+                className={`px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1 ${
+                  woodpileSubMode === 'measure'
+                    ? 'bg-amber-600 text-white shadow'
+                    : 'text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                <span>📏 Medir</span>
+                {measurementPoints.length > 0 && (
+                  <span className="w-4 h-4 rounded-full bg-slate-900 text-amber-400 text-[9px] flex items-center justify-center font-bold">
+                    {measurementPoints.length}
+                  </span>
+                )}
+              </button>
+            </div>
+
+            {woodpileSubMode === 'measure' && measurementPoints.length > 0 && (
+              <button
+                type="button"
+                onClick={() => setIsMeasureSummaryOpen(true)}
+                className="px-2.5 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-xl shadow flex items-center gap-1 active:scale-95"
+                title="Resumo da Medição de Pilha"
+              >
+                <Check className="w-3.5 h-3.5" />
+                <span>Resumo</span>
+              </button>
+            )}
+
+            <button
+              type="button"
+              onClick={() => {
+                setActiveTool('pan');
+                setMeasurementPoints([]);
+              }}
+              className="p-2 text-slate-400 hover:text-white rounded-xl hover:bg-slate-800"
+              title="Sair do modo Pilha de Madeira"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Main Map Canvas Area */}
       <div className="flex-1 w-full h-full relative bg-[#0f172a] overflow-hidden">
         {/* Leaflet Map DOM Node - Always mounted */}
@@ -2303,11 +2556,37 @@ export const PdfMapNavigator: React.FC = () => {
               >
                 <Ruler className="w-5 h-5 text-rose-400 mb-0.5" />
                 <span className="text-[10px] font-extrabold tracking-tight">Medir</span>
-                {measurementPoints.length > 0 && (
+                {measurementPoints.length > 0 && activeTool === 'measure' && (
                   <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-amber-500 text-slate-950 text-[9px] font-black flex items-center justify-center">
                     {measurementPoints.length}
                   </span>
                 )}
+              </button>
+
+              {/* Pilha de Madeira (Apontar ou Medir) */}
+              <button
+                onClick={() => {
+                  if (activeTool === 'woodpile' && measurementPoints.length > 0 && woodpileSubMode === 'measure') {
+                    setIsMeasureSummaryOpen(true);
+                  } else {
+                    setActiveTool('woodpile');
+                    setCurrentTrackPoints([]);
+                  }
+                }}
+                title="Medir ou Apontar Pilha de Madeira"
+                className={`flex flex-col items-center justify-center p-2.5 rounded-xl transition-all active:scale-95 relative ${
+                  activeTool === 'woodpile'
+                    ? 'bg-amber-600 text-white shadow-lg shadow-amber-950/60 ring-2 ring-amber-400'
+                    : 'text-slate-400 hover:text-amber-400 hover:bg-slate-800/60'
+                }`}
+              >
+                <WoodpileIcon className="w-5 h-5 text-amber-400 mb-0.5" />
+                <span className="text-[10px] font-extrabold tracking-tight">Madeira</span>
+                {activeDoc?.markers?.filter((m) => m.category === 'woodpile').length ? (
+                  <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-amber-500 text-slate-950 text-[9px] font-black flex items-center justify-center">
+                    {activeDoc.markers.filter((m) => m.category === 'woodpile').length}
+                  </span>
+                ) : null}
               </button>
 
               <div className="w-full h-px bg-slate-800 my-0.5" />
@@ -2433,12 +2712,138 @@ export const PdfMapNavigator: React.FC = () => {
                 </div>
               </div>
 
+              {/* Specific Woodpile Dimensions & Volume Estimator */}
+              {markerCategory === 'woodpile' && (
+                <div className="bg-amber-950/30 border border-amber-500/40 rounded-2xl p-3.5 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="font-extrabold text-amber-400 flex items-center gap-1.5 text-xs">
+                      <WoodpileIcon className="w-4 h-4" />
+                      Cubagem & Dimensões da Pilha
+                    </span>
+                    <span className="text-[10px] text-slate-400">Cálculo Automático</span>
+                  </div>
+
+                  {/* Tipo de Madeira */}
+                  <div>
+                    <label className="block text-[11px] text-slate-300 font-bold mb-1">Tipo de Madeira</label>
+                    <div className="grid grid-cols-3 sm:grid-cols-5 gap-1">
+                      {['Eucalipto', 'Pinus', 'Nativa', 'Lenha', 'Mista'].map((type) => (
+                        <button
+                          key={type}
+                          type="button"
+                          onClick={() => setWoodType(type)}
+                          className={`py-1 px-1.5 rounded-lg text-[11px] font-bold border transition-all text-center ${
+                            woodType === type
+                              ? 'bg-amber-500 text-slate-950 border-amber-400 font-black shadow'
+                              : 'bg-slate-900 border-slate-700 text-slate-400 hover:text-white'
+                          }`}
+                        >
+                          {type}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Dimensões: Comprimento, Altura, Largura */}
+                  <div className="grid grid-cols-3 gap-2">
+                    <div>
+                      <label className="block text-[10px] text-slate-300 font-bold mb-0.5">Comprimento (m)</label>
+                      <input
+                        type="number"
+                        step="0.1"
+                        min="0"
+                        value={woodpileLength}
+                        onChange={(e) => setWoodpileLength(e.target.value)}
+                        placeholder="Ex: 20.0"
+                        className="w-full bg-slate-900 border border-slate-700 rounded-xl px-2.5 py-1.5 text-white font-mono font-bold text-xs focus:border-amber-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] text-slate-300 font-bold mb-0.5">Altura (m)</label>
+                      <input
+                        type="number"
+                        step="0.1"
+                        min="0"
+                        value={woodpileHeight}
+                        onChange={(e) => setWoodpileHeight(e.target.value)}
+                        placeholder="Ex: 2.5"
+                        className="w-full bg-slate-900 border border-slate-700 rounded-xl px-2.5 py-1.5 text-white font-mono font-bold text-xs focus:border-amber-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] text-slate-300 font-bold mb-0.5">Tora/Largura (m)</label>
+                      <input
+                        type="number"
+                        step="0.1"
+                        min="0"
+                        value={woodpileWidth}
+                        onChange={(e) => setWoodpileWidth(e.target.value)}
+                        placeholder="Ex: 1.0"
+                        className="w-full bg-slate-900 border border-slate-700 rounded-xl px-2.5 py-1.5 text-white font-mono font-bold text-xs focus:border-amber-500"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Volume Calculator Result Badge */}
+                  {(() => {
+                    const l = parseFloat(woodpileLength.replace(',', '.')) || 0;
+                    const h = parseFloat(woodpileHeight.replace(',', '.')) || 0;
+                    const w = parseFloat(woodpileWidth.replace(',', '.')) || 0;
+                    const stF = parseFloat(woodpileStackFactor.replace(',', '.')) || 0.67;
+                    const stereo = l * h * w;
+                    const solid = stereo * stF;
+
+                    if (stereo > 0) {
+                      return (
+                        <div className="grid grid-cols-2 gap-2 bg-slate-950 p-2.5 rounded-xl border border-amber-500/40 text-center animate-in fade-in">
+                          <div>
+                            <div className="text-[10px] text-slate-400 font-semibold">Volume Estéreo (st)</div>
+                            <div className="text-sm font-black text-amber-400 font-mono">{stereo.toFixed(2)} st</div>
+                          </div>
+                          <div>
+                            <div className="text-[10px] text-slate-400 font-semibold">Volume Sólido ({stF})</div>
+                            <div className="text-sm font-black text-emerald-400 font-mono">{solid.toFixed(2)} m³</div>
+                          </div>
+                        </div>
+                      );
+                    }
+                    return null;
+                  })()}
+
+                  {/* Status da Pilha */}
+                  <div>
+                    <label className="block text-[10px] text-slate-300 font-bold mb-1">Status da Pilha</label>
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-1">
+                      {[
+                        { id: 'empilhada', label: 'Empilhada' },
+                        { id: 'medida', label: 'Medida' },
+                        { id: 'carregada', label: 'Carregada' },
+                        { id: 'transportada', label: 'Transportada' },
+                      ].map((st) => (
+                        <button
+                          key={st.id}
+                          type="button"
+                          onClick={() => setWoodpileStatus(st.id as any)}
+                          className={`py-1 px-1.5 rounded-lg text-[10px] font-bold border transition-all text-center ${
+                            woodpileStatus === st.id
+                              ? 'bg-amber-600 text-white border-amber-400 font-black'
+                              : 'bg-slate-900 border-slate-800 text-slate-400'
+                          }`}
+                        >
+                          {st.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
+
               <div>
                 <label className="block text-slate-300 font-bold mb-1">Anotações / Descrição</label>
                 <textarea
                   value={markerNotes}
                   onChange={(e) => setMarkerNotes(e.target.value)}
-                  placeholder="Observações técnicas, condições do local, etc."
+                  placeholder="Observações técnicas, condições da pilha, etc."
                   rows={2}
                   className="w-full bg-slate-800 border border-slate-700 rounded-xl p-2.5 text-white text-xs focus:outline-none focus:border-emerald-500 resize-none"
                 />
@@ -2759,8 +3164,64 @@ export const PdfMapNavigator: React.FC = () => {
             <div className="p-4 overflow-y-auto space-y-4 text-xs">
               <div className="flex items-center justify-between text-slate-400 border-b border-slate-800 pb-2">
                 <span>Registrado às {selectedMarker.createdAt}</span>
-                <span className="font-bold text-slate-300 capitalize">{selectedMarker.category}</span>
+                <span className="font-bold text-amber-400 flex items-center gap-1 capitalize">
+                  {selectedMarker.category === 'woodpile' ? '🪵 Pilha de Madeira' : selectedMarker.category}
+                </span>
               </div>
+
+              {/* Specific Woodpile Card Summary */}
+              {selectedMarker.category === 'woodpile' && (
+                <div className="bg-amber-950/30 border border-amber-500/40 rounded-2xl p-3.5 space-y-2.5 animate-in fade-in">
+                  <div className="flex items-center justify-between">
+                    <span className="font-extrabold text-amber-400 flex items-center gap-1.5 text-xs">
+                      <WoodpileIcon className="w-4 h-4" />
+                      Cubagem & Dados da Madeira
+                    </span>
+                    {selectedMarker.woodpileData?.status && (
+                      <span className="text-[10px] uppercase font-black px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-400 border border-amber-500/30">
+                        {selectedMarker.woodpileData.status}
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2 text-[11px]">
+                    <div className="bg-slate-950/80 p-2 rounded-xl border border-slate-800">
+                      <span className="text-slate-400 text-[10px] block">Tipo de Madeira</span>
+                      <span className="font-bold text-white">{selectedMarker.woodpileData?.woodType || 'Eucalipto'}</span>
+                    </div>
+                    <div className="bg-slate-950/80 p-2 rounded-xl border border-slate-800">
+                      <span className="text-slate-400 text-[10px] block">Dimensões (C x A x L)</span>
+                      <span className="font-mono font-bold text-white">
+                        {selectedMarker.woodpileData?.lengthMeters ? `${selectedMarker.woodpileData.lengthMeters}m` : '-'} ×{' '}
+                        {selectedMarker.woodpileData?.heightMeters ? `${selectedMarker.woodpileData.heightMeters}m` : '-'} ×{' '}
+                        {selectedMarker.woodpileData?.widthMeters ? `${selectedMarker.woodpileData.widthMeters}m` : '-'}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Calculated Volume Cards */}
+                  {selectedMarker.woodpileData?.estimatedStereoM3 !== undefined && (
+                    <div className="grid grid-cols-2 gap-2 bg-slate-950 p-2.5 rounded-xl border border-amber-500/40 text-center">
+                      <div>
+                        <div className="text-[10px] text-slate-400 font-semibold">Volume Estéreo</div>
+                        <div className="text-sm font-black text-amber-400 font-mono">
+                          {selectedMarker.woodpileData.estimatedStereoM3.toFixed(2)} st
+                        </div>
+                      </div>
+                      <div>
+                        <div className="text-[10px] text-slate-400 font-semibold">
+                          Volume Sólido (F={selectedMarker.woodpileData.stackFactor || 0.67})
+                        </div>
+                        <div className="text-sm font-black text-emerald-400 font-mono">
+                          {selectedMarker.woodpileData.estimatedSolidM3 !== undefined
+                            ? `${selectedMarker.woodpileData.estimatedSolidM3.toFixed(2)} m³`
+                            : '-'}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
 
               {/* Geographic Coordinates info if available */}
               {activeDoc && (
