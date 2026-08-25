@@ -19,7 +19,10 @@ import {
   Sparkles,
   Zap,
   Globe,
-  LogOut
+  LogOut,
+  Sun,
+  Moon,
+  Monitor
 } from 'lucide-react';
 
 interface SettingsModalProps {
@@ -38,7 +41,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
   } = useApp();
   const { profile, logout } = useAuth();
 
-  const [activeTab, setActiveTab] = useState<'gps' | 'coords' | 'maps' | 'field' | 'system'>('gps');
+  const [activeTab, setActiveTab] = useState<'gps' | 'coords' | 'maps' | 'field' | 'appearance' | 'system'>('gps');
   const [cachedMapSize, setCachedMapSize] = useState<string>('Calculando...');
   const [isCleaning, setIsCleaning] = useState(false);
 
@@ -165,6 +168,18 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
           >
             <MapPin className="w-3.5 h-3.5" />
             Marcações de Campo
+          </button>
+
+          <button
+            onClick={() => setActiveTab('appearance')}
+            className={`flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all ${
+              activeTab === 'appearance'
+                ? 'bg-sky-600 text-white shadow-md shadow-sky-600/20'
+                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
+            }`}
+          >
+            <Sun className="w-3.5 h-3.5 text-amber-400" />
+            Tema & Aparência
           </button>
 
           <button
@@ -473,6 +488,98 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
                       <div className="text-[10px] text-slate-400 mt-0.5">{pq.desc}</div>
                     </button>
                   ))}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* TAB: TEMA & APARÊNCIA */}
+          {activeTab === 'appearance' && (
+            <div className="space-y-4">
+              <div className="bg-slate-950/60 border border-slate-800 rounded-2xl p-4 space-y-3">
+                <h4 className="text-xs font-bold text-white flex items-center gap-2">
+                  <Sun className="w-4 h-4 text-amber-400" />
+                  Tema Visual da Interface
+                </h4>
+                <p className="text-[11px] text-slate-400">
+                  Alterne entre o tema escuro tático ou o tema claro de alta visibilidade sob luz solar direta.
+                </p>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1">
+                  {/* Modo Escuro */}
+                  <button
+                    onClick={() => updateSettings({ theme: 'dark' })}
+                    className={`p-3.5 rounded-2xl border text-left flex flex-col justify-between transition-all ${
+                      (settings.theme === 'dark' || !settings.theme)
+                        ? 'bg-sky-600/20 border-sky-500 text-white ring-2 ring-sky-500/40 shadow-lg'
+                        : 'bg-slate-900/90 border-slate-800 text-slate-400 hover:border-slate-700'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between mb-3">
+                      <div className="w-8 h-8 rounded-xl bg-slate-950 border border-slate-800 text-indigo-400 flex items-center justify-center">
+                        <Moon className="w-4 h-4" />
+                      </div>
+                      {(settings.theme === 'dark' || !settings.theme) && (
+                        <Check className="w-4 h-4 text-sky-400" />
+                      )}
+                    </div>
+                    <div>
+                      <div className="text-xs font-bold text-white">Modo Escuro Tático</div>
+                      <div className="text-[10px] text-slate-400 mt-1 leading-snug">
+                        Ideal para baixa luminosidade e economia de energia em telas AMOLED.
+                      </div>
+                    </div>
+                  </button>
+
+                  {/* Modo Claro */}
+                  <button
+                    onClick={() => updateSettings({ theme: 'light' })}
+                    className={`p-3.5 rounded-2xl border text-left flex flex-col justify-between transition-all ${
+                      settings.theme === 'light'
+                        ? 'bg-sky-600/20 border-sky-500 text-white ring-2 ring-sky-500/40 shadow-lg'
+                        : 'bg-slate-900/90 border-slate-800 text-slate-400 hover:border-slate-700'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between mb-3">
+                      <div className="w-8 h-8 rounded-xl bg-amber-500/20 border border-amber-500/30 text-amber-400 flex items-center justify-center">
+                        <Sun className="w-4 h-4" />
+                      </div>
+                      {settings.theme === 'light' && (
+                        <Check className="w-4 h-4 text-sky-400" />
+                      )}
+                    </div>
+                    <div>
+                      <div className="text-xs font-bold text-white">Modo Claro (Luz Solar)</div>
+                      <div className="text-[10px] text-slate-400 mt-1 leading-snug">
+                        Fundo claro com alto contraste, perfeito para trabalho sob sol forte.
+                      </div>
+                    </div>
+                  </button>
+
+                  {/* Modo Automático */}
+                  <button
+                    onClick={() => updateSettings({ theme: 'auto' })}
+                    className={`p-3.5 rounded-2xl border text-left flex flex-col justify-between transition-all ${
+                      settings.theme === 'auto'
+                        ? 'bg-sky-600/20 border-sky-500 text-white ring-2 ring-sky-500/40 shadow-lg'
+                        : 'bg-slate-900/90 border-slate-800 text-slate-400 hover:border-slate-700'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between mb-3">
+                      <div className="w-8 h-8 rounded-xl bg-teal-500/20 border border-teal-500/30 text-teal-400 flex items-center justify-center">
+                        <Monitor className="w-4 h-4" />
+                      </div>
+                      {settings.theme === 'auto' && (
+                        <Check className="w-4 h-4 text-sky-400" />
+                      )}
+                    </div>
+                    <div>
+                      <div className="text-xs font-bold text-white">Automático (Sistema)</div>
+                      <div className="text-[10px] text-slate-400 mt-1 leading-snug">
+                        Acompanha as configurações de tema do seu celular/sistema operacional.
+                      </div>
+                    </div>
+                  </button>
                 </div>
               </div>
             </div>

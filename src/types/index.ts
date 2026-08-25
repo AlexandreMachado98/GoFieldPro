@@ -263,6 +263,7 @@ export interface FieldRound {
 }
 
 export interface AppSettings {
+  theme?: 'dark' | 'light' | 'auto';
   coordinateFormat: 'DD' | 'DMS' | 'UTM' | 'SIRGAS';
   gpsAccuracyMode: 'high' | 'balanced' | 'power_save';
   gpsUpdateIntervalMs: number;

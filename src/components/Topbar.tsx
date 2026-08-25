@@ -17,7 +17,9 @@ import {
   LogOut,
   Settings,
   CheckCheck,
-  Trash2
+  Trash2,
+  Sun,
+  Moon
 } from 'lucide-react';
 
 export const Topbar: React.FC = () => {
@@ -40,6 +42,8 @@ export const Topbar: React.FC = () => {
     clearAllNotifications,
     setIsMobileMenuOpen,
     setIsSettingsModalOpen,
+    settings,
+    toggleTheme,
     showConfirm
   } = useApp();
 
@@ -135,6 +139,21 @@ export const Topbar: React.FC = () => {
               <RefreshCw className={`w-3.5 h-3.5 text-sky-400 ${isSyncing ? 'animate-spin' : ''}`} />
               {offlineQueue.length > 0 && (
                 <span className="w-2 h-2 rounded-full bg-amber-400"></span>
+              )}
+            </button>
+
+            {/* Theme Toggle Button (Light / Dark mode) */}
+            <button
+              id="btn-theme-toggle"
+              onClick={toggleTheme}
+              className="p-2 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-300 hover:text-white transition-colors active:scale-95"
+              title={settings.theme === 'light' ? 'Mudar para Modo Escuro' : 'Mudar para Modo Claro (Alta Visibilidade)'}
+              aria-label="Alternar Tema Claro e Escuro"
+            >
+              {settings.theme === 'light' ? (
+                <Moon className="w-4 h-4 text-indigo-400" />
+              ) : (
+                <Sun className="w-4 h-4 text-amber-400" />
               )}
             </button>
 

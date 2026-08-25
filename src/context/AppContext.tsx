@@ -158,9 +158,10 @@ interface AppContextType {
   notifyInfo: (title: string, message: string) => void;
   dismissToast: (id: string) => void;
 
-  // App Settings
+  // App Settings & Theme
   settings: AppSettings;
   updateSettings: (partial: Partial<AppSettings>) => void;
+  toggleTheme: () => void;
   isSettingsModalOpen: boolean;
   setIsSettingsModalOpen: (open: boolean) => void;
 
@@ -411,6 +412,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   // App Settings with LocalStorage persistence
   const [settings, setSettings] = useState<AppSettings>(() => {
     const defaultSettings: AppSettings = {
+      theme: 'dark',
       coordinateFormat: 'DD',
       gpsAccuracyMode: 'high',
       gpsUpdateIntervalMs: 1000,
@@ -429,6 +431,39 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       return defaultSettings;
     }
   });
+
+  // Apply Theme to Document root (HTML and Body classes/data-theme)
+  useEffect(() => {
+    const root = document.documentElement;
+    const currentTheme = settings.theme || 'dark';
+
+    const applyTheme = (isDark: boolean) => {
+      if (isDark) {
+        root.classList.remove('light');
+        root.classList.add('dark');
+        root.setAttribute('data-theme', 'dark');
+        document.body.setAttribute('data-theme', 'dark');
+      } else {
+        root.classList.remove('dark');
+        root.classList.add('light');
+        root.setAttribute('data-theme', 'light');
+        document.body.setAttribute('data-theme', 'light');
+      }
+    };
+
+    if (currentTheme === 'auto') {
+      const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+      applyTheme(mediaQuery.matches);
+
+      const handleChange = (e: MediaQueryListEvent) => {
+        applyTheme(e.matches);
+      };
+      mediaQuery.addEventListener('change', handleChange);
+      return () => mediaQuery.removeEventListener('change', handleChange);
+    } else {
+      applyTheme(currentTheme === 'dark');
+    }
+  }, [settings.theme]);
 
   // IndexedDB Persistence for core collections
   const [isStateLoaded, setIsStateLoaded] = useState(false);
@@ -479,6 +514,17 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       } catch (e) {
         console.warn('Error saving settings', e);
       }
+      return updated;
+    });
+  }, []);
+
+  const toggleTheme = useCallback(() => {
+    setSettings((prev) => {
+      const nextTheme = prev.theme === 'light' ? 'dark' : 'light';
+      const updated = { ...prev, theme: nextTheme };
+      try {
+        localStorage.setItem('gofield_app_settings', JSON.stringify(updated));
+      } catch {}
       return updated;
     });
   }, []);
@@ -1325,6 +1371,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         addNotification,
         settings,
         updateSettings,
+        toggleTheme,
         isSettingsModalOpen,
         setIsSettingsModalOpen,
         toasts,
