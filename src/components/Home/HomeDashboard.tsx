@@ -329,7 +329,7 @@ export const HomeDashboard: React.FC = () => {
               className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-700 hover:border-slate-600 text-white font-bold text-xs shadow transition-all active:scale-95 cursor-pointer"
             >
               <FileText className="w-4 h-4 text-emerald-400" />
-              <span>Importar Mapa PDF</span>
+              <span>Mapas & Plantas PDF</span>
             </button>
 
             <button
@@ -345,7 +345,7 @@ export const HomeDashboard: React.FC = () => {
               className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-sky-600 to-emerald-600 hover:from-sky-500 hover:to-emerald-500 text-white font-bold text-xs shadow-lg shadow-sky-950/50 transition-all active:scale-95 cursor-pointer"
             >
               <Plus className="w-4 h-4" />
-              <span>Nova Rodada de Campo</span>
+              <span>Registrar Atividade</span>
             </button>
           </div>
         </div>
@@ -404,13 +404,13 @@ export const HomeDashboard: React.FC = () => {
           </div>
         </div>
 
-        {/* Section: Registros de Rodadas de Campo */}
+        {/* Section: Registros de Atividades de Campo */}
         <div className="space-y-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <div className="w-2 h-2 rounded-full bg-sky-400" />
               <h2 className="text-base sm:text-lg font-bold text-white">
-                Registros de Rodadas de Campo (Viagens & Visitas)
+                Registros de Atividades de Campo
               </h2>
               <span className="text-xs text-slate-400 font-normal">
                 ({fieldRounds.length} {fieldRounds.length === 1 ? 'registro' : 'registros'})
@@ -420,7 +420,7 @@ export const HomeDashboard: React.FC = () => {
               onClick={() => setActiveTab('field_rounds')}
               className="text-xs font-semibold text-sky-400 hover:text-sky-300 flex items-center gap-1 transition-colors cursor-pointer"
             >
-              Ver todas as rodadas
+              Ver todas as atividades
               <ChevronRight className="w-4 h-4" />
             </button>
           </div>
@@ -433,12 +433,12 @@ export const HomeDashboard: React.FC = () => {
               <div className="w-16 h-16 rounded-2xl bg-sky-500/10 text-sky-400 flex items-center justify-center mx-auto mb-3 group-hover:scale-110 transition-transform">
                 <Gauge className="w-8 h-8" />
               </div>
-              <h3 className="text-sm sm:text-base font-bold text-white">Nenhuma rodada de campo registrada</h3>
+              <h3 className="text-sm sm:text-base font-bold text-white">Nenhuma atividade registrada</h3>
               <p className="text-xs text-slate-400 max-w-md mx-auto mt-1">
-                Toque aqui para registrar a primeira viagem do dia informando o KM Inicial, o local a ser visitado e anexando fotos.
+                Toque aqui para registrar a primeira atividade ou deslocamento informando o KM Inicial, o local visitado e anexando fotos.
               </p>
               <button className="mt-4 px-4 py-2 rounded-xl bg-sky-600 text-white font-bold text-xs shadow transition-colors">
-                Registrar Rodada Agora
+                Registrar Atividade Agora
               </button>
             </div>
           ) : (
@@ -721,10 +721,10 @@ export const HomeDashboard: React.FC = () => {
                 </div>
                 <div>
                   <h2 className="text-base sm:text-lg font-bold text-white">
-                    {editingRoundId ? 'Editar Rodada de Campo' : 'Nova Rodada de Campo'}
+                    {editingRoundId ? 'Editar Atividade de Campo' : 'Registrar Atividade'}
                   </h2>
                   <p className="text-[11px] text-slate-400">
-                    Registro de quilometragem e local visitado
+                    Registro de deslocamento, local e observações
                   </p>
                 </div>
               </div>

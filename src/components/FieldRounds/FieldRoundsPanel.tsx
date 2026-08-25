@@ -336,7 +336,7 @@ export const FieldRoundsPanel: React.FC = () => {
             <div className="flex items-center gap-2 mb-1">
               <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wider bg-sky-500/10 text-sky-400 border border-sky-500/20 flex items-center gap-1">
                 <Gauge className="w-3 h-3" />
-                Controle de Viagens & Quilometragem
+                Controle de Atividades & Quilometragem
               </span>
               {activeRoundCount > 0 && (
                 <span className="flex items-center gap-1 text-[10px] text-amber-400 font-bold bg-amber-950/60 px-2.5 py-0.5 rounded-full border border-amber-800/80 animate-pulse">
@@ -346,7 +346,7 @@ export const FieldRoundsPanel: React.FC = () => {
               )}
             </div>
             <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">
-              Rodadas de <span className="text-sky-400">Campo</span>
+              Registrar <span className="text-sky-400">Atividade</span>
             </h1>
             <p className="text-xs sm:text-sm text-slate-400 mt-1 max-w-xl">
               Registre a quilometragem inicial e final de cada dia de viagem, calcule a distância percorrida automaticamente, anexe fotos do odômetro e gere relatórios em PDF oficiais.
@@ -368,7 +368,7 @@ export const FieldRoundsPanel: React.FC = () => {
               className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-sky-600 to-emerald-600 hover:from-sky-500 hover:to-emerald-500 text-white font-bold text-xs shadow-lg shadow-sky-950/50 transition-all active:scale-95 cursor-pointer"
             >
               <Plus className="w-4 h-4" />
-              <span>Nova Rodada de Campo</span>
+              <span>Registrar Atividade</span>
             </button>
           </div>
         </div>
@@ -478,7 +478,7 @@ export const FieldRoundsPanel: React.FC = () => {
               <div className="w-14 h-14 rounded-2xl bg-sky-500/10 text-sky-400 flex items-center justify-center mx-auto mb-3">
                 <Gauge className="w-7 h-7" />
               </div>
-              <h3 className="text-base font-bold text-white">Nenhuma rodada de campo encontrada</h3>
+              <h3 className="text-base font-bold text-white">Nenhuma atividade encontrada</h3>
               <p className="text-xs text-slate-400 max-w-md mx-auto mt-1">
                 {searchTerm || statusFilter !== 'all'
                   ? 'Nenhum registro coincide com os filtros aplicados.'
@@ -489,7 +489,7 @@ export const FieldRoundsPanel: React.FC = () => {
                 className="mt-4 px-4 py-2 rounded-xl bg-sky-600 hover:bg-sky-500 text-white font-bold text-xs shadow transition-colors inline-flex items-center gap-2 cursor-pointer"
               >
                 <Plus className="w-4 h-4" />
-                Registrar Primeira Rodada de Campo
+                Registrar Primeira Atividade
               </button>
             </div>
           ) : (
@@ -726,7 +726,7 @@ export const FieldRoundsPanel: React.FC = () => {
                 </div>
                 <div>
                   <h2 className="text-base sm:text-lg font-bold text-white">
-                    {editingRoundId ? 'Editar Rodada de Campo' : 'Nova Rodada de Campo'}
+                    {editingRoundId ? 'Editar Atividade de Campo' : 'Registrar Atividade'}
                   </h2>
                   <p className="text-[11px] text-slate-400">
                     Registro de deslocamento e controle de quilometragem
@@ -1006,7 +1006,7 @@ export const FieldRoundsPanel: React.FC = () => {
             <div className="flex items-center justify-between pb-3 border-b border-slate-800">
               <div className="flex items-center gap-2">
                 <CheckCircle2 className="w-5 h-5 text-emerald-400" />
-                <h3 className="text-base font-bold text-white">Finalizar Rodada de Campo</h3>
+                <h3 className="text-base font-bold text-white">Finalizar Atividade</h3>
               </div>
               <button
                 onClick={() => setFinishingRound(null)}

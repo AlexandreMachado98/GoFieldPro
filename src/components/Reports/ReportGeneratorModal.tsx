@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
+import { useAuth } from '../../context/AuthContext';
 import { generateFieldDossierPDF } from '../../utils/pdfExport';
 import {
   exportToKMLString,
@@ -44,8 +45,11 @@ export const ReportGeneratorModal: React.FC = () => {
     URL.revokeObjectURL(url);
   };
 
+  const { profile } = useAuth();
+
   const handleExportPDF = () => {
-    generateFieldDossierPDF(activeProject, waypoints, savedTracks, teamMembers, 'Carlos Silva');
+    const operatorName = profile?.name || 'Técnico Responsável';
+    generateFieldDossierPDF(activeProject, waypoints, savedTracks, teamMembers, operatorName);
     confetti({ particleCount: 40, spread: 60, origin: { y: 0.8 } });
   };
 

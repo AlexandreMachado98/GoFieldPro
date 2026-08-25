@@ -25,6 +25,7 @@ import {
   generateMeasurementMapCanvasAsync,
 } from '../../utils/measurementPdfReport';
 import { useApp } from '../../context/AppContext';
+import { useAuth } from '../../context/AuthContext';
 
 interface MeasurementSummaryModalProps {
   isOpen: boolean;
@@ -102,6 +103,9 @@ export const MeasurementSummaryModal: React.FC<MeasurementSummaryModalProps> = (
     }
   });
 
+  const { profile } = useAuth();
+  const operatorName = profile?.name || 'Técnico Responsável';
+
   const session: MeasurementSession = {
     id: `meas-${Date.now()}`,
     name: sessionName,
@@ -109,7 +113,7 @@ export const MeasurementSummaryModal: React.FC<MeasurementSummaryModalProps> = (
     totalDistanceMeters,
     segmentDistancesMeters: segmentDistances,
     createdAt: new Date().toISOString(),
-    technicianName: 'Carlos Silva (Operador de Campo)',
+    technicianName: operatorName,
     projectName: activeProject.name,
   };
 
@@ -118,7 +122,7 @@ export const MeasurementSummaryModal: React.FC<MeasurementSummaryModalProps> = (
     try {
       await generateMeasurementPdfReport(session, {
         companyName: 'GOFIELD PRO • GESTÃO E ENGENHARIA DE CAMPO',
-        responsibleName: 'Carlos Silva',
+        responsibleName: operatorName,
         weatherCondition: 'Operação de Campo Normal',
         mapType,
       });

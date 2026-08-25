@@ -65,12 +65,10 @@ export const Sidebar: React.FC = () => {
 
   const tabs: TabItem[] = [
     { id: 'home', label: t.tabHome || 'Início', icon: Home },
-    { id: 'field_rounds', label: t.tabFieldRounds || 'Rodada de Campo', icon: Gauge },
-    { id: 'pdf_maps', label: t.tabPdfMaps || 'Importar Mapa PDF', icon: FileText },
-    { id: 'map', label: t.tabMap, icon: Map },
-    { id: 'tracks', label: t.tabTracks, icon: Activity },
-    { id: 'team', label: t.tabTeam, icon: Users },
-    { id: 'offline', label: t.tabOffline, icon: HardDrive },
+    { id: 'map', label: t.tabMap || 'Mapa de Navegação', icon: Map },
+    { id: 'pdf_maps', label: t.tabPdfMaps || 'Mapas & Plantas PDF', icon: FileText },
+    { id: 'field_rounds', label: t.tabFieldRounds || 'Registrar Atividade', icon: Gauge },
+    { id: 'offline', label: t.tabOffline || 'Mapas Offline', icon: HardDrive },
   ];
 
   if (profile?.role === 'super_admin') {

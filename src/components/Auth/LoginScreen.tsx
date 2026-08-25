@@ -164,7 +164,7 @@ export const LoginScreen: React.FC = () => {
                       disabled={loading}
                       required={!isLogin}
                       className="w-full bg-slate-950 border border-slate-700 rounded-xl pl-10 pr-4 py-2.5 text-sm text-white focus:outline-none focus:border-sky-500 transition-colors disabled:opacity-50"
-                      placeholder="Ex: Carlos Silva"
+                      placeholder="Ex: Seu Nome Completo"
                     />
                   </div>
                 </div>

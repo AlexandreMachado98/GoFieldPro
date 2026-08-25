@@ -46,7 +46,7 @@ export const generateFieldRoundsPdf = async (
   doc.setTextColor(255, 255, 255);
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(14);
-  doc.text('RELATÓRIO DE RODADAS DE CAMPO & QUILOMETRAGEM', 14, 13);
+  doc.text('RELATÓRIO DE ATIVIDADES DE CAMPO & QUILOMETRAGEM', 14, 13);
 
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(8.5);
@@ -184,13 +184,13 @@ export const generateFieldRoundsPdf = async (
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(12);
     doc.setTextColor(15, 23, 42);
-    doc.text('ANEXO FOTOGRÁFICO DAS RODADAS DE CAMPO', 14, currentY);
+    doc.text('ANEXO FOTOGRÁFICO DAS ATIVIDADES DE CAMPO', 14, currentY);
     currentY += 4;
 
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(8);
     doc.setTextColor(100, 116, 139);
-    doc.text('Registros de odômetro, locais visitados e evidências das viagens realizadas.', 14, currentY);
+    doc.text('Registros de odômetro, locais visitados e evidências das atividades realizadas.', 14, currentY);
     currentY += 10;
 
     for (const round of roundsWithPhotos) {

@@ -280,7 +280,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>(initialTeamMembers);
   const [sosActive, setSosActive] = useState<boolean>(false);
   const [radioMessages, setRadioMessages] = useState<{ id: string; sender: string; text: string; time: string; avatar?: string }[]>([
-    { id: 'rad-1', sender: 'Carlos Silva (Líder)', text: 'Equipe Alpha chegando à nascente do São Francisco. Coleta iniciada.', time: '10:14', avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80' },
+    { id: 'rad-1', sender: 'Operador de Campo (Líder)', text: 'Equipe Alpha em deslocamento no setor norte. Coleta iniciada.', time: '10:14', avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80' },
     { id: 'rad-2', sender: 'Marcos Lima', text: 'Alerta na trilha baixa: queda de barreira com pedras no km 4. Registrando ponto.', time: '14:08', avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&auto=format&fit=crop&q=80' },
     { id: 'rad-3', sender: 'Dra. Ana Nery (Base)', text: 'Copiado Marcos. Ortomosaico de drone sendo direcionado para o setor.', time: '14:10', avatar: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=100&auto=format&fit=crop&q=80' },
   ]);
@@ -979,7 +979,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       projectId: activeProject.id,
       name: name || `Trilha de Campo ${new Date().toLocaleTimeString('pt-BR')}`,
       userId: 'user-01',
-      userName: 'Carlos Silva (Líder)',
+      userName: 'Técnico Responsável',
       startTime: new Date().toISOString(),
       points: [
         {
@@ -1192,7 +1192,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     if (!text.trim()) return;
     const newMsg = {
       id: `rad-${Date.now()}`,
-      sender: 'Carlos Silva (Você)',
+      sender: 'Você (Operador)',
       text,
       time: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
     };

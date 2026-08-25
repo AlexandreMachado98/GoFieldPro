@@ -101,48 +101,12 @@ export const Topbar: React.FC = () => {
             </div>
           </div>
 
-          {/* Right Side: Tools, Settings, Notifications & Profile & Logout */}
+          {/* Right Side: Essential Actions (PWA, Theme, Sync, Notifications & Profile Menu) */}
           <div className="flex flex-1 items-center justify-end gap-1.5 sm:gap-2">
-            {/* PWA Install Button */}
+            {/* 1. Instalar App */}
             <PwaInstallButton variant="topbar" />
 
-            {/* E2EE Badge */}
-            <button
-              className="hidden lg:flex items-center gap-1.5 px-2 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wider bg-slate-900 border border-slate-800 text-slate-500"
-            >
-              <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
-              <span>E2EE (AES-256)</span>
-            </button>
-
-            {/* Offline / Online Toggle */}
-            <button
-              id="btn-toggle-online-offline"
-              onClick={() => setIsOffline(!isOffline)}
-              className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold transition-all border ${
-                isOffline
-                  ? 'bg-amber-950/80 border-amber-600 text-amber-300'
-                  : 'bg-emerald-950/60 border-emerald-800 text-emerald-300'
-              }`}
-            >
-              {isOffline ? <WifiOff className="w-3.5 h-3.5" /> : <Wifi className="w-3.5 h-3.5" />}
-              <span className="hidden sm:inline">{isOffline ? t.offline : t.online}</span>
-            </button>
-
-            {/* Sync Button */}
-            <button
-              id="btn-navbar-sync"
-              onClick={triggerManualSync}
-              disabled={isSyncing}
-              title={offlineQueue.length > 0 ? `${offlineQueue.length} ${t.pendingSync}` : t.allSynced}
-              className="flex items-center gap-1 px-2 py-1 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-800 text-xs font-semibold text-slate-200 transition-colors active:scale-95"
-            >
-              <RefreshCw className={`w-3.5 h-3.5 text-sky-400 ${isSyncing ? 'animate-spin' : ''}`} />
-              {offlineQueue.length > 0 && (
-                <span className="w-2 h-2 rounded-full bg-amber-400"></span>
-              )}
-            </button>
-
-            {/* Theme Toggle Button (Light / Dark mode) */}
+            {/* 2. Modo Escuro / Claro Toggle */}
             <button
               id="btn-theme-toggle"
               onClick={toggleTheme}
@@ -157,18 +121,21 @@ export const Topbar: React.FC = () => {
               )}
             </button>
 
-            {/* Settings Button */}
+            {/* 3. Sincronização */}
             <button
-              id="btn-app-settings"
-              onClick={() => setIsSettingsModalOpen(true)}
-              className="p-2 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-300 hover:text-white transition-colors active:scale-95"
-              title="Configurações do Aplicativo"
-              aria-label="Abrir Configurações"
+              id="btn-navbar-sync"
+              onClick={triggerManualSync}
+              disabled={isSyncing}
+              title={offlineQueue.length > 0 ? `${offlineQueue.length} ${t.pendingSync}` : t.allSynced}
+              className="flex items-center gap-1.5 px-2.5 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 text-xs font-semibold text-slate-200 transition-colors active:scale-95"
             >
-              <Settings className="w-4 h-4 text-sky-400" />
+              <RefreshCw className={`w-3.5 h-3.5 text-sky-400 ${isSyncing ? 'animate-spin' : ''}`} />
+              {offlineQueue.length > 0 && (
+                <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse"></span>
+              )}
             </button>
 
-            {/* Notifications Bell */}
+            {/* 4. Central de Notificações */}
             <div className="relative">
               <button
                 id="btn-notifications-bell"
@@ -240,7 +207,7 @@ export const Topbar: React.FC = () => {
               )}
             </div>
 
-            {/* User Profile Dropdown */}
+            {/* 5. Menu do Usuário & Configurações */}
             <div className="relative">
               <button
                 id="btn-user-dropdown"
@@ -248,22 +215,41 @@ export const Topbar: React.FC = () => {
                   setIsNotifDropdownOpen(false);
                   setIsUserDropdownOpen(!isUserDropdownOpen);
                 }}
-                className="flex items-center gap-2 px-2 py-1 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-800 transition-colors"
+                className="flex items-center gap-2 p-1.5 sm:px-2 sm:py-1 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 transition-colors"
+                title="Menu do Usuário"
               >
-                <img src={profile?.avatar} alt={profile?.name} className="w-5 h-5 rounded-full object-cover" />
+                <img src={profile?.avatar} alt={profile?.name} className="w-6 h-6 rounded-full object-cover border border-slate-700" />
                 <div className="hidden lg:flex flex-col items-start leading-none">
-                  <span className="text-[10px] font-bold text-slate-200">{profile?.name}</span>
-                  <span className="text-[9px] text-sky-400 uppercase">{profile?.role.replace('_', ' ')}</span>
+                  <span className="text-[11px] font-bold text-slate-200">{profile?.name}</span>
+                  <span className="text-[9px] text-sky-400 uppercase font-semibold">{profile?.role.replace('_', ' ')}</span>
                 </div>
                 <ChevronDown className="w-3 h-3 text-slate-400" />
               </button>
               {isUserDropdownOpen && (
-                <div className="absolute top-full right-0 mt-2 w-64 bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl z-[96000] p-2 animate-in fade-in slide-in-from-top-2">
+                <div className="absolute top-full right-0 mt-2 w-64 bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl z-[96000] p-2 animate-in fade-in slide-in-from-top-2 space-y-1">
                   <div className="px-3 py-2 border-b border-slate-800 mb-1 bg-slate-950/50 rounded-xl">
                     <div className="text-xs font-bold text-white">{profile?.name}</div>
                     <div className="text-[10px] text-slate-400 truncate">{profile?.email}</div>
                     <div className="text-[10px] text-sky-400 uppercase mt-1 font-semibold">{profile?.role.replace('_', ' ')}</div>
                   </div>
+
+                  {/* Online / Offline Toggle within user menu */}
+                  <button
+                    onClick={() => {
+                      setIsOffline(!isOffline);
+                    }}
+                    className={`w-full text-left p-2.5 rounded-xl text-xs font-semibold flex items-center justify-between border transition-all ${
+                      isOffline
+                        ? 'bg-amber-950/40 border-amber-800/60 text-amber-300'
+                        : 'bg-emerald-950/30 border-emerald-800/50 text-emerald-300'
+                    }`}
+                  >
+                    <div className="flex items-center gap-2">
+                      {isOffline ? <WifiOff className="w-4 h-4 text-amber-400" /> : <Wifi className="w-4 h-4 text-emerald-400" />}
+                      <span>Modo de Operação</span>
+                    </div>
+                    <span className="text-[10px] font-bold uppercase">{isOffline ? 'Offline' : 'Online'}</span>
+                  </button>
 
                   <button
                     onClick={() => {
@@ -273,32 +259,20 @@ export const Topbar: React.FC = () => {
                     className="w-full text-left p-2.5 rounded-xl text-xs font-semibold flex items-center gap-2 text-slate-300 hover:bg-slate-800 transition-colors"
                   >
                     <Settings className="w-4 h-4 text-sky-400" />
-                    Configurações
+                    <span>Configurações do Sistema</span>
                   </button>
 
                   <button
                     type="button"
                     onClick={handleLogout}
-                    className="w-full text-left p-2.5 rounded-xl text-xs font-semibold flex items-center gap-2 text-rose-400 hover:bg-rose-950/40 transition-colors"
+                    className="w-full text-left p-2.5 rounded-xl text-xs font-semibold flex items-center gap-2 text-rose-400 hover:bg-rose-950/40 transition-colors border-t border-slate-800/60 pt-2"
                   >
                     <LogOut className="w-4 h-4" />
-                    Sair do Aplicativo
+                    <span>Sair do Aplicativo</span>
                   </button>
                 </div>
               )}
             </div>
-
-            {/* Direct Logout Button (High Visibility) */}
-            <button
-              id="btn-direct-logout"
-              type="button"
-              onClick={handleLogout}
-              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-rose-950/40 hover:bg-rose-900/60 border border-rose-900/60 text-rose-300 hover:text-rose-200 text-xs font-bold transition-all active:scale-95"
-              title="Sair da Conta / Desconectar"
-            >
-              <LogOut className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">Sair</span>
-            </button>
           </div>
         </div>
       </header>
