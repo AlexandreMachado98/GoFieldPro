@@ -638,6 +638,10 @@ export const PdfMapNavigator: React.FC = () => {
 
     const pageIdx = activeDoc.currentPage || 0;
     const currentDataUrl = activeDoc.dataUrls[pageIdx] || activeDoc.dataUrls[0];
+    if (!currentDataUrl) {
+      console.warn('PDF image data is missing or corrupted.');
+      return;
+    }
     const docPageKey = `${activeDoc.id}_p${pageIdx}`;
 
     // Only update image overlay and fitBounds if the document ID or page has actually changed
@@ -686,7 +690,7 @@ export const PdfMapNavigator: React.FC = () => {
     
     markersLayerRef.current.clearLayers();
 
-    activeDoc.markers.forEach((marker) => {
+    (activeDoc.markers || []).forEach((marker) => {
       const categoryObj = CATEGORIES.find((c) => c.id === marker.category) || CATEGORIES[0];
       const isTarget = activeNavPoint?.id === marker.id;
       const hasPhotos = marker.photos && marker.photos.length > 0;
@@ -2905,7 +2909,7 @@ export const PdfMapNavigator: React.FC = () => {
                           <div className="truncate">
                             <div className="truncate font-bold">{doc.name}</div>
                             <div className="text-[10px] text-slate-500 font-normal">
-                              {doc.pageCount} pág • {doc.markers.length} pontos • {doc.tracks?.length || 0} rotas
+                              {doc.pageCount} pág • {(doc.markers || []).length} pontos • {doc.tracks?.length || 0} rotas
                             </div>
                           </div>
                         </div>
@@ -2925,10 +2929,10 @@ export const PdfMapNavigator: React.FC = () => {
               {activeDoc && (
                 <div>
                   <label className="text-[11px] font-extrabold text-slate-400 uppercase tracking-wider block mb-2">
-                    Pontos nesta Folha ({activeDoc.markers.length})
+                    Pontos nesta Folha ({(activeDoc.markers || []).length})
                   </label>
                   <div className="space-y-1.5">
-                    {activeDoc.markers.map((marker) => (
+                    {(activeDoc.markers || []).map((marker) => (
                       <div
                         key={marker.id}
                         onClick={() => {
@@ -2952,7 +2956,7 @@ export const PdfMapNavigator: React.FC = () => {
                         <span className="text-[10px] text-slate-500">{marker.createdAt}</span>
                       </div>
                     ))}
-                    {activeDoc.markers.length === 0 && (
+                    {(activeDoc.markers || []).length === 0 && (
                       <div className="p-3 text-center text-slate-500 italic">
                         Nenhum ponto marcado ainda.
                       </div>
