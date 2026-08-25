@@ -703,6 +703,11 @@ export const PdfMapNavigator: React.FC = () => {
       if (currentDataUrl) {
         imageOverlayRef.current = L.imageOverlay(currentDataUrl, bounds).addTo(map);
         map.fitBounds(bounds, { padding: [15, 15] });
+        map.setMaxBounds(bounds.pad(0.4));
+        
+        // Prevent zooming out so far that the map becomes a tiny speck or gets lost
+        const baseZoom = map.getBoundsZoom(bounds);
+        map.setMinZoom(baseZoom - 1);
       }
 
       const timer = setTimeout(() => {
