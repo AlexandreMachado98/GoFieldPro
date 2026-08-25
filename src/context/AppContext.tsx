@@ -608,47 +608,55 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     requestCurrentLocation();
   }, [notifyInfo, requestCurrentLocation]);
 
+  const isRecordingTrackRef = useRef(isRecordingTrack);
+  isRecordingTrackRef.current = isRecordingTrack;
+
   useEffect(() => {
     let watchId: number | null = null;
+    let simInterval: number | null = null;
 
-    if (!isGpsSimulated && navigator.geolocation) {
-      // 1. Kickstart immediately if not manually locked
-      if (!isManualGpsLockedRef.current) {
-        requestCurrentLocation();
+    const startGpsWatch = (highAccuracy: boolean) => {
+      if (!navigator.geolocation || isGpsSimulated) return null;
+      return navigator.geolocation.watchPosition(
+        (pos) => {
+          // If the user locked their position manually, do NOT overwrite it!
+          if (isManualGpsLockedRef.current) return;
+
+          setCurrentGps({
+            lat: pos.coords.latitude,
+            lng: pos.coords.longitude,
+            altitude: pos.coords.altitude || 1250,
+            accuracy: +(pos.coords.accuracy || 2.0).toFixed(1),
+            timestamp: Date.now(),
+          });
+          setHasGpsLock(true);
+        },
+        (err) => {
+          console.warn(`Geolocation watcher warning (highAccuracy=${highAccuracy}):`, err);
+          if (highAccuracy && watchId !== null && !isManualGpsLockedRef.current) {
+            navigator.geolocation.clearWatch(watchId);
+            watchId = startGpsWatch(false);
+          }
+        },
+        { 
+          enableHighAccuracy: highAccuracy, 
+          timeout: 15000, 
+          maximumAge: highAccuracy ? 2000 : 10000 
+        }
+      );
+    };
+
+    const stopGpsWatch = () => {
+      if (watchId !== null && navigator.geolocation) {
+        navigator.geolocation.clearWatch(watchId);
+        watchId = null;
       }
+    };
 
-      // 2. Continuous watch position with auto-reconnect fallback
-      const startWatch = (highAccuracy: boolean) => {
-        return navigator.geolocation.watchPosition(
-          (pos) => {
-            // If the user locked their position manually, do NOT overwrite it!
-            if (isManualGpsLockedRef.current) return;
-
-            setCurrentGps({
-              lat: pos.coords.latitude,
-              lng: pos.coords.longitude,
-              altitude: pos.coords.altitude || 1250,
-              accuracy: +(pos.coords.accuracy || 2.0).toFixed(1),
-              timestamp: Date.now(),
-            });
-            setHasGpsLock(true);
-          },
-          (err) => {
-            console.warn(`Geolocation watcher warning (highAccuracy=${highAccuracy}):`, err);
-            if (highAccuracy && watchId !== null && !isManualGpsLockedRef.current) {
-              navigator.geolocation.clearWatch(watchId);
-              watchId = startWatch(false);
-            }
-          },
-          { enableHighAccuracy: highAccuracy, timeout: 15000, maximumAge: highAccuracy ? 2000 : 10000 }
-        );
-      };
-
-      watchId = startWatch(true);
-    } else if (isGpsSimulated) {
-      // Gentle field surveyor wander simulation around active project
-      const interval = setInterval(() => {
-        if (isManualGpsLockedRef.current) return;
+    const startSimulation = () => {
+      if (simInterval !== null) clearInterval(simInterval);
+      simInterval = window.setInterval(() => {
+        if (isManualGpsLockedRef.current || document.visibilityState === 'hidden') return;
 
         setCurrentGps((prev) => {
           const deltaLat = (Math.random() - 0.5) * 0.00015;
@@ -662,14 +670,51 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
           };
         });
       }, 3000);
+    };
 
-      return () => clearInterval(interval);
+    const stopSimulation = () => {
+      if (simInterval !== null) {
+        clearInterval(simInterval);
+        simInterval = null;
+      }
+    };
+
+    // Thermal & Battery Saver: Pause GPS when app is minimized/screen is off (unless recording track)
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'hidden') {
+        if (!isRecordingTrackRef.current) {
+          stopGpsWatch();
+          stopSimulation();
+        }
+      } else if (document.visibilityState === 'visible') {
+        if (!isGpsSimulated) {
+          if (!isManualGpsLockedRef.current) {
+            requestCurrentLocation();
+          }
+          if (watchId === null) {
+            watchId = startGpsWatch(true);
+          }
+        } else {
+          startSimulation();
+        }
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    if (!isGpsSimulated && navigator.geolocation) {
+      if (!isManualGpsLockedRef.current) {
+        requestCurrentLocation();
+      }
+      watchId = startGpsWatch(true);
+    } else if (isGpsSimulated) {
+      startSimulation();
     }
 
     return () => {
-      if (watchId !== null && navigator.geolocation) {
-        navigator.geolocation.clearWatch(watchId);
-      }
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      stopGpsWatch();
+      stopSimulation();
     };
   }, [isGpsSimulated, requestCurrentLocation]);
 

@@ -1186,16 +1186,41 @@ export const PdfMapNavigator: React.FC = () => {
     }
   }, [isGpsActive, notifyError, notifyInfo, updateUserGpsPosition]);
 
-  // Clean up GPS watcher on unmount
+  // Clean up GPS watcher on unmount & suspend on background for battery/thermal savings
   useEffect(() => {
+    const handleVisibility = () => {
+      if (document.visibilityState === 'hidden') {
+        if (!isRecordingLive && gpsWatchIdRef.current !== null && navigator.geolocation) {
+          try {
+            navigator.geolocation.clearWatch(gpsWatchIdRef.current);
+            gpsWatchIdRef.current = null;
+          } catch {}
+        }
+      } else if (document.visibilityState === 'visible') {
+        if (isGpsActive && gpsWatchIdRef.current === null && navigator.geolocation) {
+          try {
+            gpsWatchIdRef.current = navigator.geolocation.watchPosition(
+              (pos) => updateUserGpsPosition(pos),
+              (err) => console.warn('GPS resume error:', err),
+              { enableHighAccuracy: true, timeout: 12000, maximumAge: 2000 }
+            );
+          } catch {}
+        }
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibility);
+
     return () => {
+      document.removeEventListener('visibilitychange', handleVisibility);
       if (gpsWatchIdRef.current !== null) {
         try {
           navigator.geolocation.clearWatch(gpsWatchIdRef.current);
+          gpsWatchIdRef.current = null;
         } catch {}
       }
     };
-  }, []);
+  }, [isRecordingLive, isGpsActive, updateUserGpsPosition]);
 
   // Center map on user's current GPS position on PDF
   const centerOnUserGps = useCallback(() => {

@@ -26,10 +26,11 @@ const ToastItem: React.FC<ToastItemProps> = ({ toast, onDismiss }) => {
 
   useEffect(() => {
     if (isPaused) return;
-    const intervalTime = 50;
+    const intervalTime = 120;
     const step = (intervalTime / duration) * 100;
 
     const timer = setInterval(() => {
+      if (document.visibilityState === 'hidden') return;
       setProgress((prev) => {
         if (prev <= step) {
           clearInterval(timer);
