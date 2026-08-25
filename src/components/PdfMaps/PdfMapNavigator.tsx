@@ -542,51 +542,7 @@ export const PdfMapNavigator: React.FC = () => {
   }, [initializeMap]);
 
   // Handle Load Sample Topographic Demo Map
-  const handleLoadSampleDemoMap = useCallback(async () => {
-    setIsProcessing(true);
-    setProcessingProgress('Gerando Planta Topográfica Demonstrativa...');
-    try {
-      const sample = generateSampleTopoMap();
-      const sampleDoc: PdfDocument = {
-        id: `topo-demo-${Date.now()}`,
-        name: 'Planta Topográfica Base',
-        fileName: 'Planta_Topografica_Base.pdf',
-        fileSize: '1.8 MB',
-        dataUrls: [sample.dataUrl],
-        pageCount: 1,
-        currentPage: 0,
-        width: sample.width,
-        height: sample.height,
-        calibration: createCenteredCalibration(
-          { id: '', name: '', fileName: '', fileSize: '', dataUrls: [], pageCount: 1, currentPage: 0, width: sample.width, height: sample.height, markers: [], tracks: [], uploadedAt: '' },
-          currentGps?.lat || -20.2541,
-          currentGps?.lng || -46.5823,
-          0.75
-        ),
-        markers: [],
-        tracks: [],
-        uploadedAt: new Date().toLocaleDateString('pt-BR'),
-      };
-
-      await savePdfDocument(sampleDoc);
-      setDocuments((prev) => [sampleDoc, ...prev]);
-      setActiveDocId(sampleDoc.id);
-      setIsDrawerOpen(false);
-      addPdfFile({
-        id: sampleDoc.id,
-        name: sampleDoc.name,
-        dataUrl: sample.dataUrl,
-        width: sampleDoc.width,
-        height: sampleDoc.height,
-      });
-    } catch (err: any) {
-      console.error('Error generating demo map:', err);
-      setErrorMsg('Erro ao gerar mapa demonstrativo');
-    } finally {
-      setIsProcessing(false);
-      setProcessingProgress('');
-    }
-  }, [addPdfFile]);
+  
 
   // Load documents from IndexedDB on mount & auto-seed demo if empty
   useEffect(() => {
@@ -604,9 +560,6 @@ export const PdfMapNavigator: React.FC = () => {
             } else {
               setActiveDocId(docs[0].id);
             }
-          } else {
-            // Automatically initialize with demo topo map so user can test immediately
-            handleLoadSampleDemoMap();
           }
         }
       } catch (e) {
@@ -618,7 +571,7 @@ export const PdfMapNavigator: React.FC = () => {
     return () => {
       mounted = false;
     };
-  }, [handleLoadSampleDemoMap]);
+  }, []);
 
   const activeDoc = documents.find((d) => d.id === activeDocId) || null;
 
@@ -2057,13 +2010,7 @@ export const PdfMapNavigator: React.FC = () => {
                 <UploadCloud className="w-5 h-5" />
                 <span>Importar Mapa PDF</span>
               </button>
-              <button
-                onClick={handleLoadSampleDemoMap}
-                className="flex items-center gap-2 px-4 py-3 rounded-2xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs border border-slate-700 transition-all active:scale-95"
-              >
-                <Sparkles className="w-4 h-4 text-emerald-400" />
-                <span>Carregar Planta Demonstrativa</span>
-              </button>
+              
             </div>
           </div>
         )}
