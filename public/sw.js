@@ -1,5 +1,5 @@
 // Service Worker for GoField Pro PWA
-const CACHE_NAME = 'gofield-pro-v4';
+const CACHE_NAME = 'gofield-pro-v5';
 const OFFLINE_URLS = [
   '/',
   '/index.html',
