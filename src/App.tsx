@@ -8,12 +8,9 @@ import { MapViewer } from './components/Map/MapViewer';
 import { NavigationHUD } from './components/Navigation/NavigationHUD';
 import { LayerManagerModal } from './components/Layers/LayerManagerModal';
 import { AddWaypointModal } from './components/Waypoints/AddWaypointModal';
-import { TrackRecorderPanel } from './components/FieldTrack/TrackRecorderPanel';
 import { HomeDashboard } from './components/Home/HomeDashboard';
 import { PdfMapNavigator } from './components/PdfMaps/PdfMapNavigator';
-import { TeamTelemetryPanel } from './components/Team/TeamTelemetryPanel';
 import { OfflineSyncDrawer } from './components/Offline/OfflineSyncDrawer';
-import { FieldAIAssistantModal } from './components/AI/FieldAIAssistantModal';
 import { FieldRoundsPanel } from './components/FieldRounds/FieldRoundsPanel';
 import { AdminPanel } from './components/Admin/AdminPanel';
 import { LoginScreen } from './components/Auth/LoginScreen';
@@ -58,7 +55,6 @@ const MainAppContent: React.FC = () => {
               {activeTab === 'layers' && <LayerManagerModal />}
             </div>
           )}
-          {activeTab === 'tracks' && <TrackRecorderPanel />}
           {activeTab === 'field_rounds' && <FieldRoundsPanel />}
           {activeTab === 'home' && <HomeDashboard />}
           {activeTab === 'pdf_maps' && (
@@ -66,7 +62,6 @@ const MainAppContent: React.FC = () => {
               <PdfMapNavigator />
             </ErrorBoundary>
           )}
-          {activeTab === 'team' && <TeamTelemetryPanel />}
           {activeTab === 'offline' && <OfflineSyncDrawer />}
           {activeTab === 'admin' && <AdminPanel />}
         </main>
@@ -75,7 +70,6 @@ const MainAppContent: React.FC = () => {
       {/* Global Modals & Notifications */}
       <AddWaypointModal />
       <LayerManagerModal />
-      <FieldAIAssistantModal />
       <SettingsModal isOpen={isSettingsModalOpen} onClose={() => setIsSettingsModalOpen(false)} />
       <ConfirmModal />
       <ToastContainer />

@@ -1313,13 +1313,15 @@ export const MapViewer: React.FC = () => {
           <Maximize2 className="w-5 h-5" />
         </button>
 
+        {/* Layer Manager Quick Trigger (Camadas) */}
         <button
           id="btn-layer-manager-quick"
           onClick={() => setIsLayerModalOpen(true)}
-          title="Gerenciar Camadas (PDF, KML, KMZ)"
+          title="Camadas"
+          aria-label="Camadas"
           className="w-10 h-10 rounded-lg bg-slate-900/90 hover:bg-slate-800 text-slate-300 border border-slate-800 shadow-xl flex items-center justify-center transition-all hover:scale-105 active:scale-95 relative"
         >
-          <LayersIcon className="w-5 h-5" />
+          <LayersIcon className="w-5 h-5 text-sky-400" />
           <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-sky-600 text-white text-[9px] font-bold flex items-center justify-center">
             {layers.filter((l) => l.visible).length}
           </span>
@@ -1362,16 +1364,6 @@ export const MapViewer: React.FC = () => {
           className="w-10 h-10 rounded-lg bg-slate-900/90 hover:bg-slate-800 text-emerald-400 border border-slate-800 shadow-xl flex items-center justify-center transition-all hover:scale-105 active:scale-95"
         >
           <Download className="w-5 h-5" />
-        </button>
-
-        {/* AI Assistant */}
-        <button
-          id="btn-ai-assistant"
-          onClick={() => setIsAiModalOpen(true)}
-          title="Assistente SIG IA"
-          className="w-10 h-10 rounded-lg bg-gradient-to-br from-indigo-600 to-sky-600 text-white shadow-xl flex items-center justify-center transition-all hover:scale-105 active:scale-95"
-        >
-          <SparklesIcon className="w-5 h-5" />
         </button>
       </div>
 

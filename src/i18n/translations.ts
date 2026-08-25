@@ -25,7 +25,7 @@ export const translations = {
     tabMap: 'Mapa de Navegação',
     tabPdfMaps: 'Mapas & Plantas PDF',
     tabFieldRounds: 'Registrar Atividade',
-    tabLayers: 'Camadas & Mapas PDF/KML',
+    tabLayers: 'Camadas',
     tabOffline: 'Mapas Offline',
     // Map controls
     basemap: 'Mapa Base',
