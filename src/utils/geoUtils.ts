@@ -9,6 +9,19 @@ export function calculateDistanceMeters(
   lat2: number,
   lon2: number
 ): number {
+  if (
+    typeof lat1 !== 'number' ||
+    typeof lon1 !== 'number' ||
+    typeof lat2 !== 'number' ||
+    typeof lon2 !== 'number' ||
+    isNaN(lat1) ||
+    isNaN(lon1) ||
+    isNaN(lat2) ||
+    isNaN(lon2)
+  ) {
+    return 0;
+  }
+
   const R = 6371000; // Earth radius in meters
   const dLat = ((lat2 - lat1) * Math.PI) / 180;
   const dLon = ((lon2 - lon1) * Math.PI) / 180;
@@ -18,8 +31,9 @@ export function calculateDistanceMeters(
       Math.cos((lat2 * Math.PI) / 180) *
       Math.sin(dLon / 2) *
       Math.sin(dLon / 2);
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-  return R * c;
+  const c = 2 * Math.atan2(Math.sqrt(Math.max(0, Math.min(1, a))), Math.sqrt(Math.max(0, Math.min(1, 1 - a))));
+  const dist = R * c;
+  return isNaN(dist) ? 0 : dist;
 }
 
 /**
@@ -31,6 +45,19 @@ export function calculateBearingDegrees(
   lat2: number,
   lon2: number
 ): number {
+  if (
+    typeof lat1 !== 'number' ||
+    typeof lon1 !== 'number' ||
+    typeof lat2 !== 'number' ||
+    typeof lon2 !== 'number' ||
+    isNaN(lat1) ||
+    isNaN(lon1) ||
+    isNaN(lat2) ||
+    isNaN(lon2)
+  ) {
+    return 0;
+  }
+
   const φ1 = (lat1 * Math.PI) / 180;
   const φ2 = (lat2 * Math.PI) / 180;
   const Δλ = ((lon2 - lon1) * Math.PI) / 180;
@@ -41,27 +68,31 @@ export function calculateBearingDegrees(
     Math.sin(φ1) * Math.cos(φ2) * Math.cos(Δλ);
   const θ = Math.atan2(y, x);
   const bearing = ((θ * 180) / Math.PI + 360) % 360;
-  return bearing;
+  return isNaN(bearing) ? 0 : bearing;
 }
 
 /**
  * Converts degrees into 16-point Compass Cardinal Direction
  */
 export function bearingToCardinal(bearing: number): string {
+  if (typeof bearing !== 'number' || isNaN(bearing)) return 'N';
   const directions = [
     'N', 'NNE', 'NE', 'ENE',
     'E', 'ESE', 'SE', 'SSE',
     'S', 'SSW', 'SW', 'WSW',
     'W', 'WNW', 'NW', 'NNW'
   ];
-  const index = Math.round(bearing / 22.5) % 16;
-  return directions[index];
+  const index = Math.round(((bearing % 360) + 360) % 360 / 22.5) % 16;
+  return directions[index] || 'N';
 }
 
 /**
  * Converts Decimal Degrees to DMS (Degrees, Minutes, Seconds)
  */
 export function formatToDMS(deg: number, isLatitude: boolean): string {
+  if (typeof deg !== 'number' || isNaN(deg)) {
+    return `00° 00' 00.00" ${isLatitude ? 'S' : 'W'}`;
+  }
   const absolute = Math.abs(deg);
   const degrees = Math.floor(absolute);
   const minutesNotTruncated = (absolute - degrees) * 60;
@@ -79,10 +110,18 @@ export function formatToDMS(deg: number, isLatitude: boolean): string {
  * Approximate conversion from Lat/Lng to UTM Coordinates & Zone
  */
 export function latLngToUTM(lat: number, lng: number): { zone: string; easting: number; northing: number } {
-  const zoneNumber = Math.floor((lng + 180) / 6) + 1;
+  if (
+    typeof lat !== 'number' ||
+    typeof lng !== 'number' ||
+    isNaN(lat) ||
+    isNaN(lng)
+  ) {
+    return { zone: '23S', easting: 0, northing: 0 };
+  }
+
+  const zoneNumber = Math.max(1, Math.min(60, Math.floor((lng + 180) / 6) + 1));
   const hemisphere = lat >= 0 ? 'N' : 'S';
   
-  // Approximate standard projection for quick field reference
   const latRad = (lat * Math.PI) / 180;
   const lngRad = (lng * Math.PI) / 180;
   const centralMeridian = ((zoneNumber - 1) * 6 - 180 + 3) * (Math.PI / 180);
@@ -107,8 +146,8 @@ export function latLngToUTM(lat: number, lng: number): { zone: string; easting: 
 
   return {
     zone: `${zoneNumber}${hemisphere}`,
-    easting: Math.round(easting),
-    northing: Math.round(northing),
+    easting: isNaN(easting) ? 0 : Math.round(easting),
+    northing: isNaN(northing) ? 0 : Math.round(northing),
   };
 }
 
@@ -128,28 +167,31 @@ export function calculateCrossTrackError(
   const θ12 = (calculateBearingDegrees(startLat, startLon, endLat, endLon) * Math.PI) / 180;
 
   const dxt = Math.asin(Math.sin(d13) * Math.sin(θ13 - θ12)) * 6371000;
-  return Math.round(dxt);
+  return isNaN(dxt) ? 0 : Math.round(dxt);
 }
 
 /**
  * Calculates polygon area in Hectares and Square Meters (spherical shoelace)
  */
 export function calculatePolygonArea(coords: GeoCoordinate[]): { m2: number; hectares: number } {
-  if (coords.length < 3) return { m2: 0, hectares: 0 };
+  if (!coords || !Array.isArray(coords)) return { m2: 0, hectares: 0 };
+  const valid = coords.filter((c) => c && typeof c.lat === 'number' && typeof c.lng === 'number' && !isNaN(c.lat) && !isNaN(c.lng));
+  if (valid.length < 3) return { m2: 0, hectares: 0 };
   
   const R = 6378137; // Earth radius in meters
   let area = 0;
 
-  for (let i = 0; i < coords.length; i++) {
-    const j = (i + 1) % coords.length;
-    const lat1 = (coords[i].lat * Math.PI) / 180;
-    const lat2 = (coords[j].lat * Math.PI) / 180;
-    const lon1 = (coords[i].lng * Math.PI) / 180;
-    const lon2 = (coords[j].lng * Math.PI) / 180;
+  for (let i = 0; i < valid.length; i++) {
+    const j = (i + 1) % valid.length;
+    const lat1 = (valid[i].lat * Math.PI) / 180;
+    const lat2 = (valid[j].lat * Math.PI) / 180;
+    const lon1 = (valid[i].lng * Math.PI) / 180;
+    const lon2 = (valid[j].lng * Math.PI) / 180;
     area += (lon2 - lon1) * (2 + Math.sin(lat1) + Math.sin(lat2));
   }
 
   area = Math.abs((area * R * R) / 2.0);
+  if (isNaN(area)) return { m2: 0, hectares: 0 };
   const hectares = Number((area / 10000).toFixed(2));
-  return { m2: Math.round(area), hectares };
+  return { m2: Math.round(area), hectares: isNaN(hectares) ? 0 : hectares };
 }

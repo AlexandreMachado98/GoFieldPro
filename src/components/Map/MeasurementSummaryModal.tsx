@@ -355,10 +355,12 @@ export const MeasurementSummaryModal: React.FC<MeasurementSummaryModalProps> = (
                   </thead>
                   <tbody className="divide-y divide-slate-800/60">
                     {points.map((pt, idx) => {
-                      const segDist = segmentDistances[idx];
+                      const segDist = segmentDistances[idx] || 0;
                       let cum = 0;
-                      for (let i = 0; i <= idx; i++) cum += segmentDistances[i];
-                      const utm = latLngToUTM(pt.lat, pt.lng);
+                      for (let i = 0; i <= idx; i++) cum += (segmentDistances[i] || 0);
+                      const safeLat = typeof pt.lat === 'number' && !isNaN(pt.lat) ? pt.lat : 0;
+                      const safeLng = typeof pt.lng === 'number' && !isNaN(pt.lng) ? pt.lng : 0;
+                      const utm = latLngToUTM(safeLat, safeLng);
 
                       return (
                         <tr
@@ -385,7 +387,7 @@ export const MeasurementSummaryModal: React.FC<MeasurementSummaryModalProps> = (
                             </span>
                           </td>
                           <td className="py-2 px-3 font-mono text-[11px] text-slate-300">
-                            {pt.lat.toFixed(5)}°, {pt.lng.toFixed(5)}°
+                            {safeLat.toFixed(5)}°, {safeLng.toFixed(5)}°
                             <div className="text-[9px] text-slate-500">UTM: {utm.northing}N {utm.easting}E</div>
                           </td>
                           <td className="py-2 px-3 font-mono font-bold text-right text-slate-200">

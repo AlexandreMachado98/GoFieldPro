@@ -38,18 +38,20 @@ export const MeasurementControlBar: React.FC<MeasurementControlBarProps> = ({
   onFinishMeasurement,
   onClose,
 }) => {
+  const safeTotalDist = typeof totalDistanceMeters === 'number' && !isNaN(totalDistanceMeters) ? totalDistanceMeters : 0;
   const formattedDist =
-    totalDistanceMeters >= 1000
-      ? `${(totalDistanceMeters / 1000).toFixed(3)} km`
-      : `${totalDistanceMeters.toFixed(1)} m`;
+    safeTotalDist >= 1000
+      ? `${(safeTotalDist / 1000).toFixed(3)} km`
+      : `${safeTotalDist.toFixed(1)} m`;
 
-  const stopsCount = points.filter((p) => p.type === 'stop').length;
-  const hazardsCount = points.filter((p) => p.type === 'hazard').length;
+  const validPoints = Array.isArray(points) ? points : [];
+  const stopsCount = validPoints.filter((p) => p && p.type === 'stop').length;
+  const hazardsCount = validPoints.filter((p) => p && p.type === 'hazard').length;
 
   const isClosed =
-    points.length >= 3 &&
-    points[0].lat === points[points.length - 1].lat &&
-    points[0].lng === points[points.length - 1].lng;
+    validPoints.length >= 3 &&
+    validPoints[0]?.lat === validPoints[validPoints.length - 1]?.lat &&
+    validPoints[0]?.lng === validPoints[validPoints.length - 1]?.lng;
 
   return (
     <div className="absolute top-16 left-1/2 -translate-x-1/2 z-20 w-full max-w-2xl px-3 pointer-events-none animate-in fade-in slide-in-from-top-4 duration-200">

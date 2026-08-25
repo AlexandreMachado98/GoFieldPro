@@ -59,15 +59,17 @@ export const PointDetailModal: React.FC<PointDetailModalProps> = ({
   const handleSave = () => {
     onSave({
       ...point,
-      label,
+      label: label.trim() || `Ponto ${pointIndex + 1}`,
       type,
-      notes,
-      photos,
+      notes: notes.trim(),
+      photos: Array.isArray(photos) ? photos : [],
     });
     onClose();
   };
 
-  const utm = latLngToUTM(point.lat, point.lng);
+  const safeLat = typeof point.lat === 'number' && !isNaN(point.lat) ? point.lat : 0;
+  const safeLng = typeof point.lng === 'number' && !isNaN(point.lng) ? point.lng : 0;
+  const utm = latLngToUTM(safeLat, safeLng);
 
   return (
     <div className="fixed inset-0 z-[10000] flex items-center justify-center p-3 sm:p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
@@ -97,7 +99,7 @@ export const PointDetailModal: React.FC<PointDetailModalProps> = ({
                 Editar Vértice #{pointIndex + 1}
               </h3>
               <p className="text-[11px] text-slate-400 font-mono">
-                {point.lat.toFixed(5)}°, {point.lng.toFixed(5)}° • UTM: E {utm.easting} N {utm.northing}
+                {safeLat.toFixed(5)}°, {safeLng.toFixed(5)}° • UTM: E {utm.easting} N {utm.northing}
               </p>
             </div>
           </div>

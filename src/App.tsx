@@ -61,7 +61,11 @@ const MainAppContent: React.FC = () => {
           {activeTab === 'tracks' && <TrackRecorderPanel />}
           {activeTab === 'field_rounds' && <FieldRoundsPanel />}
           {activeTab === 'home' && <HomeDashboard />}
-          {activeTab === 'pdf_maps' && <PdfMapNavigator />}
+          {activeTab === 'pdf_maps' && (
+            <ErrorBoundary fallbackTitle="Visualizador de Mapas e Plantas PDF">
+              <PdfMapNavigator />
+            </ErrorBoundary>
+          )}
           {activeTab === 'team' && <TeamTelemetryPanel />}
           {activeTab === 'offline' && <OfflineSyncDrawer />}
           {activeTab === 'admin' && <AdminPanel />}

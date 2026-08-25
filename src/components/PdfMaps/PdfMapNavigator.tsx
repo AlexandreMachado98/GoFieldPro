@@ -22,24 +22,17 @@ import {
   Play,
   Pause,
   Square,
-  Compass,
   X,
   Layers,
   Sparkles,
-  ArrowRight,
   Eye,
-  RotateCcw,
   Footprints,
   FolderOpen,
   Undo2,
-  Info,
   Share2,
   Crosshair,
   LocateFixed,
   Sliders,
-  Radio,
-  Download,
-  Gauge,
   Ruler
 } from 'lucide-react';
 import L from 'leaflet';
@@ -59,8 +52,7 @@ import {
   gpsToPdf, 
   pdfToGps, 
   createCenteredCalibration, 
-  calculateNavigationToMarker,
-  getDocumentCalibration 
+  calculateNavigationToMarker
 } from '../../utils/geoTransform';
 import { calculateDistanceMeters } from '../../utils/geoUtils';
 import { MeasurementPoint, MeasurementPointType } from '../../types';
@@ -89,184 +81,47 @@ const CATEGORIES = [
   { id: 'note', label: 'Anotação Geral', color: '#f59e0b' },
 ] as const;
 
-// Generate ultra high resolution cartographic topographic demo map
-function generateSampleTopoMap(): { dataUrl: string; width: number; height: number } {
-  const width = 1600;
-  const height = 1200;
-  const canvas = document.createElement('canvas');
-  canvas.width = width;
-  canvas.height = height;
-  const ctx = canvas.getContext('2d');
-  if (!ctx) return { dataUrl: '', width, height };
-
-  // Background - Cartographic cream/topographic paper
-  ctx.fillStyle = '#f8f9fa';
-  ctx.fillRect(0, 0, width, height);
-
-  // Soft relief gradient
-  const reliefGrad = ctx.createRadialGradient(800, 600, 50, 800, 600, 700);
-  reliefGrad.addColorStop(0, '#e2f0d9');
-  reliefGrad.addColorStop(0.5, '#f0f4c3');
-  reliefGrad.addColorStop(0.8, '#ffe0b2');
-  reliefGrad.addColorStop(1, '#f5f5f5');
-  ctx.fillStyle = reliefGrad;
-  ctx.fillRect(40, 40, width - 80, height - 80);
-
-  // Border & Neatline
-  ctx.lineWidth = 3;
-  ctx.strokeStyle = '#1e293b';
-  ctx.strokeRect(30, 30, width - 60, height - 60);
-  ctx.lineWidth = 1;
-  ctx.strokeRect(40, 40, width - 80, height - 80);
-
-  // Grid lines & UTM ticks
-  ctx.strokeStyle = 'rgba(100, 116, 139, 0.25)';
-  ctx.lineWidth = 1;
-  ctx.setLineDash([4, 4]);
-  for (let x = 120; x < width - 60; x += 160) {
-    ctx.beginPath();
-    ctx.moveTo(x, 40);
-    ctx.lineTo(x, height - 40);
-    ctx.stroke();
-    // UTM Label
-    ctx.font = '10px monospace';
-    ctx.fillStyle = '#475569';
-    ctx.fillText(`${(680000 + x * 50).toLocaleString('pt-BR')}m E`, x - 30, 36);
-    ctx.fillText(`${(680000 + x * 50).toLocaleString('pt-BR')}m E`, x - 30, height - 25);
-  }
-  for (let y = 120; y < height - 60; y += 160) {
-    ctx.beginPath();
-    ctx.moveTo(40, y);
-    ctx.lineTo(width - 40, y);
-    ctx.stroke();
-    ctx.font = '10px monospace';
-    ctx.fillStyle = '#475569';
-    ctx.fillText(`${(7450000 - y * 50).toLocaleString('pt-BR')}m N`, 4, y + 3);
-  }
-  ctx.setLineDash([]);
-
-  // Topographic Contour Lines (Curvas de Nível)
-  const drawContour = (centerX: number, centerY: number, rx: number, ry: number, elevation: number, isIndex: boolean) => {
-    ctx.beginPath();
-    ctx.ellipse(centerX, centerY, rx, ry, Math.PI / 12, 0, Math.PI * 2);
-    ctx.strokeStyle = isIndex ? '#854d0e' : '#b45309';
-    ctx.lineWidth = isIndex ? 2 : 1;
-    ctx.stroke();
-
-    if (isIndex) {
-      ctx.fillStyle = '#854d0e';
-      ctx.font = 'bold 11px sans-serif';
-      ctx.fillText(`${elevation} m`, centerX + rx - 35, centerY - 5);
-    }
-  };
-
-  // Multiple elevation peaks
-  for (let i = 1; i <= 8; i++) {
-    drawContour(650, 500, i * 45, i * 35, 800 - i * 20, i % 3 === 0);
-    drawContour(1100, 750, i * 38, i * 30, 720 - i * 20, i % 2 === 0);
-  }
-
-  // River / Drainage line
-  ctx.beginPath();
-  ctx.moveTo(60, 200);
-  ctx.bezierCurveTo(400, 300, 700, 150, 950, 450);
-  ctx.bezierCurveTo(1100, 650, 1300, 800, 1540, 950);
-  ctx.strokeStyle = '#0284c7';
-  ctx.lineWidth = 5;
-  ctx.lineCap = 'round';
-  ctx.stroke();
-
-  // River Label
-  ctx.fillStyle = '#0369a1';
-  ctx.font = 'italic bold 13px sans-serif';
-  ctx.fillText('Rio das Pedras (Drenagem Principal)', 720, 260);
-
-  // Map Title Box & Legend
-  ctx.fillStyle = '#ffffff';
-  ctx.fillRect(60, 60, 440, 160);
-  ctx.strokeStyle = '#1e293b';
-  ctx.lineWidth = 2;
-  ctx.strokeRect(60, 60, 440, 160);
-
-  ctx.fillStyle = '#0f172a';
-  ctx.font = 'bold 18px sans-serif';
-  ctx.fillText('CARTA TOPOGRÁFICA / PLANTA PILOTO', 80, 95);
-  ctx.font = 'bold 12px sans-serif';
-  ctx.fillStyle = '#059669';
-  ctx.fillText('SETOR SUL - FAZENDA MONTE VERDE (ESCALA 1:10.000)', 80, 120);
-  ctx.font = '11px sans-serif';
-  ctx.fillStyle = '#64748b';
-  ctx.fillText('Datum: SIRGAS 2000 / UTM Fuso 23S | Curvas de Nível: Equidistância 20m', 80, 145);
-  ctx.fillText('Sistema Offline GeoField Pro | Navegação e Coleta Georreferenciada', 80, 165);
-  ctx.fillText('Pronto para Anotações de Campo, Vistorias e Traçado de Rota', 80, 185);
-
-  // North Arrow
-  ctx.fillStyle = '#1e293b';
-  ctx.beginPath();
-  ctx.moveTo(width - 100, 80);
-  ctx.lineTo(width - 110, 125);
-  ctx.lineTo(width - 100, 115);
-  ctx.lineTo(width - 90, 125);
-  ctx.closePath();
-  ctx.fill();
-  ctx.font = 'bold 16px sans-serif';
-  ctx.fillText('N', width - 106, 70);
-
-  // Scale Bar
-  ctx.fillStyle = '#ffffff';
-  ctx.fillRect(width - 260, height - 90, 200, 40);
-  ctx.strokeRect(width - 260, height - 90, 200, 40);
-  ctx.fillStyle = '#000000';
-  ctx.fillRect(width - 240, height - 72, 80, 8);
-  ctx.fillStyle = '#ffffff';
-  ctx.fillRect(width - 160, height - 72, 80, 8);
-  ctx.strokeRect(width - 240, height - 72, 160, 8);
-  ctx.font = 'bold 10px monospace';
-  ctx.fillStyle = '#0f172a';
-  ctx.fillText('0', width - 244, height - 76);
-  ctx.fillText('500m', width - 170, height - 76);
-  ctx.fillText('1.000m', width - 95, height - 76);
-
-  return {
-    dataUrl: canvas.toDataURL('image/jpeg', 0.9),
-    width,
-    height,
-  };
-}
-
 // Compress image file to lightweight Base64 to save storage and keep UI fast
 const compressImageFile = (file: File, maxDim = 800, quality = 0.7): Promise<string> => {
   return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      const img = new Image();
-      img.onload = () => {
-        let { width, height } = img;
-        if (width > maxDim || height > maxDim) {
-          if (width > height) {
-            height = Math.round((height * maxDim) / width);
-            width = maxDim;
-          } else {
-            width = Math.round((width * maxDim) / height);
-            height = maxDim;
+    try {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const img = new Image();
+        img.onload = () => {
+          try {
+            let { width, height } = img;
+            if (width > maxDim || height > maxDim) {
+              if (width > height) {
+                height = Math.round((height * maxDim) / width);
+                width = maxDim;
+              } else {
+                width = Math.round((width * maxDim) / height);
+                height = maxDim;
+              }
+            }
+            const canvas = document.createElement('canvas');
+            canvas.width = Math.max(1, width);
+            canvas.height = Math.max(1, height);
+            const ctx = canvas.getContext('2d');
+            if (!ctx) {
+              resolve(e.target?.result as string);
+              return;
+            }
+            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+            resolve(canvas.toDataURL('image/jpeg', quality));
+          } catch (err) {
+            resolve(e.target?.result as string);
           }
-        }
-        const canvas = document.createElement('canvas');
-        canvas.width = width;
-        canvas.height = height;
-        const ctx = canvas.getContext('2d');
-        if (!ctx) {
-          resolve(e.target?.result as string);
-          return;
-        }
-        ctx.drawImage(img, 0, 0, width, height);
-        resolve(canvas.toDataURL('image/jpeg', quality));
+        };
+        img.onerror = () => reject(new Error('Falha ao processar foto'));
+        img.src = e.target?.result as string;
       };
-      img.onerror = () => reject(new Error('Falha ao processar foto'));
-      img.src = e.target?.result as string;
-    };
-    reader.onerror = () => reject(new Error('Falha ao ler arquivo de foto'));
-    reader.readAsDataURL(file);
+      reader.onerror = () => reject(new Error('Falha ao ler arquivo de foto'));
+      reader.readAsDataURL(file);
+    } catch (err) {
+      reject(err);
+    }
   });
 };
 
@@ -288,13 +143,10 @@ export const PdfMapNavigator: React.FC = () => {
 
   // Tools mode: 'pan', 'add_point', 'draw_track', 'record_track', 'measure'
   const [activeTool, setActiveTool] = useState<'pan' | 'add_point' | 'draw_track' | 'record_track' | 'measure'>('pan');
-  const activeToolRef = useRef<'pan' | 'add_point' | 'draw_track' | 'record_track' | 'measure'>('pan');
 
   // Measurement state on PDF sheet
   const [measurementPoints, setMeasurementPoints] = useState<MeasurementPoint[]>([]);
   const [currentMeasureType, setCurrentMeasureType] = useState<MeasurementPointType>('standard');
-  const currentMeasureTypeRef = useRef<MeasurementPointType>(currentMeasureType);
-  currentMeasureTypeRef.current = currentMeasureType;
   const [selectedMeasurePointForEdit, setSelectedMeasurePointForEdit] = useState<{
     point: MeasurementPoint;
     index: number;
@@ -351,8 +203,6 @@ export const PdfMapNavigator: React.FC = () => {
     heading: number | null;
     timestamp: number;
   } | null>(null);
-  const [isSimulatedGps, setIsSimulatedGps] = useState(false);
-  const [gpsError, setGpsError] = useState<string | null>(null);
 
   // Export Modal state
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
@@ -384,12 +234,43 @@ export const PdfMapNavigator: React.FC = () => {
   const gpsWatchIdRef = useRef<number | null>(null);
   const lastLoadedDocPageRef = useRef<string>('');
 
-  // Keep ref in sync
-  useEffect(() => {
-    activeToolRef.current = activeTool;
-  }, [activeTool]);
+  // Critical State Refs to prevent stale closures and React race conditions
+  const activeToolRef = useRef(activeTool);
+  activeToolRef.current = activeTool;
 
-  // Initialize Map and keep instances robust
+  const currentMeasureTypeRef = useRef(currentMeasureType);
+  currentMeasureTypeRef.current = currentMeasureType;
+
+  const documentsRef = useRef<PdfDocument[]>(documents);
+  documentsRef.current = documents;
+
+  const activeDocIdRef = useRef<string | null>(activeDocId);
+  activeDocIdRef.current = activeDocId;
+
+  const measurementPointsRef = useRef<MeasurementPoint[]>(measurementPoints);
+  measurementPointsRef.current = measurementPoints;
+
+  // Active Document Helper
+  const activeDoc = useMemo(() => {
+    return documents.find((d) => d.id === activeDocId) || null;
+  }, [documents, activeDocId]);
+
+  // Persist updated doc into IndexedDB asynchronously with safety
+  const updateDocumentInStore = useCallback((updatedDoc: PdfDocument) => {
+    try {
+      const cleanDoc: PdfDocument = {
+        ...updatedDoc,
+        markers: Array.isArray(updatedDoc.markers) ? updatedDoc.markers : [],
+        tracks: Array.isArray(updatedDoc.tracks) ? updatedDoc.tracks : [],
+      };
+      setDocuments((prev) => prev.map((d) => (d.id === cleanDoc.id ? cleanDoc : d)));
+      savePdfDocument(cleanDoc).catch((e) => console.warn('Failed to persist doc', e));
+    } catch (err) {
+      console.error('Error updating document in store:', err);
+    }
+  }, []);
+
+  // Initialize Map safely
   const initializeMap = useCallback(() => {
     if (!mapContainerRef.current || mapInstanceRef.current) return;
 
@@ -421,108 +302,121 @@ export const PdfMapNavigator: React.FC = () => {
       const measureGroup = L.layerGroup().addTo(map);
       measureLayerRef.current = measureGroup;
 
-      // Click listener uses activeToolRef to prevent stale closures
+      // Click listener uses activeToolRef and state refs to prevent crashes & stale closures
       map.on('click', (e: L.LeafletMouseEvent) => {
-        const currentTool = activeToolRef.current;
+        try {
+          if (!e || !e.latlng) return;
+          const lat = e.latlng.lat;
+          const lng = e.latlng.lng;
+          if (typeof lat !== 'number' || typeof lng !== 'number' || isNaN(lat) || isNaN(lng)) return;
 
-        if (currentTool === 'add_point') {
-          setPendingMarkerPos({ x: e.latlng.lat, y: e.latlng.lng });
-          setMarkerTitle(`Ponto ${Date.now().toString().slice(-4)}`);
-          setMarkerNotes('');
-          setMarkerPhotos([]);
-          setSelectedMarker(null);
-        } else if (currentTool === 'draw_track') {
-          setCurrentTrackPoints((prev) => [...prev, { x: e.latlng.lat, y: e.latlng.lng }]);
-        } else if (currentTool === 'record_track') {
-          setRecordedPoints((prev) => [
-            ...prev,
-            { x: e.latlng.lat, y: e.latlng.lng, time: new Date().toLocaleTimeString('pt-BR') }
-          ]);
-        } else if (currentTool === 'measure') {
-          const activeDoc = documents.find((d) => d.id === activeDocId);
-          const coords = activeDoc
-            ? pdfToGps(e.latlng.lat, e.latlng.lng, activeDoc)
-            : { lat: -23.542, lng: -46.638 };
+          const currentTool = activeToolRef.current;
+          const currentDocs = documentsRef.current;
+          const currentDocId = activeDocIdRef.current;
+          const currentDoc = currentDocs.find((d) => d.id === currentDocId);
 
-          // If clicking near the start point (< 30px in PDF sheet) and length >= 2, snap to close loop
-          if (measurementPoints.length >= 2) {
-            const startPt = measurementPoints[0];
-            if (startPt.pdfX !== undefined && startPt.pdfY !== undefined) {
-              const dx = e.latlng.lat - startPt.pdfX;
-              const dy = e.latlng.lng - startPt.pdfY;
-              const distPx = Math.sqrt(dx * dx + dy * dy);
-              if (distPx < 30) {
-                const isAlreadyClosed =
-                  measurementPoints.length >= 3 &&
-                  measurementPoints[0].lat === measurementPoints[measurementPoints.length - 1].lat &&
-                  measurementPoints[0].lng === measurementPoints[measurementPoints.length - 1].lng;
+          if (currentTool === 'add_point') {
+            setPendingMarkerPos({ x: lat, y: lng });
+            setMarkerTitle(`Ponto ${Date.now().toString().slice(-4)}`);
+            setMarkerNotes('');
+            setMarkerPhotos([]);
+            setSelectedMarker(null);
+          } else if (currentTool === 'draw_track') {
+            setCurrentTrackPoints((prev) => [...prev, { x: lat, y: lng }]);
+          } else if (currentTool === 'record_track') {
+            setRecordedPoints((prev) => [
+              ...prev,
+              { x: lat, y: lng, time: new Date().toLocaleTimeString('pt-BR') }
+            ]);
+          } else if (currentTool === 'measure') {
+            const pts = measurementPointsRef.current;
+            const coords = currentDoc
+              ? pdfToGps(lat, lng, currentDoc)
+              : { lat: -23.542, lng: -46.638 };
 
-                if (!isAlreadyClosed) {
-                  const closePt: MeasurementPoint = {
-                    id: `pdf-meas-close-${Date.now()}`,
-                    lat: startPt.lat,
-                    lng: startPt.lng,
-                    pdfX: startPt.pdfX,
-                    pdfY: startPt.pdfY,
-                    altitude: startPt.altitude,
-                    type: 'stop',
-                    label: `Fechamento (Ponto 1)`,
-                    notes: 'Ponto final conectado exatamente ao início para fechamento de perímetro sem perda métrica',
-                    photos: [],
-                    timestamp: Date.now(),
-                  };
-                  setMeasurementPoints((prev) => [...prev, closePt]);
-                  notifySuccess('Perímetro Fechado', 'Traçado conectado com precisão cirúrgica ao ponto inicial.');
-                  return;
+            // If clicking near the start point (< 35px in PDF sheet) and length >= 2, snap to close loop
+            if (pts.length >= 2) {
+              const startPt = pts[0];
+              if (typeof startPt.pdfX === 'number' && typeof startPt.pdfY === 'number') {
+                const distPx = Math.hypot(lat - startPt.pdfX, lng - startPt.pdfY);
+                if (distPx < 35) {
+                  const isAlreadyClosed =
+                    pts.length >= 3 &&
+                    pts[0].lat === pts[pts.length - 1].lat &&
+                    pts[0].lng === pts[pts.length - 1].lng;
+
+                  if (!isAlreadyClosed) {
+                    const closePt: MeasurementPoint = {
+                      id: `pdf-meas-close-${Date.now()}`,
+                      lat: startPt.lat,
+                      lng: startPt.lng,
+                      pdfX: startPt.pdfX,
+                      pdfY: startPt.pdfY,
+                      altitude: startPt.altitude || 1280,
+                      type: 'stop',
+                      label: `Fechamento (${startPt.label || 'Ponto 1'})`,
+                      notes: 'Vértice conectado exatamente ao início para fechamento de perímetro',
+                      photos: [],
+                      timestamp: Date.now(),
+                    };
+                    setMeasurementPoints((prev) => [...prev, closePt]);
+                    notifySuccess('Perímetro Fechado', 'Traçado conectado com precisão ao ponto inicial.');
+                    return;
+                  }
                 }
               }
             }
+
+            const type = currentMeasureTypeRef.current || 'standard';
+            const ptIndex = pts.length;
+            let label = `Ponto ${ptIndex + 1}`;
+            if (type === 'stop') {
+              const stopsSoFar = pts.filter((p) => p.type === 'stop').length;
+              label = `Parada ${stopsSoFar + 1}`;
+            } else if (type === 'hazard') {
+              const hazardsSoFar = pts.filter((p) => p.type === 'hazard').length;
+              label = `Atenção ${hazardsSoFar + 1}`;
+            }
+
+            const newPt: MeasurementPoint = {
+              id: `pdf-meas-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+              lat: coords.lat,
+              lng: coords.lng,
+              pdfX: lat,
+              pdfY: lng,
+              altitude: 1280,
+              type,
+              label,
+              notes: '',
+              photos: [],
+              timestamp: Date.now(),
+            };
+
+            setMeasurementPoints((prev) => [...prev, newPt]);
           }
-
-          const type = currentMeasureTypeRef.current;
-          const ptIndex = measurementPoints.length;
-          let label = `Ponto ${ptIndex + 1}`;
-          if (type === 'stop') {
-            const stopsSoFar = measurementPoints.filter((p) => p.type === 'stop').length;
-            label = `Parada ${stopsSoFar + 1}`;
-          } else if (type === 'hazard') {
-            const hazardsSoFar = measurementPoints.filter((p) => p.type === 'hazard').length;
-            label = `Atenção ${hazardsSoFar + 1}`;
-          }
-
-          const newPt: MeasurementPoint = {
-            id: `pdf-meas-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-            lat: coords.lat,
-            lng: coords.lng,
-            pdfX: e.latlng.lat,
-            pdfY: e.latlng.lng,
-            altitude: 1280,
-            type,
-            label,
-            notes: '',
-            photos: [],
-            timestamp: Date.now(),
-          };
-
-          setMeasurementPoints((prev) => [...prev, newPt]);
+        } catch (err) {
+          console.error('Error handling map click:', err);
         }
       });
     } catch (err) {
       console.warn('Map initialization error:', err);
     }
-  }, [activeDocId, documents, measurementPoints.length]);
+  }, [notifySuccess]);
 
   // Initialize Map on mount
   useEffect(() => {
     initializeMap();
 
-    // Resize observer to keep map viewport crisp
     const container = mapContainerRef.current;
     let resizeObserver: ResizeObserver | null = null;
     if (container && typeof ResizeObserver !== 'undefined') {
       resizeObserver = new ResizeObserver(() => {
         if (mapInstanceRef.current) {
-          mapInstanceRef.current.invalidateSize();
+          try {
+            mapInstanceRef.current.invalidateSize();
+          } catch {
+            // ignore
+          }
         }
       });
       resizeObserver.observe(container);
@@ -531,7 +425,11 @@ export const PdfMapNavigator: React.FC = () => {
     return () => {
       if (resizeObserver) resizeObserver.disconnect();
       if (mapInstanceRef.current) {
-        mapInstanceRef.current.remove();
+        try {
+          mapInstanceRef.current.remove();
+        } catch {
+          // ignore
+        }
         mapInstanceRef.current = null;
         imageOverlayRef.current = null;
         markersLayerRef.current = null;
@@ -541,10 +439,7 @@ export const PdfMapNavigator: React.FC = () => {
     };
   }, [initializeMap]);
 
-  // Handle Load Sample Topographic Demo Map
-  
-
-  // Load documents from IndexedDB on mount & auto-seed demo if empty
+  // Load documents from IndexedDB on mount
   useEffect(() => {
     let mounted = true;
     (async () => {
@@ -554,7 +449,7 @@ export const PdfMapNavigator: React.FC = () => {
           if (docs.length > 0) {
             setDocuments(docs);
             const requested = localStorage.getItem('geofield_selected_pdf_id');
-            const exists = docs.some(d => d.id === requested);
+            const exists = docs.some((d) => d.id === requested);
             if (requested && exists) {
               setActiveDocId(requested);
             } else {
@@ -571,14 +466,6 @@ export const PdfMapNavigator: React.FC = () => {
     return () => {
       mounted = false;
     };
-  }, []);
-
-  const activeDoc = documents.find((d) => d.id === activeDocId) || null;
-
-  // Persist updated doc into IndexedDB asynchronously
-  const updateDocumentInStore = useCallback((updatedDoc: PdfDocument) => {
-    setDocuments((prev) => prev.map((d) => (d.id === updatedDoc.id ? updatedDoc : d)));
-    savePdfDocument(updatedDoc).catch((e) => console.warn('Failed to persist doc', e));
   }, []);
 
   // Timer for live track recording
@@ -619,7 +506,6 @@ export const PdfMapNavigator: React.FC = () => {
 
   // Update Image Overlay when active doc or page changes
   useEffect(() => {
-    // Ensure map is initialized
     initializeMap();
 
     const map = mapInstanceRef.current;
@@ -642,14 +528,14 @@ export const PdfMapNavigator: React.FC = () => {
       console.warn('PDF image data is missing or corrupted.');
       return;
     }
+
     const docPageKey = `${activeDoc.id}_p${pageIdx}`;
 
-    // Only update image overlay and fitBounds if the document ID or page has actually changed
     if (lastLoadedDocPageRef.current !== docPageKey) {
       lastLoadedDocPageRef.current = docPageKey;
 
-      const h = activeDoc.height || 1000;
-      const w = activeDoc.width || 1000;
+      const h = activeDoc.height && !isNaN(activeDoc.height) ? activeDoc.height : 1000;
+      const w = activeDoc.width && !isNaN(activeDoc.width) ? activeDoc.width : 1000;
       const bounds = new L.LatLngBounds([0, 0], [h, w]);
 
       if (imageOverlayRef.current) {
@@ -658,120 +544,136 @@ export const PdfMapNavigator: React.FC = () => {
       }
 
       if (currentDataUrl) {
-        imageOverlayRef.current = L.imageOverlay(currentDataUrl, bounds).addTo(map);
-        map.fitBounds(bounds, { padding: [15, 15] });
-        // Use a very large pad (1.5) to prevent Leaflet maxBounds infinite loop bug 
-        // when the user zooms out and the view becomes larger than the max bounds!
-        map.setMaxBounds(bounds.pad(1.5));
-        
-        // Prevent zooming out so far that the map becomes a tiny speck or gets lost
-        // isFinite check is critical because if container is size 0 on mount, it returns Infinity, which crashes Leaflet!
-        const baseZoom = map.getBoundsZoom(bounds);
-        if (isFinite(baseZoom)) {
-          map.setMinZoom(baseZoom - 1.2);
-        } else {
-          map.setMinZoom(-3);
+        try {
+          imageOverlayRef.current = L.imageOverlay(currentDataUrl, bounds).addTo(map);
+          map.fitBounds(bounds, { padding: [15, 15] });
+          map.setMaxBounds(bounds.pad(1.5));
+          
+          const baseZoom = map.getBoundsZoom(bounds);
+          if (isFinite(baseZoom)) {
+            map.setMinZoom(baseZoom - 1.2);
+          } else {
+            map.setMinZoom(-3);
+          }
+        } catch (err) {
+          console.warn('Error loading image overlay:', err);
         }
       }
 
       const timer = setTimeout(() => {
         if (mapInstanceRef.current) {
-          mapInstanceRef.current.invalidateSize();
+          try {
+            mapInstanceRef.current.invalidateSize();
+          } catch {
+            // ignore
+          }
         }
       }, 120);
 
       return () => clearTimeout(timer);
     }
-  }, [activeDocId, activeDoc?.currentPage, initializeMap]);
+  }, [activeDocId, activeDoc?.currentPage, initializeMap, activeDoc]);
 
-  // Render Markers on Map
+  // Render Markers safely on Map
   useEffect(() => {
     if (!markersLayerRef.current || !activeDoc) return;
     
-    markersLayerRef.current.clearLayers();
+    try {
+      markersLayerRef.current.clearLayers();
+      const markers = Array.isArray(activeDoc.markers) ? activeDoc.markers : [];
 
-    (activeDoc.markers || []).forEach((marker) => {
-      const categoryObj = CATEGORIES.find((c) => c.id === marker.category) || CATEGORIES[0];
-      const isTarget = activeNavPoint?.id === marker.id;
-      const hasPhotos = marker.photos && marker.photos.length > 0;
-      const color = marker.color || categoryObj.color;
-      
-      const pinHtml = `
-        <div class="tactical-pin-wrap">
-          <div style="position: relative; display: flex; flex-direction: column; align-items: center;">
-            <div style="
-              width: ${isTarget ? '32px' : '26px'};
-              height: ${isTarget ? '32px' : '26px'};
-              border-radius: 50% 50% 50% 0;
-              transform: rotate(-45deg);
-              background-color: ${color};
-              border: 2px solid #ffffff;
-              box-shadow: 0 4px 12px rgba(0,0,0,0.6);
-              display: flex;
-              align-items: center;
-              justify-content: center;
-              ${isTarget ? 'animation: bounce 1.5s infinite;' : ''}
-            ">
+      markers.forEach((marker) => {
+        if (!marker || typeof marker.x !== 'number' || typeof marker.y !== 'number' || isNaN(marker.x) || isNaN(marker.y)) {
+          return;
+        }
+
+        const categoryObj = CATEGORIES.find((c) => c.id === marker.category) || CATEGORIES[0];
+        const isTarget = activeNavPoint?.id === marker.id;
+        const hasPhotos = Array.isArray(marker.photos) && marker.photos.length > 0;
+        const color = marker.color || categoryObj.color;
+        
+        const pinHtml = `
+          <div class="tactical-pin-wrap">
+            <div style="position: relative; display: flex; flex-direction: column; align-items: center;">
               <div style="
-                transform: rotate(45deg);
-                color: #ffffff;
-                font-size: 11px;
-                font-weight: 900;
-                line-height: 1;
+                width: ${isTarget ? '32px' : '26px'};
+                height: ${isTarget ? '32px' : '26px'};
+                border-radius: 50% 50% 50% 0;
+                transform: rotate(-45deg);
+                background-color: ${color};
+                border: 2px solid #ffffff;
+                box-shadow: 0 4px 12px rgba(0,0,0,0.6);
                 display: flex;
                 align-items: center;
                 justify-content: center;
+                ${isTarget ? 'animation: bounce 1.5s infinite;' : ''}
               ">
-                ${isTarget ? '🎯' : '📍'}
+                <div style="
+                  transform: rotate(45deg);
+                  color: #ffffff;
+                  font-size: 11px;
+                  font-weight: 900;
+                  line-height: 1;
+                  display: flex;
+                  align-items: center;
+                  justify-content: center;
+                ">
+                  ${isTarget ? '🎯' : '📍'}
+                </div>
               </div>
+              ${hasPhotos ? `
+                <div style="
+                  margin-top: 2px;
+                  background: rgba(15,23,42,0.9);
+                  color: #38bdf8;
+                  font-size: 9px;
+                  font-weight: 700;
+                  padding: 1px 4px;
+                  border-radius: 4px;
+                  border: 1px solid rgba(56,189,248,0.4);
+                  white-space: nowrap;
+                  box-shadow: 0 2px 4px rgba(0,0,0,0.4);
+                ">📷 ${marker.photos!.length}</div>
+              ` : ''}
             </div>
-            ${hasPhotos ? `
-              <div style="
-                margin-top: 2px;
-                background: rgba(15,23,42,0.9);
-                color: #38bdf8;
-                font-size: 9px;
-                font-weight: 700;
-                padding: 1px 4px;
-                border-radius: 4px;
-                border: 1px solid rgba(56,189,248,0.4);
-                white-space: nowrap;
-                box-shadow: 0 2px 4px rgba(0,0,0,0.4);
-              ">📷 ${marker.photos!.length}</div>
-            ` : ''}
           </div>
-        </div>
-      `;
+        `;
 
-      const divIcon = L.divIcon({
-        className: 'custom-pdf-pin',
-        html: pinHtml,
-        iconSize: [26, 32],
-        iconAnchor: [13, 32],
+        const divIcon = L.divIcon({
+          className: 'custom-pdf-pin',
+          html: pinHtml,
+          iconSize: [26, 32],
+          iconAnchor: [13, 32],
+        });
+
+        const leafletMarker = L.marker([marker.x, marker.y], { icon: divIcon });
+        
+        leafletMarker.on('click', (e) => {
+          L.DomEvent.stopPropagation(e);
+          setSelectedMarker(marker);
+          setPendingMarkerPos(null);
+        });
+
+        leafletMarker.addTo(markersLayerRef.current!);
       });
+    } catch (err) {
+      console.warn('Error rendering markers:', err);
+    }
+  }, [activeDoc?.markers, activeNavPoint, activeDoc]);
 
-      const leafletMarker = L.marker([marker.x, marker.y], { icon: divIcon });
-      
-      leafletMarker.on('click', (e) => {
-        L.DomEvent.stopPropagation(e);
-        setSelectedMarker(marker);
-        setPendingMarkerPos(null);
-      });
-
-      leafletMarker.addTo(markersLayerRef.current!);
-    });
-  }, [activeDoc?.markers, activeNavPoint]);
-
-  // Render Saved Tracks on Map
+  // Render Saved Tracks safely on Map
   useEffect(() => {
     if (!tracksLayerRef.current || !activeDoc) return;
     
-    tracksLayerRef.current.clearLayers();
+    try {
+      tracksLayerRef.current.clearLayers();
+      const tracks = Array.isArray(activeDoc.tracks) ? activeDoc.tracks : [];
 
-    if (activeDoc.tracks) {
-      activeDoc.tracks.forEach((track) => {
-        if (track.points.length > 1) {
-          const latLngs = track.points.map((p) => [p.x, p.y] as [number, number]);
+      tracks.forEach((track) => {
+        if (!track || !Array.isArray(track.points)) return;
+        const validPoints = track.points.filter((p) => p && typeof p.x === 'number' && typeof p.y === 'number' && !isNaN(p.x) && !isNaN(p.y));
+        if (validPoints.length > 1) {
+          const latLngs = validPoints.map((p) => [p.x, p.y] as [number, number]);
           const line = L.polyline(latLngs, {
             color: track.color || '#0284c7',
             weight: 4,
@@ -783,11 +685,11 @@ export const PdfMapNavigator: React.FC = () => {
 
           line.bindPopup(`
             <div style="font-family: sans-serif; padding: 4px;">
-              <b style="color: #0f172a; font-size: 13px;">${track.name}</b>
+              <b style="color: #0f172a; font-size: 13px;">${track.name || 'Rota'}</b>
               <div style="font-size: 11px; color: #64748b; margin-top: 2px;">
                 ${track.isRecorded ? '🔴 Trilha Gravada' : '✏️ Rota Traçada'}<br/>
-                Pontos: ${track.points.length}<br/>
-                Data: ${track.createdAt}
+                Pontos: ${validPoints.length}<br/>
+                Data: ${track.createdAt || ''}
               </div>
             </div>
           `);
@@ -795,60 +697,65 @@ export const PdfMapNavigator: React.FC = () => {
           line.addTo(tracksLayerRef.current!);
         }
       });
+    } catch (err) {
+      console.warn('Error rendering tracks:', err);
     }
-  }, [activeDoc?.tracks]);
+  }, [activeDoc?.tracks, activeDoc]);
 
-  // Calculate total measurement distance on PDF
+  // Calculate total measurement distance safely
   const totalMeasureDistanceMeters = useMemo(() => {
-    if (measurementPoints.length < 2) return 0;
+    if (!measurementPoints || measurementPoints.length < 2) return 0;
     let total = 0;
     for (let i = 1; i < measurementPoints.length; i++) {
-      total += calculateDistanceMeters(
-        measurementPoints[i - 1].lat,
-        measurementPoints[i - 1].lng,
-        measurementPoints[i].lat,
-        measurementPoints[i].lng
-      );
+      const p1 = measurementPoints[i - 1];
+      const p2 = measurementPoints[i];
+      if (p1 && p2 && !isNaN(p1.lat) && !isNaN(p1.lng) && !isNaN(p2.lat) && !isNaN(p2.lng)) {
+        total += calculateDistanceMeters(p1.lat, p1.lng, p2.lat, p2.lng);
+      }
     }
-    return total;
+    return isNaN(total) ? 0 : total;
   }, [measurementPoints]);
 
-  // Add GPS point to PDF measurement
+  // Add GPS point to PDF measurement safely
   const handleAddGpsToPdfMeasurement = () => {
     if (!activeDoc) return;
     const gpsLat = userGps?.lat || currentGps?.lat;
     const gpsLng = userGps?.lng || currentGps?.lng;
-    if (!gpsLat || !gpsLng) {
+    if (typeof gpsLat !== 'number' || typeof gpsLng !== 'number' || isNaN(gpsLat) || isNaN(gpsLng)) {
       notifyWarning('GPS Não Detectado', 'Ative o GPS para marcar sua coordenada na folha.');
       return;
     }
 
-    const pdfPos = gpsToPdf(gpsLat, gpsLng, activeDoc);
-    const type = currentMeasureType;
-    const ptIndex = measurementPoints.length;
-    let label = `Ponto GPS ${ptIndex + 1}`;
-    if (type === 'stop') label = `Parada GPS ${ptIndex + 1}`;
-    if (type === 'hazard') label = `Atenção GPS ${ptIndex + 1}`;
+    try {
+      const pdfPos = gpsToPdf(gpsLat, gpsLng, activeDoc);
+      const type = currentMeasureType;
+      const ptIndex = measurementPoints.length;
+      let label = `Ponto GPS ${ptIndex + 1}`;
+      if (type === 'stop') label = `Parada GPS ${ptIndex + 1}`;
+      if (type === 'hazard') label = `Atenção GPS ${ptIndex + 1}`;
 
-    const newPt: MeasurementPoint = {
-      id: `pdf-meas-gps-${Date.now()}`,
-      lat: gpsLat,
-      lng: gpsLng,
-      pdfX: pdfPos.x,
-      pdfY: pdfPos.y,
-      altitude: userGps?.altitude || currentGps?.altitude || 1280,
-      type,
-      label,
-      notes: 'Marcado via GPS na folha PDF',
-      photos: [],
-      timestamp: Date.now(),
-    };
+      const newPt: MeasurementPoint = {
+        id: `pdf-meas-gps-${Date.now()}`,
+        lat: gpsLat,
+        lng: gpsLng,
+        pdfX: pdfPos.x,
+        pdfY: pdfPos.y,
+        altitude: userGps?.altitude || currentGps?.altitude || 1280,
+        type,
+        label,
+        notes: 'Marcado via GPS na folha PDF',
+        photos: [],
+        timestamp: Date.now(),
+      };
 
-    setMeasurementPoints((prev) => [...prev, newPt]);
-    notifyInfo('Ponto Adicionado', `Coordenada GPS (${gpsLat.toFixed(5)}°, ${gpsLng.toFixed(5)}°) inserida.`);
+      setMeasurementPoints((prev) => [...prev, newPt]);
+      notifyInfo('Ponto Adicionado', `Coordenada GPS (${gpsLat.toFixed(5)}°, ${gpsLng.toFixed(5)}°) inserida.`);
+    } catch (err) {
+      console.error('Error adding GPS to measurement:', err);
+    }
   };
 
-  // Close measurement loop on PDF map
+  // Close measurement loop safely on PDF map
   const handleCloseLoopPdf = () => {
     if (measurementPoints.length < 2) return;
     const startPt = measurementPoints[0];
@@ -870,36 +777,38 @@ export const PdfMapNavigator: React.FC = () => {
       pdfY: startPt.pdfY,
       altitude: startPt.altitude,
       type: 'stop',
-      label: `Fechamento (Ponto 1)`,
-      notes: 'Ponto final conectado exatamente ao início para fechamento de perímetro na folha PDF',
+      label: `Fechamento (${startPt.label || 'Ponto 1'})`,
+      notes: 'Ponto final conectado exatamente ao início para fechamento de perímetro',
       photos: [],
       timestamp: Date.now(),
     };
 
     setMeasurementPoints((prev) => [...prev, closePt]);
-    notifySuccess('Perímetro Fechado', 'Traçado conectado com precisão cirúrgica ao ponto inicial.');
+    notifySuccess('Perímetro Fechado', 'Traçado conectado com precisão ao ponto inicial.');
   };
 
-  // Render Measurement Overlay on PDF Map
+  // Render Measurement Overlay safely on PDF Map
   useEffect(() => {
     if (!measureLayerRef.current) return;
     const group = measureLayerRef.current;
-    group.clearLayers();
 
-    if (measurementPoints.length === 0) return;
+    try {
+      group.clearLayers();
+      if (!measurementPoints || measurementPoints.length === 0) return;
 
-    const isClosed =
-      measurementPoints.length >= 3 &&
-      measurementPoints[0].lat === measurementPoints[measurementPoints.length - 1].lat &&
-      measurementPoints[0].lng === measurementPoints[measurementPoints.length - 1].lng;
+      const isClosed =
+        measurementPoints.length >= 3 &&
+        measurementPoints[0].lat === measurementPoints[measurementPoints.length - 1].lat &&
+        measurementPoints[0].lng === measurementPoints[measurementPoints.length - 1].lng;
 
-    // Draw Polyline along (pdfX, pdfY)
-    if (measurementPoints.length > 1) {
-      const latLngs = measurementPoints
-        .filter((p) => p.pdfX !== undefined && p.pdfY !== undefined)
-        .map((p) => [p.pdfX!, p.pdfY!] as [number, number]);
+      const validPts = measurementPoints.filter(
+        (p) => p && typeof p.pdfX === 'number' && typeof p.pdfY === 'number' && !isNaN(p.pdfX) && !isNaN(p.pdfY)
+      );
 
-      if (latLngs.length > 1) {
+      // Draw Polyline along (pdfX, pdfY)
+      if (validPts.length > 1) {
+        const latLngs = validPts.map((p) => [p.pdfX!, p.pdfY!] as [number, number]);
+
         L.polyline(latLngs, {
           color: isClosed ? '#10b981' : '#e11d48',
           weight: 3.5,
@@ -908,9 +817,9 @@ export const PdfMapNavigator: React.FC = () => {
         }).addTo(group);
 
         // Segment distance badges
-        for (let i = 1; i < measurementPoints.length; i++) {
-          const p1 = measurementPoints[i - 1];
-          const p2 = measurementPoints[i];
+        for (let i = 1; i < validPts.length; i++) {
+          const p1 = validPts[i - 1];
+          const p2 = validPts[i];
           if (p1.pdfX !== undefined && p1.pdfY !== undefined && p2.pdfX !== undefined && p2.pdfY !== undefined) {
             const segDist = calculateDistanceMeters(p1.lat, p1.lng, p2.lat, p2.lng);
             const segFormatted =
@@ -918,264 +827,270 @@ export const PdfMapNavigator: React.FC = () => {
             const midX = (p1.pdfX + p2.pdfX) / 2;
             const midY = (p1.pdfY + p2.pdfY) / 2;
 
-            const pillIcon = L.divIcon({
-              className: 'pdf-measure-seg-pill',
-              html: `
-                <div style="
-                  background: rgba(15, 23, 42, 0.9);
-                  border: 1.5px solid ${isClosed ? '#10b981' : '#f43f5e'};
-                  color: #ffffff;
-                  font-weight: 800;
-                  font-size: 10px;
-                  padding: 2px 6px;
-                  border-radius: 9999px;
-                  box-shadow: 0 2px 6px rgba(0,0,0,0.5);
-                  white-space: nowrap;
-                  transform: translate(-50%, -50%);
-                ">
-                  ${segFormatted}
-                </div>
-              `,
-              iconSize: [0, 0],
-              iconAnchor: [0, 0],
-            });
+            if (!isNaN(midX) && !isNaN(midY)) {
+              const pillIcon = L.divIcon({
+                className: 'pdf-measure-seg-pill',
+                html: `
+                  <div style="
+                    background: rgba(15, 23, 42, 0.9);
+                    border: 1.5px solid ${isClosed ? '#10b981' : '#f43f5e'};
+                    color: #ffffff;
+                    font-weight: 800;
+                    font-size: 10px;
+                    padding: 2px 6px;
+                    border-radius: 9999px;
+                    box-shadow: 0 2px 6px rgba(0,0,0,0.5);
+                    white-space: nowrap;
+                    transform: translate(-50%, -50%);
+                  ">
+                    ${segFormatted}
+                  </div>
+                `,
+                iconSize: [0, 0],
+                iconAnchor: [0, 0],
+              });
 
-            L.marker([midX, midY], { icon: pillIcon, interactive: false }).addTo(group);
+              L.marker([midX, midY], { icon: pillIcon, interactive: false }).addTo(group);
+            }
           }
         }
       }
-    }
 
-    // Draw styled point markers on (pdfX, pdfY)
-    measurementPoints.forEach((pt, idx) => {
-      if (pt.pdfX === undefined || pt.pdfY === undefined) return;
-      let bgColor = '#0284c7';
-      let iconSymbol = `${idx + 1}`;
+      // Draw styled point markers on (pdfX, pdfY)
+      validPts.forEach((pt, idx) => {
+        if (pt.pdfX === undefined || pt.pdfY === undefined || isNaN(pt.pdfX) || isNaN(pt.pdfY)) return;
+        let bgColor = '#0284c7';
+        let iconSymbol = `${idx + 1}`;
 
-      if (pt.type === 'stop') {
-        bgColor = '#10b981';
-        iconSymbol = `🛑 ${idx + 1}`;
-      } else if (pt.type === 'hazard') {
-        bgColor = '#f59e0b';
-        iconSymbol = `⚠️ ${idx + 1}`;
-      }
-
-      const isStartPoint = idx === 0;
-
-      const pointIcon = L.divIcon({
-        className: 'custom-pdf-measure-marker',
-        html: `
-          <div style="position: relative; display: flex; flex-direction: column; align-items: center; cursor: pointer;">
-            <div style="
-              min-width: 26px;
-              height: 26px;
-              padding: 0 4px;
-              border-radius: 13px;
-              background-color: ${bgColor};
-              border: 2px solid ${isStartPoint && measurementPoints.length >= 2 && !isClosed ? '#fbbf24' : '#ffffff'};
-              box-shadow: 0 4px 10px rgba(0,0,0,0.6);
-              color: white;
-              font-weight: 800;
-              font-size: 10px;
-              display: flex;
-              align-items: center;
-              justify-content: center;
-            ">
-              ${iconSymbol}
-            </div>
-            <div style="
-              margin-top: 2px;
-              background: rgba(15, 23, 42, 0.85);
-              border: 1px solid rgba(255, 255, 255, 0.2);
-              color: #f1f5f9;
-              font-size: 9px;
-              font-weight: 600;
-              padding: 1px 4px;
-              border-radius: 4px;
-              white-space: nowrap;
-            ">
-              ${pt.label || `Ponto ${idx + 1}`}
-            </div>
-          </div>
-        `,
-        iconSize: [26, 38],
-        iconAnchor: [13, 13],
-      });
-
-      const marker = L.marker([pt.pdfX, pt.pdfY], { icon: pointIcon, zIndexOffset: 500 });
-      marker.on('click', (e) => {
-        L.DomEvent.stopPropagation(e);
-        if (idx === 0 && measurementPoints.length >= 2 && !isClosed) {
-          handleCloseLoopPdf();
-        } else {
-          setSelectedMeasurePointForEdit({ point: pt, index: idx });
+        if (pt.type === 'stop') {
+          bgColor = '#10b981';
+          iconSymbol = `🛑 ${idx + 1}`;
+        } else if (pt.type === 'hazard') {
+          bgColor = '#f59e0b';
+          iconSymbol = `⚠️ ${idx + 1}`;
         }
-      });
 
-      marker.addTo(group);
-    });
+        const isStartPoint = idx === 0;
+
+        const pointIcon = L.divIcon({
+          className: 'custom-pdf-measure-marker',
+          html: `
+            <div style="position: relative; display: flex; flex-direction: column; align-items: center; cursor: pointer;">
+              <div style="
+                min-width: 26px;
+                height: 26px;
+                padding: 0 4px;
+                border-radius: 13px;
+                background-color: ${bgColor};
+                border: 2px solid ${isStartPoint && validPts.length >= 2 && !isClosed ? '#fbbf24' : '#ffffff'};
+                box-shadow: 0 4px 10px rgba(0,0,0,0.6);
+                color: white;
+                font-weight: 800;
+                font-size: 10px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+              ">
+                ${iconSymbol}
+              </div>
+              <div style="
+                margin-top: 2px;
+                background: rgba(15, 23, 42, 0.85);
+                border: 1px solid rgba(255, 255, 255, 0.2);
+                color: #f1f5f9;
+                font-size: 9px;
+                font-weight: 600;
+                padding: 1px 4px;
+                border-radius: 4px;
+                white-space: nowrap;
+              ">
+                ${pt.label || `Ponto ${idx + 1}`}
+              </div>
+            </div>
+          `,
+          iconSize: [26, 38],
+          iconAnchor: [13, 13],
+        });
+
+        const marker = L.marker([pt.pdfX, pt.pdfY], { icon: pointIcon, zIndexOffset: 500 });
+        marker.on('click', (e) => {
+          L.DomEvent.stopPropagation(e);
+          if (idx === 0 && validPts.length >= 2 && !isClosed) {
+            handleCloseLoopPdf();
+          } else {
+            setSelectedMeasurePointForEdit({ point: pt, index: idx });
+          }
+        });
+
+        marker.addTo(group);
+      });
+    } catch (err) {
+      console.warn('Error rendering measurement overlay:', err);
+    }
   }, [measurementPoints]);
 
-  // Render Active Drawing Track
+  // Render Active Drawing Track safely
   useEffect(() => {
     if (!mapInstanceRef.current) return;
     const map = mapInstanceRef.current;
 
-    if (activeDrawPolylineRef.current) {
-      map.removeLayer(activeDrawPolylineRef.current);
-      activeDrawPolylineRef.current = null;
-    }
+    try {
+      if (activeDrawPolylineRef.current) {
+        map.removeLayer(activeDrawPolylineRef.current);
+        activeDrawPolylineRef.current = null;
+      }
 
-    if (currentTrackPoints.length > 0) {
-      const latLngs = currentTrackPoints.map((p) => [p.x, p.y] as [number, number]);
-      activeDrawPolylineRef.current = L.polyline(latLngs, {
-        color: '#f59e0b',
-        weight: 4,
-        dashArray: '6, 8',
-      }).addTo(map);
+      const valid = currentTrackPoints.filter((p) => p && typeof p.x === 'number' && typeof p.y === 'number' && !isNaN(p.x) && !isNaN(p.y));
+      if (valid.length > 0) {
+        const latLngs = valid.map((p) => [p.x, p.y] as [number, number]);
+        activeDrawPolylineRef.current = L.polyline(latLngs, {
+          color: '#f59e0b',
+          weight: 4,
+          dashArray: '6, 8',
+        }).addTo(map);
+      }
+    } catch (err) {
+      console.warn('Error rendering active draw track:', err);
     }
   }, [currentTrackPoints]);
 
-  // Render Live Recording Track
+  // Render Live Recording Track safely
   useEffect(() => {
     if (!mapInstanceRef.current) return;
     const map = mapInstanceRef.current;
 
-    if (liveRecordPolylineRef.current) {
-      map.removeLayer(liveRecordPolylineRef.current);
-      liveRecordPolylineRef.current = null;
-    }
+    try {
+      if (liveRecordPolylineRef.current) {
+        map.removeLayer(liveRecordPolylineRef.current);
+        liveRecordPolylineRef.current = null;
+      }
 
-    if (recordedPoints.length > 0) {
-      const latLngs = recordedPoints.map((p) => [p.x, p.y] as [number, number]);
-      liveRecordPolylineRef.current = L.polyline(latLngs, {
-        color: '#ef4444',
-        weight: 5,
-        opacity: 0.95,
-        lineCap: 'round',
-        lineJoin: 'round',
-      }).addTo(map);
+      const valid = recordedPoints.filter((p) => p && typeof p.x === 'number' && typeof p.y === 'number' && !isNaN(p.x) && !isNaN(p.y));
+      if (valid.length > 0) {
+        const latLngs = valid.map((p) => [p.x, p.y] as [number, number]);
+        liveRecordPolylineRef.current = L.polyline(latLngs, {
+          color: '#ef4444',
+          weight: 5,
+          opacity: 0.95,
+          lineCap: 'round',
+          lineJoin: 'round',
+        }).addTo(map);
+      }
+    } catch (err) {
+      console.warn('Error rendering live recorded track:', err);
     }
   }, [recordedPoints]);
 
-  // Target Navigation Line and live user-to-target updates
+  // Target Navigation Line safely
   useEffect(() => {
     if (!mapInstanceRef.current || !activeDoc) return;
     const map = mapInstanceRef.current;
 
-    if (targetGuideLineRef.current) {
-      map.removeLayer(targetGuideLineRef.current);
-      targetGuideLineRef.current = null;
-    }
-
-    if (activeNavPoint) {
-      let startPoint: [number, number];
-      if (userGps) {
-        const userPdf = gpsToPdf(userGps.lat, userGps.lng, activeDoc);
-        startPoint = [userPdf.x, userPdf.y];
-      } else {
-        const center = map.getCenter();
-        startPoint = [center.lat, center.lng];
+    try {
+      if (targetGuideLineRef.current) {
+        map.removeLayer(targetGuideLineRef.current);
+        targetGuideLineRef.current = null;
       }
 
-      targetGuideLineRef.current = L.polyline([startPoint, [activeNavPoint.x, activeNavPoint.y]], {
-        color: '#38bdf8',
-        weight: 3,
-        dashArray: '6, 6',
-        opacity: 0.85,
-      }).addTo(map);
+      if (activeNavPoint && typeof activeNavPoint.x === 'number' && typeof activeNavPoint.y === 'number' && !isNaN(activeNavPoint.x) && !isNaN(activeNavPoint.y)) {
+        let startPoint: [number, number];
+        if (userGps && typeof userGps.lat === 'number' && typeof userGps.lng === 'number' && !isNaN(userGps.lat) && !isNaN(userGps.lng)) {
+          const userPdf = gpsToPdf(userGps.lat, userGps.lng, activeDoc);
+          startPoint = [userPdf.x, userPdf.y];
+        } else {
+          const center = map.getCenter();
+          startPoint = [center.lat, center.lng];
+        }
+
+        if (!isNaN(startPoint[0]) && !isNaN(startPoint[1])) {
+          targetGuideLineRef.current = L.polyline([startPoint, [activeNavPoint.x, activeNavPoint.y]], {
+            color: '#38bdf8',
+            weight: 3,
+            dashArray: '6, 6',
+            opacity: 0.85,
+          }).addTo(map);
+        }
+      }
+    } catch (err) {
+      console.warn('Error rendering nav guide line:', err);
     }
   }, [activeNavPoint, userGps, activeDoc]);
 
   // Real-time GPS Location Tracker & PDF Coordinate Projection Engine
   const updateUserGpsPosition = useCallback((pos: GeolocationPosition) => {
-    const { latitude, longitude, accuracy, speed, altitude, heading } = pos.coords;
-    setUserGps({
-      lat: latitude,
-      lng: longitude,
-      accuracy,
-      speed,
-      altitude,
-      heading,
-      timestamp: pos.timestamp,
-    });
-    setGpsError(null);
+    try {
+      if (!pos || !pos.coords) return;
+      const { latitude, longitude, accuracy, speed, altitude, heading } = pos.coords;
+      if (typeof latitude !== 'number' || typeof longitude !== 'number' || isNaN(latitude) || isNaN(longitude)) return;
 
-    if (!mapInstanceRef.current || !activeDoc) return;
-    const map = mapInstanceRef.current;
+      setUserGps({
+        lat: latitude,
+        lng: longitude,
+        accuracy: typeof accuracy === 'number' && !isNaN(accuracy) ? accuracy : 5,
+        speed: typeof speed === 'number' && !isNaN(speed) ? speed : null,
+        altitude: typeof altitude === 'number' && !isNaN(altitude) ? altitude : null,
+        heading: typeof heading === 'number' && !isNaN(heading) ? heading : null,
+        timestamp: pos.timestamp || Date.now(),
+      });
+      setErrorMsg(null);
 
-    // Convert GPS (Lat, Lng) to PDF Pixel Coordinates (x, y)
-    const pdfCoords = gpsToPdf(latitude, longitude, activeDoc);
+      if (!mapInstanceRef.current || !activeDoc) return;
+      const map = mapInstanceRef.current;
 
-    // Update or Create Leaflet User GPS Marker
-    const headingDeg = heading !== null && !isNaN(heading) ? heading : 0;
-    const userMarkerHtml = `
-      <div class="user-gps-pulse-wrapper" style="position: relative; width: 36px; height: 36px; display: flex; align-items: center; justify-content: center;">
-        <div style="position: absolute; inset: 0; border-radius: 50%; background: rgba(14, 165, 233, 0.35); animation: ping 2s cubic-bezier(0, 0, 0.2, 1) infinite;"></div>
-        <div style="width: 20px; height: 20px; border-radius: 50%; background: #0284c7; border: 3px solid #ffffff; box-shadow: 0 0 14px rgba(2, 132, 199, 0.9); display: flex; align-items: center; justify-content: center;">
-          <div style="width: 6px; height: 6px; border-radius: 50%; background: #ffffff;"></div>
+      const pdfCoords = gpsToPdf(latitude, longitude, activeDoc);
+      if (isNaN(pdfCoords.x) || isNaN(pdfCoords.y)) return;
+
+      const headingDeg = heading !== null && !isNaN(heading) ? heading : 0;
+      const userMarkerHtml = `
+        <div class="user-gps-pulse-wrapper" style="position: relative; width: 36px; height: 36px; display: flex; align-items: center; justify-content: center;">
+          <div style="position: absolute; inset: 0; border-radius: 50%; background: rgba(14, 165, 233, 0.35); animation: ping 2s cubic-bezier(0, 0, 0.2, 1) infinite;"></div>
+          <div style="width: 20px; height: 20px; border-radius: 50%; background: #0284c7; border: 3px solid #ffffff; box-shadow: 0 0 14px rgba(2, 132, 199, 0.9); display: flex; align-items: center; justify-content: center;">
+            <div style="width: 6px; height: 6px; border-radius: 50%; background: #ffffff;"></div>
+          </div>
+          ${heading !== null ? `
+            <div style="position: absolute; top: -8px; width: 0; height: 0; border-left: 5px solid transparent; border-right: 5px solid transparent; border-bottom: 8px solid #38bdf8; transform: rotate(${headingDeg}deg); transform-origin: 50% 26px;"></div>
+          ` : ''}
         </div>
-        ${heading !== null ? `
-          <div style="position: absolute; top: -8px; width: 0; height: 0; border-left: 5px solid transparent; border-right: 5px solid transparent; border-bottom: 8px solid #38bdf8; transform: rotate(${headingDeg}deg); transform-origin: 50% 26px;"></div>
-        ` : ''}
-      </div>
-    `;
+      `;
 
-    const userIcon = L.divIcon({
-      className: 'custom-user-gps-marker',
-      html: userMarkerHtml,
-      iconSize: [36, 36],
-      iconAnchor: [18, 18],
-    });
+      const userIcon = L.divIcon({
+        className: 'custom-user-gps-marker',
+        html: userMarkerHtml,
+        iconSize: [36, 36],
+        iconAnchor: [18, 18],
+      });
 
-    if (gpsUserMarkerRef.current) {
-      gpsUserMarkerRef.current.setLatLng([pdfCoords.x, pdfCoords.y]);
-      gpsUserMarkerRef.current.setIcon(userIcon);
-    } else {
-      gpsUserMarkerRef.current = L.marker([pdfCoords.x, pdfCoords.y], {
-        icon: userIcon,
-        zIndexOffset: 10000,
-      }).addTo(map);
-    }
+      if (gpsUserMarkerRef.current) {
+        gpsUserMarkerRef.current.setLatLng([pdfCoords.x, pdfCoords.y]);
+        gpsUserMarkerRef.current.setIcon(userIcon);
+      } else {
+        gpsUserMarkerRef.current = L.marker([pdfCoords.x, pdfCoords.y], {
+          icon: userIcon,
+          zIndexOffset: 10000,
+        }).addTo(map);
+      }
 
-    // Update or Create Accuracy Circle
-    const accuracyRadiusPx = Math.max(15, Math.min(120, accuracy * 0.8));
-    if (gpsAccuracyCircleRef.current) {
-      gpsAccuracyCircleRef.current.setLatLng([pdfCoords.x, pdfCoords.y]);
-      gpsAccuracyCircleRef.current.setRadius(accuracyRadiusPx);
-    } else {
-      gpsAccuracyCircleRef.current = L.circle([pdfCoords.x, pdfCoords.y], {
-        radius: accuracyRadiusPx,
-        color: '#0284c7',
-        fillColor: '#38bdf8',
-        fillOpacity: 0.12,
-        weight: 1,
-        dashArray: '4, 4',
-      }).addTo(map);
-    }
+      const safeAccuracy = typeof accuracy === 'number' && !isNaN(accuracy) ? accuracy : 5;
+      const accuracyRadiusPx = Math.max(15, Math.min(120, safeAccuracy * 0.8));
+      if (gpsAccuracyCircleRef.current) {
+        gpsAccuracyCircleRef.current.setLatLng([pdfCoords.x, pdfCoords.y]);
+        gpsAccuracyCircleRef.current.setRadius(accuracyRadiusPx);
+      } else {
+        gpsAccuracyCircleRef.current = L.circle([pdfCoords.x, pdfCoords.y], {
+          radius: accuracyRadiusPx,
+          color: '#0284c7',
+          fillColor: '#38bdf8',
+          fillOpacity: 0.12,
+          weight: 1,
+          dashArray: '4, 4',
+        }).addTo(map);
+      }
 
-    // Auto-record waypoint if currently in recording mode
-    if (activeToolRef.current === 'record_track' && !isRecordingPaused) {
-      setRecordedPoints((prev) => {
-        const lastPt = prev[prev.length - 1];
-        if (!lastPt) {
-          return [{
-            x: pdfCoords.x,
-            y: pdfCoords.y,
-            lat: latitude,
-            lng: longitude,
-            speed: speed !== null ? speed : undefined,
-            altitude: altitude !== null ? altitude : undefined,
-            time: new Date().toLocaleTimeString('pt-BR'),
-          }];
-        }
-
-        // Add point if moved at least 2 pixels or 1.5 meters
-        const distPx = Math.hypot(pdfCoords.x - lastPt.x, pdfCoords.y - lastPt.y);
-        if (distPx >= 3) {
-          return [
-            ...prev,
-            {
+      if (activeToolRef.current === 'record_track' && !isRecordingPaused) {
+        setRecordedPoints((prev) => {
+          const lastPt = prev[prev.length - 1];
+          if (!lastPt) {
+            return [{
               x: pdfCoords.x,
               y: pdfCoords.y,
               lat: latitude,
@@ -1183,11 +1098,29 @@ export const PdfMapNavigator: React.FC = () => {
               speed: speed !== null ? speed : undefined,
               altitude: altitude !== null ? altitude : undefined,
               time: new Date().toLocaleTimeString('pt-BR'),
-            },
-          ];
-        }
-        return prev;
-      });
+            }];
+          }
+
+          const distPx = Math.hypot(pdfCoords.x - lastPt.x, pdfCoords.y - lastPt.y);
+          if (distPx >= 3) {
+            return [
+              ...prev,
+              {
+                x: pdfCoords.x,
+                y: pdfCoords.y,
+                lat: latitude,
+                lng: longitude,
+                speed: speed !== null ? speed : undefined,
+                altitude: altitude !== null ? altitude : undefined,
+                time: new Date().toLocaleTimeString('pt-BR'),
+              },
+            ];
+          }
+          return prev;
+        });
+      }
+    } catch (err) {
+      console.warn('Error in GPS update:', err);
     }
   }, [activeDoc, isRecordingPaused]);
 
@@ -1204,28 +1137,32 @@ export const PdfMapNavigator: React.FC = () => {
       setIsGpsActive(true);
       notifyInfo('GPS Ativado', 'Obtendo localização de satélite em tempo real...');
 
-      gpsWatchIdRef.current = navigator.geolocation.watchPosition(
-        (pos) => {
-          updateUserGpsPosition(pos);
-        },
-        (err) => {
-          console.warn('Geolocation watch error:', err);
-          let errText = 'Não foi possível obter a localização do dispositivo.';
-          if (err.code === err.PERMISSION_DENIED) {
-            errText = 'Permissão de localização negada pelo usuário.';
-          } else if (err.code === err.POSITION_UNAVAILABLE) {
-            errText = 'Sinal de GPS indisponível no momento.';
-          } else if (err.code === err.TIMEOUT) {
-            errText = 'Tempo limite esgotado ao buscar satélites.';
+      try {
+        gpsWatchIdRef.current = navigator.geolocation.watchPosition(
+          (pos) => {
+            updateUserGpsPosition(pos);
+          },
+          (err) => {
+            console.warn('Geolocation watch error:', err);
+            let errText = 'Não foi possível obter a localização do dispositivo.';
+            if (err.code === err.PERMISSION_DENIED) {
+              errText = 'Permissão de localização negada pelo usuário.';
+            } else if (err.code === err.POSITION_UNAVAILABLE) {
+              errText = 'Sinal de GPS indisponível no momento.';
+            } else if (err.code === err.TIMEOUT) {
+              errText = 'Tempo limite esgotado ao buscar satélites.';
+            }
+            setErrorMsg(errText);
+          },
+          {
+            enableHighAccuracy: true,
+            timeout: 12000,
+            maximumAge: 1000,
           }
-          setGpsError(errText);
-        },
-        {
-          enableHighAccuracy: true,
-          timeout: 12000,
-          maximumAge: 1000,
-        }
-      );
+        );
+      } catch (err) {
+        console.warn('Failed to start GPS watch:', err);
+      }
     } else {
       setIsGpsActive(false);
       if (gpsWatchIdRef.current !== null) {
@@ -1233,11 +1170,15 @@ export const PdfMapNavigator: React.FC = () => {
         gpsWatchIdRef.current = null;
       }
       if (gpsUserMarkerRef.current && mapInstanceRef.current) {
-        mapInstanceRef.current.removeLayer(gpsUserMarkerRef.current);
+        try {
+          mapInstanceRef.current.removeLayer(gpsUserMarkerRef.current);
+        } catch {}
         gpsUserMarkerRef.current = null;
       }
       if (gpsAccuracyCircleRef.current && mapInstanceRef.current) {
-        mapInstanceRef.current.removeLayer(gpsAccuracyCircleRef.current);
+        try {
+          mapInstanceRef.current.removeLayer(gpsAccuracyCircleRef.current);
+        } catch {}
         gpsAccuracyCircleRef.current = null;
       }
       setUserGps(null);
@@ -1249,7 +1190,9 @@ export const PdfMapNavigator: React.FC = () => {
   useEffect(() => {
     return () => {
       if (gpsWatchIdRef.current !== null) {
-        navigator.geolocation.clearWatch(gpsWatchIdRef.current);
+        try {
+          navigator.geolocation.clearWatch(gpsWatchIdRef.current);
+        } catch {}
       }
     };
   }, []);
@@ -1262,9 +1205,15 @@ export const PdfMapNavigator: React.FC = () => {
     }
 
     if (!mapInstanceRef.current || !activeDoc) return;
-    const pdfCoords = gpsToPdf(userGps.lat, userGps.lng, activeDoc);
-    mapInstanceRef.current.panTo([pdfCoords.x, pdfCoords.y], { animate: true, duration: 0.6 });
-    notifySuccess('Localização Centralizada', `Lat: ${userGps.lat.toFixed(5)} | Lng: ${userGps.lng.toFixed(5)}`);
+    try {
+      const pdfCoords = gpsToPdf(userGps.lat, userGps.lng, activeDoc);
+      if (!isNaN(pdfCoords.x) && !isNaN(pdfCoords.y)) {
+        mapInstanceRef.current.panTo([pdfCoords.x, pdfCoords.y], { animate: true, duration: 0.6 });
+        notifySuccess('Localização Centralizada', `Lat: ${userGps.lat.toFixed(5)} | Lng: ${userGps.lng.toFixed(5)}`);
+      }
+    } catch (err) {
+      console.warn('Error centering on GPS:', err);
+    }
   }, [userGps, activeDoc, toggleGps, notifySuccess]);
 
   // Calibrate map with user's current GPS position
@@ -1276,35 +1225,46 @@ export const PdfMapNavigator: React.FC = () => {
       return;
     }
 
-    const newCalibration = createCenteredCalibration(activeDoc, userGps.lat, userGps.lng, calibScale);
-    const updatedDoc: PdfDocument = {
-      ...activeDoc,
-      calibration: newCalibration,
-    };
+    try {
+      const newCalibration = createCenteredCalibration(activeDoc, userGps.lat, userGps.lng, calibScale);
+      const updatedDoc: PdfDocument = {
+        ...activeDoc,
+        calibration: newCalibration,
+      };
 
-    updateDocumentInStore(updatedDoc);
-    setIsCalibrationModalOpen(false);
-    notifySuccess('Planta Calibrada', 'A folha do PDF foi ancorada na sua posição geográfica atual.');
-  }, [activeDoc, userGps, calibScale, updateDocumentInStore, toggleGps, notifySuccess, notifyWarning]);
+      updateDocumentInStore(updatedDoc);
+      setIsCalibrationModalOpen(false);
+      notifySuccess('Planta Calibrada', 'A folha do PDF foi ancorada na sua posição geográfica atual.');
+    } catch (err) {
+      console.error('Error calibrating doc:', err);
+      notifyError('Erro de Calibração', 'Não foi possível salvar os parâmetros de escala.');
+    }
+  }, [activeDoc, userGps, calibScale, updateDocumentInStore, toggleGps, notifySuccess, notifyWarning, notifyError]);
 
   // Calculate live navigation metrics to active target marker
-  const navMetrics = activeDoc && activeNavPoint && userGps
-    ? calculateNavigationToMarker(userGps, activeNavPoint, activeDoc)
-    : null;
+  const navMetrics = useMemo(() => {
+    if (!activeDoc || !activeNavPoint || !userGps) return null;
+    try {
+      return calculateNavigationToMarker(userGps, activeNavPoint, activeDoc);
+    } catch {
+      return null;
+    }
+  }, [activeDoc, activeNavPoint, userGps]);
 
   // Calculate total recorded distance in meters
-  const totalRecordedDistanceMeters = recordedPoints.reduce((acc, pt, idx, arr) => {
-    if (idx === 0) return 0;
-    const prev = arr[idx - 1];
-    if (pt.lat !== undefined && pt.lng !== undefined && prev.lat !== undefined && prev.lng !== undefined) {
-      return acc + calculateDistanceMeters(prev.lat, prev.lng, pt.lat, pt.lng);
-    }
-    // Fallback: estimate using pixel distance
-    const distPx = Math.hypot(pt.x - prev.x, pt.y - prev.y);
-    return acc + distPx * 0.85;
-  }, 0);
+  const totalRecordedDistanceMeters = useMemo(() => {
+    return recordedPoints.reduce((acc, pt, idx, arr) => {
+      if (idx === 0) return 0;
+      const prev = arr[idx - 1];
+      if (pt.lat !== undefined && pt.lng !== undefined && prev.lat !== undefined && prev.lng !== undefined && !isNaN(pt.lat) && !isNaN(prev.lat)) {
+        return acc + calculateDistanceMeters(prev.lat, prev.lng, pt.lat, pt.lng);
+      }
+      const distPx = Math.hypot(pt.x - prev.x, pt.y - prev.y);
+      return acc + (isNaN(distPx) ? 0 : distPx * 0.85);
+    }, 0);
+  }, [recordedPoints]);
 
-  // Process and Render PDF / Image File
+  // Process and Render PDF / Image File safely
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -1338,7 +1298,6 @@ export const PdfMapNavigator: React.FC = () => {
 
           const unscaledViewport = page.getViewport({ scale: 1.0 });
           const maxDim = Math.max(unscaledViewport.width, unscaledViewport.height);
-          // Strictly limit the maximum pixel dimension to 1800px to prevent mobile GPU OOM (black screen on pan/zoom)
           const scale = Math.min(2.5, 1800 / maxDim);
           const viewport = page.getViewport({ scale });
 
@@ -1368,15 +1327,21 @@ export const PdfMapNavigator: React.FC = () => {
         }
 
         const newDoc: PdfDocument = {
-          id: `pdf-doc-${Date.now()}`,
-          name: file.name.replace(/\.[^/.]+$/, ''),
+          id: `pdf-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+          name: file.name.replace(/\.[^/.]+$/, '').replace(/[_]/g, ' '),
           fileName: file.name,
           fileSize: `${(file.size / (1024 * 1024)).toFixed(1)} MB`,
           dataUrls: renderedPages,
-          pageCount: totalPages,
+          pageCount: renderedPages.length,
           currentPage: 0,
           width: baseWidth,
           height: baseHeight,
+          calibration: createCenteredCalibration(
+            null,
+            currentGps?.lat || -23.542,
+            currentGps?.lng || -46.638,
+            0.75
+          ),
           markers: [],
           tracks: [],
           uploadedAt: new Date().toLocaleDateString('pt-BR'),
@@ -1386,34 +1351,39 @@ export const PdfMapNavigator: React.FC = () => {
         setDocuments((prev) => [newDoc, ...prev]);
         setActiveDocId(newDoc.id);
         setIsDrawerOpen(false);
-        
         addPdfFile({
           id: newDoc.id,
           name: newDoc.name,
           dataUrl: renderedPages[0],
-          width: baseWidth,
-          height: baseHeight,
+          width: newDoc.width,
+          height: newDoc.height,
         });
-        notifySuccess('Planta PDF Carregada', `"${newDoc.name}" (${newDoc.pageCount} ${newDoc.pageCount === 1 ? 'página' : 'páginas'}) pronta para anotações.`);
 
+        notifySuccess('Mapa em PDF Importado', `"${newDoc.name}" pronto para navegação e marcações.`);
       } else {
-        // Direct Image Upload
-        setProcessingProgress('Processando imagem...');
+        // Image format handling
+        setProcessingProgress('Carregando imagem do mapa...');
         const reader = new FileReader();
-        reader.onload = async (loadEvent) => {
-          const dataUrl = loadEvent.target?.result as string;
+        reader.onload = async (event) => {
+          const dataUrl = event.target?.result as string;
           const img = new Image();
           img.onload = async () => {
             const newDoc: PdfDocument = {
-              id: `img-doc-${Date.now()}`,
-              name: file.name.replace(/\.[^/.]+$/, ''),
+              id: `img-${Date.now()}`,
+              name: file.name.replace(/\.[^/.]+$/, '').replace(/[_]/g, ' '),
               fileName: file.name,
               fileSize: `${(file.size / (1024 * 1024)).toFixed(1)} MB`,
               dataUrls: [dataUrl],
               pageCount: 1,
               currentPage: 0,
-              width: img.naturalWidth || 1500,
-              height: img.naturalHeight || 1000,
+              width: img.naturalWidth || 1600,
+              height: img.naturalHeight || 1200,
+              calibration: createCenteredCalibration(
+                null,
+                currentGps?.lat || -23.542,
+                currentGps?.lng || -46.638,
+                0.75
+              ),
               markers: [],
               tracks: [],
               uploadedAt: new Date().toLocaleDateString('pt-BR'),
@@ -1451,7 +1421,7 @@ export const PdfMapNavigator: React.FC = () => {
     }
   };
 
-  // Handle Photo Capture for New Marker
+  // Handle Photo Capture for New Marker safely
   const handleCaptureMarkerPhoto = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
@@ -1475,7 +1445,7 @@ export const PdfMapNavigator: React.FC = () => {
     }
   };
 
-  // Handle adding photos to an already existing marker
+  // Handle adding photos to an already existing marker safely
   const handleAddPhotosToExisting = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!selectedMarker || !activeDoc) return;
     const files = e.target.files;
@@ -1493,9 +1463,10 @@ export const PdfMapNavigator: React.FC = () => {
         photos: [...(selectedMarker.photos || []), ...compressedList],
       };
 
+      const existingMarkers = Array.isArray(activeDoc.markers) ? activeDoc.markers : [];
       const updatedDoc: PdfDocument = {
         ...activeDoc,
-        markers: activeDoc.markers.map((m) => (m.id === selectedMarker.id ? updatedMarker : m)),
+        markers: existingMarkers.map((m) => (m.id === selectedMarker.id ? updatedMarker : m)),
       };
 
       updateDocumentInStore(updatedDoc);
@@ -1509,7 +1480,7 @@ export const PdfMapNavigator: React.FC = () => {
     }
   };
 
-  // Save new marker
+  // Save new marker safely (no crash)
   const handleSaveMarker = () => {
     if (!pendingMarkerPos || !activeDoc) return;
     if (!markerTitle.trim()) {
@@ -1517,93 +1488,116 @@ export const PdfMapNavigator: React.FC = () => {
       return;
     }
 
-    const categoryObj = CATEGORIES.find((c) => c.id === markerCategory) || CATEGORIES[0];
-    const newMarker: PdfMarker = {
-      id: `m-${Date.now()}`,
-      x: pendingMarkerPos.x,
-      y: pendingMarkerPos.y,
-      title: markerTitle.trim(),
-      notes: markerNotes.trim(),
-      category: markerCategory,
-      color: categoryObj.color,
-      photos: markerPhotos,
-      createdAt: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
-    };
+    try {
+      const categoryObj = CATEGORIES.find((c) => c.id === markerCategory) || CATEGORIES[0];
+      const newMarker: PdfMarker = {
+        id: `m-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+        x: pendingMarkerPos.x,
+        y: pendingMarkerPos.y,
+        title: markerTitle.trim(),
+        notes: markerNotes.trim(),
+        category: markerCategory,
+        color: categoryObj.color,
+        photos: Array.isArray(markerPhotos) ? markerPhotos : [],
+        createdAt: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
+      };
 
-    const updatedDoc: PdfDocument = {
-      ...activeDoc,
-      markers: [...activeDoc.markers, newMarker],
-    };
+      const existingMarkers = Array.isArray(activeDoc.markers) ? activeDoc.markers : [];
+      const updatedDoc: PdfDocument = {
+        ...activeDoc,
+        markers: [...existingMarkers, newMarker],
+      };
 
-    updateDocumentInStore(updatedDoc);
-    notifySuccess('Ponto Registrado', `Ponto "${newMarker.title}" adicionado à folha da planta.`);
+      updateDocumentInStore(updatedDoc);
+      notifySuccess('Ponto Registrado', `Ponto "${newMarker.title}" adicionado à folha da planta.`);
 
-    setPendingMarkerPos(null);
-    setMarkerTitle('');
-    setMarkerNotes('');
-    setMarkerPhotos([]);
-    setActiveTool('pan');
+      setPendingMarkerPos(null);
+      setMarkerTitle('');
+      setMarkerNotes('');
+      setMarkerPhotos([]);
+      setActiveTool('pan');
+    } catch (err) {
+      console.error('Error saving marker:', err);
+      notifyError('Erro ao Salvar', 'Não foi possível gravar o ponto na folha.');
+    }
   };
 
-  // Save Drawn Track
+  // Save Drawn Track safely
   const handleSaveTrack = () => {
     if (!activeDoc || currentTrackPoints.length < 2) {
       notifyWarning('Pontos Insuficientes', 'Adicione pelo menos 2 pontos na folha para salvar a rota.');
       return;
     }
 
-    const newTrack: PdfTrack = {
-      id: `trk-${Date.now()}`,
-      name: trackName.trim() || `Rota ${activeDoc.tracks?.length ? activeDoc.tracks.length + 1 : 1}`,
-      points: currentTrackPoints,
-      color: trackColor,
-      isRecorded: false,
-      createdAt: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
-    };
+    try {
+      const validPoints = currentTrackPoints.filter(
+        (p) => p && typeof p.x === 'number' && typeof p.y === 'number' && !isNaN(p.x) && !isNaN(p.y)
+      );
 
-    const updatedDoc: PdfDocument = {
-      ...activeDoc,
-      tracks: [...(activeDoc.tracks || []), newTrack],
-    };
+      const newTrack: PdfTrack = {
+        id: `trk-${Date.now()}`,
+        name: trackName.trim() || `Rota ${activeDoc.tracks?.length ? activeDoc.tracks.length + 1 : 1}`,
+        points: validPoints,
+        color: trackColor || '#0284c7',
+        isRecorded: false,
+        createdAt: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
+      };
 
-    updateDocumentInStore(updatedDoc);
-    notifySuccess('Rota Salva', `Rota "${newTrack.name}" cadastrada com sucesso.`);
+      const existingTracks = Array.isArray(activeDoc.tracks) ? activeDoc.tracks : [];
+      const updatedDoc: PdfDocument = {
+        ...activeDoc,
+        tracks: [...existingTracks, newTrack],
+      };
 
-    setCurrentTrackPoints([]);
-    setIsTrackModalOpen(false);
-    setTrackName('');
-    setActiveTool('pan');
+      updateDocumentInStore(updatedDoc);
+      notifySuccess('Rota Salva', `Rota "${newTrack.name}" cadastrada com sucesso.`);
+
+      setCurrentTrackPoints([]);
+      setIsTrackModalOpen(false);
+      setTrackName('');
+      setActiveTool('pan');
+    } catch (err) {
+      console.error('Error saving track:', err);
+      notifyError('Erro ao Salvar', 'Não foi possível salvar o traçado.');
+    }
   };
 
-  // Live Track Recording controls
+  // Live Track Recording controls safely
   const handleStartLiveRecording = () => {
-    setActiveTool('record_track');
-    setIsRecordingLive(true);
-    setIsRecordingPaused(false);
-    setRecordedPoints([]);
-    setRecordDuration(0);
+    try {
+      setActiveTool('record_track');
+      setIsRecordingLive(true);
+      setIsRecordingPaused(false);
+      setRecordedPoints([]);
+      setRecordDuration(0);
 
-    // Auto-enable GPS if not yet active
-    if (!isGpsActive) {
-      toggleGps(true);
-    }
+      if (!isGpsActive) {
+        toggleGps(true);
+      }
 
-    if (userGps && activeDoc) {
-      const p = gpsToPdf(userGps.lat, userGps.lng, activeDoc);
-      setRecordedPoints([{ 
-        x: p.x, 
-        y: p.y, 
-        lat: userGps.lat, 
-        lng: userGps.lng, 
-        time: new Date().toLocaleTimeString('pt-BR'),
-        speed: userGps.speed !== null ? userGps.speed : undefined,
-        altitude: userGps.altitude !== null ? userGps.altitude : undefined
-      }]);
-    } else if (mapInstanceRef.current) {
-      const center = mapInstanceRef.current.getCenter();
-      setRecordedPoints([{ x: center.lat, y: center.lng, time: new Date().toLocaleTimeString('pt-BR') }]);
+      if (userGps && activeDoc) {
+        const p = gpsToPdf(userGps.lat, userGps.lng, activeDoc);
+        if (!isNaN(p.x) && !isNaN(p.y)) {
+          setRecordedPoints([{ 
+            x: p.x, 
+            y: p.y, 
+            lat: userGps.lat, 
+            lng: userGps.lng, 
+            time: new Date().toLocaleTimeString('pt-BR'),
+            speed: userGps.speed !== null ? userGps.speed : undefined,
+            altitude: userGps.altitude !== null ? userGps.altitude : undefined
+          }]);
+        }
+      } else if (mapInstanceRef.current) {
+        const center = mapInstanceRef.current.getCenter();
+        if (!isNaN(center.lat) && !isNaN(center.lng)) {
+          setRecordedPoints([{ x: center.lat, y: center.lng, time: new Date().toLocaleTimeString('pt-BR') }]);
+        }
+      }
+      notifyInfo('Gravação Iniciada', 'Rastreio do trajeto exato em tempo real ativado.');
+    } catch (err) {
+      console.warn('Error starting recording:', err);
     }
-    notifyInfo('Gravação Iniciada', 'Rastreio do trajeto exato em tempo real ativado.');
   };
 
   const handleStopAndSaveLiveRecording = () => {
@@ -1633,41 +1627,52 @@ export const PdfMapNavigator: React.FC = () => {
   const handleConfirmSaveRecordedRoute = () => {
     if (!activeDoc) return;
 
-    const formattedDist = totalRecordedDistanceMeters >= 1000
-      ? `${(totalRecordedDistanceMeters / 1000).toFixed(2)} km`
-      : `${Math.round(totalRecordedDistanceMeters)} m`;
+    try {
+      const validPoints = recordedPoints.filter(
+        (p) => p && typeof p.x === 'number' && typeof p.y === 'number' && !isNaN(p.x) && !isNaN(p.y)
+      );
 
-    const newTrack: PdfTrack = {
-      id: `rec-trk-${Date.now()}`,
-      name: recordedRouteName.trim() || `Trilha de Campo ${new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`,
-      points: recordedPoints,
-      color: recordedRouteColor,
-      isRecorded: true,
-      distance: formattedDist,
-      duration: formatTimer(recordDuration),
-      createdAt: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
-    };
+      const formattedDist = totalRecordedDistanceMeters >= 1000
+        ? `${(totalRecordedDistanceMeters / 1000).toFixed(2)} km`
+        : `${Math.round(totalRecordedDistanceMeters)} m`;
 
-    const updatedDoc: PdfDocument = {
-      ...activeDoc,
-      tracks: [...(activeDoc.tracks || []), newTrack],
-    };
+      const newTrack: PdfTrack = {
+        id: `rec-trk-${Date.now()}`,
+        name: recordedRouteName.trim() || `Trilha de Campo ${new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`,
+        points: validPoints,
+        color: recordedRouteColor || '#ef4444',
+        isRecorded: true,
+        distance: formattedDist,
+        duration: formatTimer(recordDuration),
+        createdAt: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
+      };
 
-    updateDocumentInStore(updatedDoc);
-    notifySuccess('Trilha Salva', `Trilha "${newTrack.name}" salva com ${recordedPoints.length} pontos e extensão de ${formattedDist}.`);
+      const existingTracks = Array.isArray(activeDoc.tracks) ? activeDoc.tracks : [];
+      const updatedDoc: PdfDocument = {
+        ...activeDoc,
+        tracks: [...existingTracks, newTrack],
+      };
 
-    setIsSaveRecordedModalOpen(false);
-    setIsRecordingLive(false);
-    setIsRecordingPaused(false);
-    setRecordedPoints([]);
-    setRecordDuration(0);
-    setActiveTool('pan');
+      updateDocumentInStore(updatedDoc);
+      notifySuccess('Trilha Salva', `Trilha "${newTrack.name}" salva com ${validPoints.length} pontos e extensão de ${formattedDist}.`);
+
+      setIsSaveRecordedModalOpen(false);
+      setIsRecordingLive(false);
+      setIsRecordingPaused(false);
+      setRecordedPoints([]);
+      setRecordDuration(0);
+      setActiveTool('pan');
+    } catch (err) {
+      console.error('Error saving recorded track:', err);
+      notifyError('Erro ao Salvar', 'Não foi possível persistir a trilha gravada.');
+    }
   };
 
-  // Delete marker
+  // Delete marker safely
   const handleDeleteMarker = (markerId: string) => {
     if (!activeDoc) return;
-    const markerToDelete = activeDoc.markers.find((m) => m.id === markerId);
+    const existingMarkers = Array.isArray(activeDoc.markers) ? activeDoc.markers : [];
+    const markerToDelete = existingMarkers.find((m) => m.id === markerId);
     showConfirm({
       title: 'Excluir Ponto',
       message: `Deseja realmente excluir o ponto "${markerToDelete?.title || 'selecionado'}" desta folha?`,
@@ -1676,7 +1681,7 @@ export const PdfMapNavigator: React.FC = () => {
       onConfirm: () => {
         const updatedDoc: PdfDocument = {
           ...activeDoc,
-          markers: activeDoc.markers.filter((m) => m.id !== markerId),
+          markers: existingMarkers.filter((m) => m.id !== markerId),
         };
         updateDocumentInStore(updatedDoc);
         if (activeNavPoint?.id === markerId) {
@@ -1688,10 +1693,11 @@ export const PdfMapNavigator: React.FC = () => {
     });
   };
 
-  // Delete track
+  // Delete track safely
   const handleDeleteTrack = (trackId: string) => {
     if (!activeDoc) return;
-    const trackToDelete = (activeDoc.tracks || []).find((t) => t.id === trackId);
+    const existingTracks = Array.isArray(activeDoc.tracks) ? activeDoc.tracks : [];
+    const trackToDelete = existingTracks.find((t) => t.id === trackId);
     showConfirm({
       title: 'Excluir Rota',
       message: `Deseja remover a rota "${trackToDelete?.name || 'selecionada'}"?`,
@@ -1700,7 +1706,7 @@ export const PdfMapNavigator: React.FC = () => {
       onConfirm: () => {
         const updatedDoc: PdfDocument = {
           ...activeDoc,
-          tracks: (activeDoc.tracks || []).filter((t) => t.id !== trackId),
+          tracks: existingTracks.filter((t) => t.id !== trackId),
         };
         updateDocumentInStore(updatedDoc);
         notifyInfo('Rota Excluída', 'A rota foi descarregada da planta.');
@@ -1708,7 +1714,7 @@ export const PdfMapNavigator: React.FC = () => {
     });
   };
 
-  // Delete document
+  // Delete document safely
   const handleDeleteDoc = (docId: string, e: React.MouseEvent) => {
     e.stopPropagation();
     const docToDelete = documents.find((d) => d.id === docId);
@@ -1718,13 +1724,17 @@ export const PdfMapNavigator: React.FC = () => {
       type: 'danger',
       confirmText: 'Excluir Planta',
       onConfirm: async () => {
-        await deletePdfDocument(docId);
-        const remaining = documents.filter((d) => d.id !== docId);
-        setDocuments(remaining);
-        if (activeDocId === docId) {
-          setActiveDocId(remaining.length > 0 ? remaining[0].id : null);
+        try {
+          await deletePdfDocument(docId);
+          const remaining = documents.filter((d) => d.id !== docId);
+          setDocuments(remaining);
+          if (activeDocId === docId) {
+            setActiveDocId(remaining.length > 0 ? remaining[0].id : null);
+          }
+          notifySuccess('Planta Excluída', 'Documento removido do armazenamento local.');
+        } catch (err) {
+          console.error('Error deleting doc:', err);
         }
-        notifySuccess('Planta Excluída', 'Documento removido do armazenamento local.');
       },
     });
   };
@@ -1738,12 +1748,28 @@ export const PdfMapNavigator: React.FC = () => {
   };
 
   // Map Controls
-  const handleZoomIn = () => mapInstanceRef.current?.zoomIn();
-  const handleZoomOut = () => mapInstanceRef.current?.zoomOut();
+  const handleZoomIn = () => {
+    try {
+      mapInstanceRef.current?.zoomIn();
+    } catch {}
+  };
+
+  const handleZoomOut = () => {
+    try {
+      mapInstanceRef.current?.zoomOut();
+    } catch {}
+  };
+
   const handleFitBounds = () => {
-    if (activeDoc && mapInstanceRef.current) {
-      const bounds = new L.LatLngBounds([0, 0], [activeDoc.height, activeDoc.width]);
-      mapInstanceRef.current.fitBounds(bounds, { padding: [10, 10] });
+    try {
+      if (activeDoc && mapInstanceRef.current) {
+        const h = activeDoc.height && !isNaN(activeDoc.height) ? activeDoc.height : 1000;
+        const w = activeDoc.width && !isNaN(activeDoc.width) ? activeDoc.width : 1000;
+        const bounds = new L.LatLngBounds([0, 0], [h, w]);
+        mapInstanceRef.current.fitBounds(bounds, { padding: [10, 10] });
+      }
+    } catch (err) {
+      console.warn('Error fitting bounds:', err);
     }
   };
 
@@ -2014,7 +2040,6 @@ export const PdfMapNavigator: React.FC = () => {
                 <UploadCloud className="w-5 h-5" />
                 <span>Importar Mapa PDF</span>
               </button>
-              
             </div>
           </div>
         )}
@@ -2110,26 +2135,34 @@ export const PdfMapNavigator: React.FC = () => {
               <div className="bg-slate-900/95 backdrop-blur-md border border-rose-500/80 rounded-2xl p-2 shadow-2xl flex flex-col sm:flex-row items-center gap-1.5 pointer-events-auto animate-in slide-in-from-right duration-200">
                 <button
                   onClick={() => {
-                    if (userGps && activeDoc) {
-                      const p = gpsToPdf(userGps.lat, userGps.lng, activeDoc);
-                      setRecordedPoints((prev) => [
-                        ...prev,
-                        { 
-                          x: p.x, 
-                          y: p.y, 
-                          lat: userGps.lat, 
-                          lng: userGps.lng, 
-                          time: new Date().toLocaleTimeString('pt-BR'),
-                          speed: userGps.speed !== null ? userGps.speed : undefined,
-                          altitude: userGps.altitude !== null ? userGps.altitude : undefined
+                    try {
+                      if (userGps && activeDoc) {
+                        const p = gpsToPdf(userGps.lat, userGps.lng, activeDoc);
+                        if (!isNaN(p.x) && !isNaN(p.y)) {
+                          setRecordedPoints((prev) => [
+                            ...prev,
+                            { 
+                              x: p.x, 
+                              y: p.y, 
+                              lat: userGps.lat, 
+                              lng: userGps.lng, 
+                              time: new Date().toLocaleTimeString('pt-BR'),
+                              speed: userGps.speed !== null ? userGps.speed : undefined,
+                              altitude: userGps.altitude !== null ? userGps.altitude : undefined
+                            }
+                          ]);
                         }
-                      ]);
-                    } else if (mapInstanceRef.current) {
-                      const center = mapInstanceRef.current.getCenter();
-                      setRecordedPoints((prev) => [
-                        ...prev,
-                        { x: center.lat, y: center.lng, time: new Date().toLocaleTimeString('pt-BR') }
-                      ]);
+                      } else if (mapInstanceRef.current) {
+                        const center = mapInstanceRef.current.getCenter();
+                        if (!isNaN(center.lat) && !isNaN(center.lng)) {
+                          setRecordedPoints((prev) => [
+                            ...prev,
+                            { x: center.lat, y: center.lng, time: new Date().toLocaleTimeString('pt-BR') }
+                          ]);
+                        }
+                      }
+                    } catch (err) {
+                      console.warn('Error recording point:', err);
                     }
                   }}
                   className="w-full sm:w-auto px-3 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-xl flex items-center justify-center gap-1 active:scale-95"
@@ -2709,12 +2742,17 @@ export const PdfMapNavigator: React.FC = () => {
                 <div className="bg-slate-950 p-2.5 rounded-xl border border-slate-800 flex items-center justify-between text-[11px]">
                   <span className="text-slate-400">Coordenadas Estimadas:</span>
                   {(() => {
-                    const gps = pdfToGps(selectedMarker.x, selectedMarker.y, activeDoc);
-                    return (
-                      <span className="font-mono text-sky-400 font-bold">
-                        {gps.lat.toFixed(5)}, {gps.lng.toFixed(5)}
-                      </span>
-                    );
+                    try {
+                      const gps = pdfToGps(selectedMarker.x, selectedMarker.y, activeDoc);
+                      if (!gps || isNaN(gps.lat) || isNaN(gps.lng)) return null;
+                      return (
+                        <span className="font-mono text-sky-400 font-bold">
+                          {gps.lat.toFixed(5)}, {gps.lng.toFixed(5)}
+                        </span>
+                      );
+                    } catch {
+                      return null;
+                    }
                   })()}
                 </div>
               )}
@@ -2876,13 +2914,6 @@ export const PdfMapNavigator: React.FC = () => {
                 </div>
               )}
 
-              {errorMsg && (
-                <div className="p-3 rounded-xl bg-rose-950/80 border border-rose-800 text-rose-200 flex items-start gap-2">
-                  <AlertTriangle className="w-4 h-4 text-rose-400 shrink-0 mt-0.5" />
-                  <div>{errorMsg}</div>
-                </div>
-              )}
-
               {/* List of Maps */}
               <div>
                 <label className="text-[11px] font-extrabold text-slate-400 uppercase tracking-wider block mb-2">
@@ -2891,6 +2922,8 @@ export const PdfMapNavigator: React.FC = () => {
                 <div className="space-y-2">
                   {documents.map((doc) => {
                     const isActive = activeDocId === doc.id;
+                    const docMarkers = Array.isArray(doc.markers) ? doc.markers : [];
+                    const docTracks = Array.isArray(doc.tracks) ? doc.tracks : [];
                     return (
                       <div
                         key={doc.id}
@@ -2909,7 +2942,7 @@ export const PdfMapNavigator: React.FC = () => {
                           <div className="truncate">
                             <div className="truncate font-bold">{doc.name}</div>
                             <div className="text-[10px] text-slate-500 font-normal">
-                              {doc.pageCount} pág • {(doc.markers || []).length} pontos • {doc.tracks?.length || 0} rotas
+                              {doc.pageCount} pág • {docMarkers.length} pontos • {docTracks.length} rotas
                             </div>
                           </div>
                         </div>
@@ -2938,8 +2971,10 @@ export const PdfMapNavigator: React.FC = () => {
                         onClick={() => {
                           setSelectedMarker(marker);
                           setIsDrawerOpen(false);
-                          if (mapInstanceRef.current) {
-                            mapInstanceRef.current.setView([marker.x, marker.y], 2);
+                          if (mapInstanceRef.current && typeof marker.x === 'number' && typeof marker.y === 'number' && !isNaN(marker.x) && !isNaN(marker.y)) {
+                            try {
+                              mapInstanceRef.current.setView([marker.x, marker.y], 2);
+                            } catch {}
                           }
                         }}
                         className="p-2.5 rounded-xl bg-slate-950 border border-slate-800 flex items-center justify-between hover:border-slate-700 cursor-pointer"
@@ -2956,7 +2991,7 @@ export const PdfMapNavigator: React.FC = () => {
                         <span className="text-[10px] text-slate-500">{marker.createdAt}</span>
                       </div>
                     ))}
-                    {(activeDoc.markers || []).length === 0 && (
+                    {(!activeDoc.markers || activeDoc.markers.length === 0) && (
                       <div className="p-3 text-center text-slate-500 italic">
                         Nenhum ponto marcado ainda.
                       </div>
@@ -2980,7 +3015,7 @@ export const PdfMapNavigator: React.FC = () => {
                         <div className="flex items-center gap-2">
                           <span className="w-3 h-1 rounded" style={{ backgroundColor: trk.color }} />
                           <span className="font-bold text-slate-200">{trk.name}</span>
-                          <span className="text-[10px] text-slate-500">({trk.points.length} pts)</span>
+                          <span className="text-[10px] text-slate-500">({trk.points?.length || 0} pts)</span>
                         </div>
                         <button
                           onClick={() => handleDeleteTrack(trk.id)}

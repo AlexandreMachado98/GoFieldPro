@@ -79,6 +79,46 @@ function openDB(): Promise<IDBDatabase> {
   });
 }
 
+function sanitizeDocument(doc: any): PdfDocument {
+  if (!doc) throw new Error('Document is empty');
+  return {
+    id: doc.id || `doc-${Date.now()}`,
+    name: doc.name || 'Mapa sem Título',
+    fileName: doc.fileName || 'documento.pdf',
+    fileSize: doc.fileSize || '1 MB',
+    dataUrls: Array.isArray(doc.dataUrls) ? doc.dataUrls : (doc.dataUrl ? [doc.dataUrl] : []),
+    pageCount: typeof doc.pageCount === 'number' && doc.pageCount > 0 ? doc.pageCount : 1,
+    currentPage: typeof doc.currentPage === 'number' ? Math.max(0, doc.currentPage) : 0,
+    width: typeof doc.width === 'number' && doc.width > 0 ? doc.width : 1600,
+    height: typeof doc.height === 'number' && doc.height > 0 ? doc.height : 1200,
+    markers: Array.isArray(doc.markers) ? doc.markers.map((m: any) => ({
+      id: m.id || `m-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+      x: typeof m.x === 'number' && !isNaN(m.x) ? m.x : 0,
+      y: typeof m.y === 'number' && !isNaN(m.y) ? m.y : 0,
+      lat: typeof m.lat === 'number' && !isNaN(m.lat) ? m.lat : undefined,
+      lng: typeof m.lng === 'number' && !isNaN(m.lng) ? m.lng : undefined,
+      title: m.title || 'Ponto',
+      notes: m.notes || '',
+      category: m.category || 'checkpoint',
+      color: m.color || '#0284c7',
+      photos: Array.isArray(m.photos) ? m.photos : [],
+      createdAt: m.createdAt || new Date().toLocaleTimeString('pt-BR'),
+    })) : [],
+    tracks: Array.isArray(doc.tracks) ? doc.tracks.map((t: any) => ({
+      id: t.id || `trk-${Date.now()}`,
+      name: t.name || 'Rota',
+      points: Array.isArray(t.points) ? t.points.filter((p: any) => p && typeof p.x === 'number' && typeof p.y === 'number' && !isNaN(p.x) && !isNaN(p.y)) : [],
+      color: t.color || '#0284c7',
+      distance: t.distance,
+      duration: t.duration,
+      isRecorded: !!t.isRecorded,
+      createdAt: t.createdAt || new Date().toLocaleTimeString('pt-BR'),
+    })) : [],
+    calibration: doc.calibration,
+    uploadedAt: doc.uploadedAt || new Date().toLocaleDateString('pt-BR'),
+  };
+}
+
 export async function getAllPdfDocuments(): Promise<PdfDocument[]> {
   try {
     const db = await openDB();
@@ -87,9 +127,9 @@ export async function getAllPdfDocuments(): Promise<PdfDocument[]> {
       const store = tx.objectStore(STORE_NAME);
       const request = store.getAll();
       request.onsuccess = () => {
-        const docs = request.result || [];
-        // Sort newest first
-        resolve(docs.reverse());
+        const rawDocs = request.result || [];
+        const sanitized = rawDocs.map(sanitizeDocument);
+        resolve(sanitized.reverse());
       };
       request.onerror = () => reject(request.error);
     });
@@ -98,7 +138,12 @@ export async function getAllPdfDocuments(): Promise<PdfDocument[]> {
     // Fallback to localStorage
     try {
       const saved = localStorage.getItem('geofield_pdf_maps_v2');
-      if (saved) return JSON.parse(saved);
+      if (saved) {
+        const raw = JSON.parse(saved);
+        if (Array.isArray(raw)) {
+          return raw.map(sanitizeDocument);
+        }
+      }
     } catch {
       // ignore
     }
@@ -107,17 +152,25 @@ export async function getAllPdfDocuments(): Promise<PdfDocument[]> {
 }
 
 export async function savePdfDocument(doc: PdfDocument): Promise<void> {
+  const sanitized = sanitizeDocument(doc);
   try {
     const db = await openDB();
     return new Promise((resolve, reject) => {
       const tx = db.transaction(STORE_NAME, 'readwrite');
       const store = tx.objectStore(STORE_NAME);
-      const request = store.put(doc);
+      const request = store.put(sanitized);
       request.onsuccess = () => resolve();
       request.onerror = () => reject(request.error);
     });
   } catch (e) {
     console.warn('IndexedDB save fallback:', e);
+    try {
+      const existing = await getAllPdfDocuments();
+      const next = [sanitized, ...existing.filter((d) => d.id !== sanitized.id)];
+      localStorage.setItem('geofield_pdf_maps_v2', JSON.stringify(next));
+    } catch {
+      // ignore
+    }
   }
 }
 
@@ -133,5 +186,12 @@ export async function deletePdfDocument(id: string): Promise<void> {
     });
   } catch (e) {
     console.warn('IndexedDB delete fallback:', e);
+    try {
+      const existing = await getAllPdfDocuments();
+      const next = existing.filter((d) => d.id !== id);
+      localStorage.setItem('geofield_pdf_maps_v2', JSON.stringify(next));
+    } catch {
+      // ignore
+    }
   }
 }
