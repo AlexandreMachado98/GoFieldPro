@@ -83,6 +83,8 @@ interface AppContextType {
 
   // Waypoints
   waypoints: Waypoint[];
+  pendingWaypointCoord: { lat: number; lng: number; altitude?: number } | null;
+  setPendingWaypointCoord: (coord: { lat: number; lng: number; altitude?: number } | null) => void;
   addWaypoint: (wp: Omit<Waypoint, 'id' | 'createdAt' | 'synced' | 'encrypted'>) => void;
   deleteWaypoint: (id: string) => void;
   updateWaypointStatus: (id: string, status: Waypoint['status']) => void;
@@ -102,7 +104,7 @@ interface AppContextType {
   startTrackRecording: (name: string) => void;
   pauseTrackRecording: () => void;
   resumeTrackRecording: () => void;
-  stopTrackRecording: () => void;
+  stopTrackRecording: (customName?: string, customColor?: string) => void;
   savedTracks: Track[];
 
   // Navigation HUD
@@ -400,6 +402,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   // Modals
   const [isAiModalOpen, setIsAiModalOpen] = useState<boolean>(false);
   const [isAddWaypointModalOpen, setIsAddWaypointModalOpen] = useState<boolean>(false);
+  const [pendingWaypointCoord, setPendingWaypointCoord] = useState<{ lat: number; lng: number; altitude?: number } | null>(null);
   const [isLayerModalOpen, setIsLayerModalOpen] = useState<boolean>(false);
   const [isReportModalOpen, setIsReportModalOpen] = useState<boolean>(false);
   const [isMeasuring, setIsMeasuring] = useState<boolean>(false);
@@ -650,44 +653,13 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         setCurrentGps((prev) => {
           const deltaLat = (Math.random() - 0.5) * 0.00015;
           const deltaLng = (Math.random() - 0.5) * 0.00015;
-          const newCoord: GeoCoordinate = {
+          return {
             lat: prev.lat + deltaLat,
             lng: prev.lng + deltaLng,
             altitude: Math.round((prev.altitude || 1280) + (Math.random() - 0.5) * 2),
             accuracy: +(1.2 + Math.random() * 0.8).toFixed(1),
             timestamp: Date.now(),
           };
-
-          // If recording track, append point
-          if (isRecordingTrack && !isRecordingPaused && activeTrack) {
-            setActiveTrack((curr) => {
-              if (!curr) return null;
-              const newPoints = [
-                ...curr.points,
-                {
-                  lat: newCoord.lat,
-                  lng: newCoord.lng,
-                  altitude: newCoord.altitude || 1280,
-                  speed: +(3.6 + Math.random() * 1.5).toFixed(1),
-                  timestamp: Date.now(),
-                },
-              ];
-              const distInc = calculateDistanceMeters(
-                curr.points[curr.points.length - 1]?.lat || newCoord.lat,
-                curr.points[curr.points.length - 1]?.lng || newCoord.lng,
-                newCoord.lat,
-                newCoord.lng
-              ) / 1000;
-              return {
-                ...curr,
-                points: newPoints,
-                distanceKm: +(curr.distanceKm + distInc).toFixed(3),
-                durationSeconds: curr.durationSeconds + 2,
-              };
-            });
-          }
-
-          return newCoord;
         });
       }, 3000);
 
@@ -699,7 +671,88 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         navigator.geolocation.clearWatch(watchId);
       }
     };
-  }, [isGpsSimulated, isRecordingTrack, isRecordingPaused, activeTrack, requestCurrentLocation]);
+  }, [isGpsSimulated, requestCurrentLocation]);
+
+  // Continuous Track Points Accumulation during live recording
+  useEffect(() => {
+    if (!isRecordingTrack || isRecordingPaused) return;
+
+    setActiveTrack((curr) => {
+      if (!curr) return null;
+      const lastPoint = curr.points[curr.points.length - 1];
+      if (lastPoint) {
+        const distFromLastMeters = calculateDistanceMeters(
+          lastPoint.lat,
+          lastPoint.lng,
+          currentGps.lat,
+          currentGps.lng
+        );
+        // Append if moved at least 0.5 meter
+        if (distFromLastMeters < 0.5) return curr;
+
+        const newPoint = {
+          lat: currentGps.lat,
+          lng: currentGps.lng,
+          altitude: currentGps.altitude || 1280,
+          speed: currentGps.speed || 3.8,
+          timestamp: Date.now(),
+        };
+
+        const distIncKm = distFromLastMeters / 1000;
+        const newTotalKm = +(curr.distanceKm + distIncKm).toFixed(3);
+        return {
+          ...curr,
+          points: [...curr.points, newPoint],
+          distanceKm: newTotalKm,
+          elevationGainM:
+            newPoint.altitude > lastPoint.altitude
+              ? curr.elevationGainM + Math.round(newPoint.altitude - lastPoint.altitude)
+              : curr.elevationGainM,
+          elevationLossM:
+            newPoint.altitude < lastPoint.altitude
+              ? curr.elevationLossM + Math.round(lastPoint.altitude - newPoint.altitude)
+              : curr.elevationLossM,
+        };
+      } else {
+        return {
+          ...curr,
+          points: [
+            {
+              lat: currentGps.lat,
+              lng: currentGps.lng,
+              altitude: currentGps.altitude || 1280,
+              speed: currentGps.speed || 3.8,
+              timestamp: Date.now(),
+            },
+          ],
+        };
+      }
+    });
+  }, [currentGps.lat, currentGps.lng, currentGps.altitude, isRecordingTrack, isRecordingPaused]);
+
+  // Duration Timer for active track (1-second tick)
+  useEffect(() => {
+    let timer: number | null = null;
+    if (isRecordingTrack && !isRecordingPaused) {
+      timer = window.setInterval(() => {
+        setActiveTrack((curr) => {
+          if (!curr) return null;
+          const newDuration = curr.durationSeconds + 1;
+          return {
+            ...curr,
+            durationSeconds: newDuration,
+            avgSpeedKmh:
+              newDuration > 0 && curr.distanceKm > 0
+                ? +((curr.distanceKm / (newDuration / 3600))).toFixed(1)
+                : curr.avgSpeedKmh,
+          };
+        });
+      }, 1000);
+    }
+    return () => {
+      if (timer) clearInterval(timer);
+    };
+  }, [isRecordingTrack, isRecordingPaused]);
 
   // Recalculate Navigation Target HUD metrics whenever GPS updates
   useEffect(() => {
@@ -871,11 +924,14 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     setIsRecordingPaused(false);
   };
 
-  const stopTrackRecording = () => {
+  const stopTrackRecording = (customName?: string, customColor?: string) => {
     if (activeTrack) {
       const finished: Track = {
         ...activeTrack,
+        name: customName || activeTrack.name,
+        color: customColor || activeTrack.color,
         endTime: new Date().toISOString(),
+        visible: true,
         synced: !isOffline,
       };
       setSavedTracks((prev) => [finished, ...prev]);
@@ -895,11 +951,10 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         ]);
       }
 
-      addNotification({
-        title: 'Trilha Concluída e Gravada',
-        message: `Trilha "${finished.name}" salva com ${finished.distanceKm.toFixed(2)} km de percurso.`,
-        type: 'sync',
-      });
+      notifySuccess(
+        'Trilha Salva no Mapa',
+        `Trilha "${finished.name}" com ${finished.distanceKm.toFixed(2)} km aplicada com sucesso.`
+      );
     }
     setActiveTrack(null);
     setIsRecordingTrack(false);
@@ -1175,6 +1230,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         removeLayer,
         calibratePdfOverlay,
         waypoints,
+        pendingWaypointCoord,
+        setPendingWaypointCoord,
         addWaypoint,
         deleteWaypoint,
         updateWaypointStatus,

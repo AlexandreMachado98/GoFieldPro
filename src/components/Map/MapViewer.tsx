@@ -24,13 +24,19 @@ import {
   Download,
   Activity,
   Play,
+  Pause,
   Square,
   MapPin,
+  Pin,
+  Trash2,
+  Clock,
+  Gauge,
 } from 'lucide-react';
 import { MeasurementControlBar } from './MeasurementControlBar';
 import { PointDetailModal } from './PointDetailModal';
 import { MeasurementSummaryModal } from './MeasurementSummaryModal';
 import { OfflineMapDownloadModal } from '../Offline/OfflineMapDownloadModal';
+import { SaveTrackModal } from '../FieldTrack/SaveTrackModal';
 
 const basemapTileUrls = {
   satellite: 'http://mt0.google.com/vt/lyrs=y&hl=pt-BR&x={x}&y={y}&z={z}',
@@ -64,7 +70,9 @@ export const MapViewer: React.FC = () => {
     unlockDeviceGps,
     teamMembers,
     navigateToWaypoint,
+    deleteWaypoint,
     setIsAddWaypointModalOpen,
+    setPendingWaypointCoord,
     setIsLayerModalOpen,
     setIsAiModalOpen,
     isMeasuring,
@@ -74,7 +82,10 @@ export const MapViewer: React.FC = () => {
     t,
     currentRole,
     isRecordingTrack,
+    isRecordingPaused,
     startTrackRecording,
+    pauseTrackRecording,
+    resumeTrackRecording,
     stopTrackRecording,
     notifySuccess,
     notifyInfo,
@@ -95,6 +106,9 @@ export const MapViewer: React.FC = () => {
 
   const [isLocating, setIsLocating] = useState<boolean>(false);
   const [isCalibratingGps, setIsCalibratingGps] = useState<boolean>(false);
+  const [isPinModeActive, setIsPinModeActive] = useState<boolean>(false);
+  const [isPinChoiceMenuOpen, setIsPinChoiceMenuOpen] = useState<boolean>(false);
+  const [isSaveTrackModalOpen, setIsSaveTrackModalOpen] = useState<boolean>(false);
   const [measurementPoints, setMeasurementPoints] = useState<MeasurementPoint[]>([]);
   const [currentMeasureType, setCurrentMeasureType] = useState<MeasurementPointType>('standard');
   const [selectedPointForEdit, setSelectedPointForEdit] = useState<{
@@ -104,12 +118,22 @@ export const MapViewer: React.FC = () => {
   const [isSummaryModalOpen, setIsSummaryModalOpen] = useState<boolean>(false);
   const [isOfflineModalOpen, setIsOfflineModalOpen] = useState<boolean>(false);
 
-  // Ref to keep current measurement type and calibration state accessible in Leaflet event listeners
+  // Ref to keep current measurement type, calibration state, and pin mode accessible in Leaflet event listeners
   const currentMeasureTypeRef = useRef<MeasurementPointType>(currentMeasureType);
   currentMeasureTypeRef.current = currentMeasureType;
 
   const isCalibratingGpsRef = useRef<boolean>(isCalibratingGps);
   isCalibratingGpsRef.current = isCalibratingGps;
+
+  const isPinModeActiveRef = useRef<boolean>(isPinModeActive);
+  isPinModeActiveRef.current = isPinModeActive;
+
+  const formatDuration = (seconds: number) => {
+    const hrs = Math.floor(seconds / 3600);
+    const mins = Math.floor((seconds % 3600) / 60);
+    const secs = seconds % 60;
+    return `${hrs.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+  };
 
   // Initialize Leaflet Map
   useEffect(() => {
@@ -318,80 +342,157 @@ export const MapViewer: React.FC = () => {
     }
 
     // 4. Render Active Recording Track Live
-    if (activeTrack && activeTrack.points.length > 1) {
-      const latLngs = activeTrack.points.map((p) => [p.lat, p.lng] as [number, number]);
-      const activeLine = L.polyline(latLngs, {
-        color: '#ef4444',
-        weight: 5,
-        opacity: 0.95,
-        dashArray: '8, 6',
-      });
-      activeLine.addTo(group);
+    if (activeTrack && activeTrack.points.length >= 1) {
+      if (activeTrack.points.length > 1) {
+        const latLngs = activeTrack.points.map((p) => [p.lat, p.lng] as [number, number]);
+
+        // Shadow outline for sharp visibility
+        const shadowLine = L.polyline(latLngs, {
+          color: '#000000',
+          weight: 7,
+          opacity: 0.6,
+          lineCap: 'round',
+          lineJoin: 'round',
+        });
+        shadowLine.addTo(group);
+
+        // Glowing Active Neon Line
+        const activeLine = L.polyline(latLngs, {
+          color: activeTrack.color || '#ef4444',
+          weight: 4.5,
+          opacity: 1.0,
+          dashArray: isRecordingPaused ? '8, 8' : undefined,
+          lineCap: 'round',
+          lineJoin: 'round',
+        });
+        activeLine.addTo(group);
+      }
+
+      // Track Start Marker
+      if (activeTrack.points[0]) {
+        const startIcon = L.divIcon({
+          className: 'custom-track-start-pin',
+          html: `
+            <div style="background-color: #10b981; color: white; font-weight: 900; font-size: 10px; padding: 2px 6px; border-radius: 12px; border: 2px solid white; box-shadow: 0 2px 8px rgba(0,0,0,0.6); display: flex; align-items: center; gap: 3px; white-space: nowrap;">
+              <span>🟢 Início</span>
+            </div>
+          `,
+          iconSize: [60, 20],
+          iconAnchor: [30, 10],
+        });
+        L.marker([activeTrack.points[0].lat, activeTrack.points[0].lng], {
+          icon: startIcon,
+          zIndexOffset: 800,
+        }).addTo(group);
+      }
     }
 
-    // 5. Render Project Waypoints
+    // 5. Render Project Waypoints (Alfinetes de Marcação)
     for (const wp of waypoints) {
-      const getCategoryColor = (cat: Waypoint['category']) => {
+      const getCategoryInfo = (cat: Waypoint['category']) => {
         switch (cat) {
           case 'hazard':
+            return { color: '#ef4444', icon: '⚠️', label: 'Perigo' };
           case 'obstacle':
-            return '#ef4444'; // Red
+            return { color: '#f97316', icon: '🚧', label: 'Obstáculo' };
           case 'geodesic':
-            return '#8b5cf6'; // Violet
+            return { color: '#8b5cf6', icon: '📐', label: 'Geodésico' };
           case 'fauna_flora':
-            return '#10b981'; // Green
+            return { color: '#059669', icon: '🌲', label: 'Fauna/Flora' };
           case 'soil_sample':
-            return '#ec4899'; // Pink
+            return { color: '#ec4899', icon: '🧪', label: 'Solo/Minério' };
           case 'infrastructure':
-            return '#f59e0b'; // Amber
+            return { color: '#f59e0b', icon: '🏗️', label: 'Infraestrutura' };
+          case 'inspection':
+            return { color: '#10b981', icon: '🔍', label: 'Inspeção' };
           default:
-            return '#0284c7'; // Sky
+            return { color: '#0284c7', icon: '📍', label: 'Marco' };
         }
       };
 
-      const color = getCategoryColor(wp.category);
+      const info = getCategoryInfo(wp.category);
       const isNavTarget = navTarget?.id === wp.id;
 
       const wpIcon = L.divIcon({
         className: 'custom-wp-pin',
         html: `
-          <div style="position: relative; display: flex; align-items: center; justify-content: center; cursor: pointer;">
-            <div style="width: ${isNavTarget ? '28px' : '20px'}; height: ${isNavTarget ? '28px' : '20px'}; border-radius: 50%; background-color: ${color}; border: 2.5px solid #ffffff; box-shadow: 0 4px 10px rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; font-size: 10px;">
-              ${wp.code ? wp.code.slice(0, 3) : '•'}
+          <div style="position: relative; display: flex; flex-direction: column; align-items: center; cursor: pointer;">
+            <div style="width: ${isNavTarget ? '32px' : '26px'}; height: ${isNavTarget ? '32px' : '26px'}; border-radius: 50% 50% 50% 0; transform: rotate(-45deg); background-color: ${info.color}; border: 2px solid #ffffff; box-shadow: 0 4px 12px rgba(0,0,0,0.6); display: flex; align-items: center; justify-content: center; ${isNavTarget ? 'animation: bounce 1.5s infinite;' : ''}">
+              <div style="transform: rotate(45deg); font-size: 11px; line-height: 1;">
+                ${info.icon}
+              </div>
+            </div>
+            <div style="margin-top: 2px; background: rgba(15, 23, 42, 0.9); border: 1px solid rgba(255,255,255,0.2); color: #f1f5f9; font-size: 9px; font-weight: 700; padding: 1px 4px; border-radius: 4px; white-space: nowrap;">
+              ${wp.code || wp.name}
             </div>
             ${
               isNavTarget
-                ? `<div style="position: absolute; width: 38px; height: 38px; border-radius: 50%; border: 2px solid ${color}; animation: ping 1.5s cubic-bezier(0, 0, 0.2, 1) infinite;"></div>`
+                ? `<div style="position: absolute; top: -6px; width: 44px; height: 44px; border-radius: 50%; border: 2.5px solid ${info.color}; animation: ping 1.5s cubic-bezier(0, 0, 0.2, 1) infinite;"></div>`
                 : ''
             }
           </div>
         `,
-        iconSize: [24, 24],
-        iconAnchor: [12, 12],
+        iconSize: [30, 42],
+        iconAnchor: [15, 30],
       });
 
-      const marker = L.marker([wp.lat, wp.lng], { icon: wpIcon });
-
+      const marker = L.marker([wp.lat, wp.lng], { icon: wpIcon, zIndexOffset: isNavTarget ? 1500 : 700 });
       const utmCoord = latLngToUTM(wp.lat, wp.lng);
 
+      const photosHtml =
+        wp.photos && wp.photos.length > 0
+          ? `
+            <div style="margin-top: 8px; border-top: 1px solid #e2e8f0; padding-top: 6px;">
+              <div style="font-size: 10px; font-weight: 700; color: #0284c7; margin-bottom: 4px;">📷 ${wp.photos.length} Foto(s) Georreferenciada(s):</div>
+              <div style="display: flex; gap: 4px; overflow-x: auto; padding-bottom: 4px;">
+                ${wp.photos.map((p) => `<img src="${p}" style="width: 54px; height: 54px; object-fit: cover; border-radius: 6px; border: 1px solid #cbd5e1;" />`).join('')}
+              </div>
+            </div>
+          `
+          : '';
+
       marker.bindPopup(`
-        <div class="p-2 text-slate-900 font-sans max-w-xs">
-          <div class="flex items-center justify-between gap-2 mb-1">
-            <span class="px-1.5 py-0.5 text-[9px] font-bold bg-sky-100 text-sky-800 rounded uppercase">${wp.code || 'MARCO'}</span>
-            <span class="text-[10px] text-slate-500 font-mono">${wp.createdAt ? new Date(wp.createdAt).toLocaleDateString('pt-BR') : ''}</span>
+        <div style="font-family: system-ui, -apple-system, sans-serif; min-width: 220px; max-width: 280px; padding: 4px;">
+          <div style="display: flex; align-items: center; justify-content: space-between; gap: 6px; margin-bottom: 4px;">
+            <span style="font-size: 9px; font-weight: 800; background-color: ${info.color}20; color: ${info.color}; border: 1px solid ${info.color}40; padding: 2px 6px; border-radius: 6px; text-transform: uppercase;">
+              ${info.icon} ${wp.code || 'ALF'}
+            </span>
+            <span style="font-size: 10px; color: #64748b; font-family: monospace;">
+              ${wp.createdAt ? new Date(wp.createdAt).toLocaleDateString('pt-BR') : ''}
+            </span>
           </div>
-          <h4 class="font-bold text-sm text-slate-900">${wp.name}</h4>
-          <div class="text-[11px] font-mono text-slate-600 mt-1 bg-slate-100 p-1.5 rounded">
-            <div>LAT: ${wp.lat.toFixed(5)}° LNG: ${wp.lng.toFixed(5)}°</div>
-            <div>UTM: E ${utmCoord.easting} N ${utmCoord.northing}</div>
-            <div>ALT: ${wp.altitude}m (±${wp.accuracy}m)</div>
+
+          <h4 style="margin: 0 0 6px 0; font-size: 14px; font-weight: 800; color: #0f172a; line-height: 1.2;">
+            ${wp.name}
+          </h4>
+
+          <div style="font-size: 11px; font-family: monospace; color: #334155; background: #f8fafc; border: 1px solid #e2e8f0; padding: 6px; border-radius: 8px; line-height: 1.4;">
+            <div><b>LAT:</b> ${wp.lat.toFixed(6)}°</div>
+            <div><b>LNG:</b> ${wp.lng.toFixed(6)}°</div>
+            <div><b>UTM ${utmCoord.zone}:</b> E ${utmCoord.easting} | N ${utmCoord.northing}</div>
+            <div><b>ALT:</b> ${wp.altitude}m (±${wp.accuracy}m)</div>
           </div>
-          ${wp.notes ? `<p class="text-xs text-slate-700 mt-1.5 italic">"${wp.notes}"</p>` : ''}
-          ${
-            wp.photos && wp.photos.length > 0
-              ? `<div class="mt-2 text-[10px] font-bold text-sky-600">📷 ${wp.photos.length} foto(s) anexada(s)</div>`
-              : ''
-          }
+
+          ${wp.notes ? `<p style="margin: 6px 0 0 0; font-size: 11px; color: #475569; font-style: italic;">"${wp.notes}"</p>` : ''}
+          ${photosHtml}
+
+          <div style="margin-top: 8px; display: flex; gap: 4px;">
+            <button
+              id="popup-btn-nav-${wp.id}"
+              onclick="window.dispatchEvent(new CustomEvent('gofield-navigate-waypoint', { detail: '${wp.id}' }))"
+              style="flex: 1; background-color: #0284c7; color: #ffffff; border: none; padding: 6px 8px; border-radius: 6px; font-size: 11px; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 4px;"
+            >
+              🎯 Navegar
+            </button>
+            <button
+              id="popup-btn-del-${wp.id}"
+              onclick="window.dispatchEvent(new CustomEvent('gofield-delete-waypoint', { detail: '${wp.id}' }))"
+              style="background-color: #f1f5f9; color: #ef4444; border: 1px solid #cbd5e1; padding: 6px 8px; border-radius: 6px; font-size: 11px; font-weight: 700; cursor: pointer;"
+              title="Excluir Alfinete"
+            >
+              🗑️
+            </button>
+          </div>
         </div>
       `);
 
@@ -516,6 +617,18 @@ export const MapViewer: React.FC = () => {
         });
         setIsCalibratingGps(false);
         map.flyTo([e.latlng.lat, e.latlng.lng], Math.max(map.getZoom(), 17));
+        return;
+      }
+
+      // 2. If in Pin Dropping Mode, open AddWaypointModal at clicked location
+      if (isPinModeActiveRef.current) {
+        setPendingWaypointCoord({
+          lat: e.latlng.lat,
+          lng: e.latlng.lng,
+          altitude: currentGps.altitude || 1280,
+        });
+        setIsPinModeActive(false);
+        setIsAddWaypointModalOpen(true);
         return;
       }
 
@@ -851,6 +964,30 @@ export const MapViewer: React.FC = () => {
     }
   };
 
+  // Handle custom popup events for navigation and deletion
+  useEffect(() => {
+    const handleNav = (e: any) => {
+      const wpId = e.detail;
+      const targetWp = waypoints.find((w) => w.id === wpId);
+      if (targetWp) {
+        navigateToWaypoint(targetWp);
+      }
+    };
+
+    const handleDel = (e: any) => {
+      const wpId = e.detail;
+      deleteWaypoint(wpId);
+    };
+
+    window.addEventListener('gofield-navigate-waypoint', handleNav);
+    window.addEventListener('gofield-delete-waypoint', handleDel);
+
+    return () => {
+      window.removeEventListener('gofield-navigate-waypoint', handleNav);
+      window.removeEventListener('gofield-delete-waypoint', handleDel);
+    };
+  }, [waypoints, navigateToWaypoint, deleteWaypoint]);
+
   const currentUtm = latLngToUTM(currentGps.lat, currentGps.lng);
 
   return (
@@ -872,6 +1009,94 @@ export const MapViewer: React.FC = () => {
           onFinishMeasurement={() => setIsSummaryModalOpen(true)}
           onClose={() => setIsMeasuring(false)}
         />
+      )}
+
+      {/* Live Track Recording Floating Console HUD */}
+      {isRecordingTrack && activeTrack && (
+        <div className="absolute top-20 left-1/2 -translate-x-1/2 z-30 w-[94%] max-w-md bg-slate-900/95 backdrop-blur-md border-2 border-red-500/80 rounded-2xl p-3 shadow-2xl text-white pointer-events-auto animate-in slide-in-from-top-4 duration-200">
+          <div className="flex items-center justify-between border-b border-slate-800 pb-2 mb-2">
+            <div className="flex items-center gap-2">
+              <span className="relative flex h-2.5 w-2.5">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-red-500"></span>
+              </span>
+              <span className="font-bold text-xs uppercase tracking-wider text-red-400">
+                {isRecordingPaused ? '⏸️ Gravação Pausada' : '🔴 Gravando Rota no Mapa'}
+              </span>
+            </div>
+            <span className="font-mono text-xs font-bold text-slate-300">
+              {activeTrack.points.length} pts
+            </span>
+          </div>
+
+          <div className="grid grid-cols-3 gap-2 text-center mb-2.5">
+            <div className="bg-slate-950/70 p-2 rounded-xl border border-slate-800">
+              <div className="text-[9px] text-slate-400 uppercase font-semibold">Distância</div>
+              <div className="text-sm font-mono font-black text-white mt-0.5">
+                {activeTrack.distanceKm >= 1
+                  ? `${activeTrack.distanceKm.toFixed(2)} km`
+                  : `${Math.round(activeTrack.distanceKm * 1000)} m`}
+              </div>
+            </div>
+
+            <div className="bg-slate-950/70 p-2 rounded-xl border border-slate-800">
+              <div className="text-[9px] text-slate-400 uppercase font-semibold">Duração</div>
+              <div className="text-sm font-mono font-black text-amber-400 mt-0.5">
+                {formatDuration(activeTrack.durationSeconds)}
+              </div>
+            </div>
+
+            <div className="bg-slate-950/70 p-2 rounded-xl border border-slate-800">
+              <div className="text-[9px] text-slate-400 uppercase font-semibold">Velocidade</div>
+              <div className="text-sm font-mono font-black text-emerald-400 mt-0.5">
+                {(activeTrack.points[activeTrack.points.length - 1]?.speed || 3.8).toFixed(1)}{' '}
+                <span className="text-[9px] font-normal text-slate-400">km/h</span>
+              </div>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2">
+            {isRecordingPaused ? (
+              <button
+                onClick={resumeTrackRecording}
+                className="flex-1 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 shadow-lg transition-colors"
+              >
+                <Play className="w-3.5 h-3.5 fill-current" />
+                Continuar
+              </button>
+            ) : (
+              <button
+                onClick={pauseTrackRecording}
+                className="flex-1 py-2 bg-amber-600 hover:bg-amber-500 text-white rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 shadow-lg transition-colors"
+              >
+                <Pause className="w-3.5 h-3.5" />
+                Pausar
+              </button>
+            )}
+
+            <button
+              onClick={() => setIsSaveTrackModalOpen(true)}
+              className="flex-1 py-2 bg-red-600 hover:bg-red-500 text-white rounded-xl font-black text-xs flex items-center justify-center gap-1.5 shadow-lg shadow-red-900/40 transition-colors"
+            >
+              <Square className="w-3.5 h-3.5 fill-current" />
+              Finalizar & Baixar
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Active Pin Dropping Mode Banner */}
+      {isPinModeActive && (
+        <div className="absolute top-16 left-1/2 -translate-x-1/2 z-30 bg-sky-600 text-white font-bold px-4 py-2.5 rounded-2xl shadow-2xl flex items-center gap-3 border-2 border-sky-400 animate-pulse pointer-events-auto">
+          <MapPin className="w-5 h-5 text-white animate-bounce" />
+          <span className="text-xs sm:text-sm">Toque no mapa no local exato onde deseja fixar o alfinete</span>
+          <button
+            onClick={() => setIsPinModeActive(false)}
+            className="px-2.5 py-1 bg-slate-950 text-white rounded-lg text-xs font-bold hover:bg-slate-800 transition-colors"
+          >
+            Cancelar
+          </button>
+        </div>
       )}
 
       {/* Floating Tactical Top-Left Telemetry Bar */}
@@ -988,6 +1213,79 @@ export const MapViewer: React.FC = () => {
           <MapPin className="w-5 h-5" />
         </button>
 
+        {/* Pin Dropping Tool Trigger with Quick Selector */}
+        <div className="relative">
+          <button
+            id="btn-add-pin-tool"
+            onClick={() => setIsPinChoiceMenuOpen(!isPinChoiceMenuOpen)}
+            title="Adicionar Alfinete de Marcação no Mapa"
+            className={`w-10 h-10 rounded-lg border shadow-xl flex items-center justify-center transition-all hover:scale-105 active:scale-95 ${
+              isPinModeActive
+                ? 'bg-sky-500 text-white border-sky-400 shadow-sky-900/50 animate-bounce'
+                : 'bg-slate-900/90 hover:bg-slate-800 text-sky-400 border-slate-800'
+            }`}
+          >
+            <Pin className="w-5 h-5" />
+          </button>
+
+          {/* Pin Choice Dropdown */}
+          {isPinChoiceMenuOpen && (
+            <div className="absolute right-12 top-0 bg-slate-900/95 border border-slate-700 p-1.5 rounded-xl shadow-2xl flex flex-col gap-1 w-48 z-40 backdrop-blur-md">
+              <button
+                onClick={() => {
+                  setIsPinChoiceMenuOpen(false);
+                  setPendingWaypointCoord(null);
+                  setIsAddWaypointModalOpen(true);
+                }}
+                className="text-left px-3 py-2 rounded-lg hover:bg-slate-800 text-xs font-bold text-sky-400 flex items-center gap-2 transition-colors"
+              >
+                <Crosshair className="w-3.5 h-3.5" />
+                <span>Marcar no GPS Atual</span>
+              </button>
+              <button
+                onClick={() => {
+                  setIsPinChoiceMenuOpen(false);
+                  setIsPinModeActive(true);
+                }}
+                className="text-left px-3 py-2 rounded-lg hover:bg-slate-800 text-xs font-bold text-amber-400 flex items-center gap-2 transition-colors"
+              >
+                <MapPin className="w-3.5 h-3.5" />
+                <span>Marcar Clicando no Mapa</span>
+              </button>
+            </div>
+          )}
+        </div>
+
+        {/* Live Track Recording Toggle Trigger */}
+        <button
+          id="btn-track-record-tool"
+          onClick={() => {
+            if (isRecordingTrack) {
+              setIsSaveTrackModalOpen(true);
+            } else {
+              startTrackRecording(
+                `Trilha Campo ${new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`
+              );
+              notifySuccess(
+                'Gravação de Rota Iniciada',
+                'O traçado em tempo real está ativo. Percorra o terreno para registrar os pontos.'
+              );
+            }
+          }}
+          title={
+            isRecordingTrack
+              ? 'Trilha em Gravação Ativa - Clique para Concluir e Baixar'
+              : 'Iniciar Gravação de Trilha / Rota no Mapa'
+          }
+          className={`w-10 h-10 rounded-lg border shadow-xl flex items-center justify-center transition-all hover:scale-105 active:scale-95 ${
+            isRecordingTrack
+              ? 'bg-red-600 text-white border-red-500 shadow-red-900/50 animate-pulse'
+              : 'bg-slate-900/90 hover:bg-slate-800 text-emerald-400 border-slate-800'
+          }`}
+        >
+          <Activity className="w-5 h-5" />
+        </button>
+
         <button
           id="btn-zoom-in"
           onClick={() => mapInstanceRef.current?.zoomIn()}
@@ -1077,21 +1375,26 @@ export const MapViewer: React.FC = () => {
         </button>
       </div>
 
-      {/* Floating Bottom Quick Action Button: Mark Waypoint */}
+      {/* Floating Bottom Quick Action Button: Mark Waypoint & Track */}
       {currentRole !== 'auditor' && (
         <div className="absolute bottom-8 right-4 sm:bottom-6 sm:right-6 z-10 pointer-events-auto pb-[env(safe-area-inset-bottom)] flex items-center gap-2">
           {/* Quick Track Recording on Map */}
           {isRecordingTrack ? (
             <button
-              onClick={stopTrackRecording}
-              className="flex items-center gap-1.5 bg-red-600 hover:bg-red-500 text-white px-3.5 py-3 rounded-full font-bold shadow-2xl transition-all transform hover:-translate-y-0.5 border border-red-400/40 text-xs animate-pulse"
+              onClick={() => setIsSaveTrackModalOpen(true)}
+              className="flex items-center gap-1.5 bg-red-600 hover:bg-red-500 text-white px-4 py-3 rounded-full font-bold shadow-2xl transition-all transform hover:-translate-y-0.5 border border-red-400/40 text-xs animate-pulse"
             >
               <Square className="w-4 h-4" />
-              <span>Parar Gravação</span>
+              <span>Finalizar & Baixar Rota</span>
             </button>
           ) : (
             <button
-              onClick={() => startTrackRecording(`Trilha Campo ${new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`)}
+              onClick={() => {
+                startTrackRecording(
+                  `Trilha Campo ${new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`
+                );
+                notifySuccess('Gravação Iniciada', 'Traçado em tempo real ativado.');
+              }}
               className="flex items-center gap-1.5 bg-slate-900/95 hover:bg-slate-800 text-emerald-400 border border-slate-800 px-3.5 py-3 rounded-full font-bold shadow-2xl transition-all transform hover:-translate-y-0.5 text-xs"
               title="Iniciar Gravação de Trilha GPS no Mapa"
             >
@@ -1102,11 +1405,14 @@ export const MapViewer: React.FC = () => {
 
           <button
             id="btn-quick-drop-waypoint"
-            onClick={() => setIsAddWaypointModalOpen(true)}
+            onClick={() => {
+              setPendingWaypointCoord(null);
+              setIsAddWaypointModalOpen(true);
+            }}
             className="flex items-center gap-2 bg-sky-600 hover:bg-sky-500 active:bg-sky-700 text-white px-4 py-3 rounded-full font-bold shadow-2xl transition-all transform hover:-translate-y-0.5 border border-sky-400/40"
           >
-            <Plus className="w-5 h-5" />
-            <span className="text-sm">Marcar Ponto em Campo</span>
+            <Pin className="w-4 h-4" />
+            <span className="text-xs sm:text-sm font-bold">Marcar Alfinete</span>
           </button>
         </div>
       )}
@@ -1128,6 +1434,16 @@ export const MapViewer: React.FC = () => {
       </div>
 
       {/* Modals */}
+      <SaveTrackModal
+        isOpen={isSaveTrackModalOpen}
+        activeTrack={activeTrack}
+        onClose={() => setIsSaveTrackModalOpen(false)}
+        onSaveAndApply={(name, color) => {
+          stopTrackRecording(name, color);
+          setIsSaveTrackModalOpen(false);
+        }}
+      />
+
       <PointDetailModal
         isOpen={selectedPointForEdit !== null}
         point={selectedPointForEdit?.point || null}
