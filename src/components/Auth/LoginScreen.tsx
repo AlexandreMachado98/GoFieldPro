@@ -427,7 +427,7 @@ export const LoginScreen: React.FC = () => {
               <div className="relative flex items-center justify-center my-3">
                 <div className="border-t border-slate-800 w-full" />
                 <span className="bg-slate-900 px-2.5 text-[9px] uppercase font-bold text-slate-500 tracking-wider">
-                  ou com e-mail
+                  ou
                 </span>
                 <div className="border-t border-slate-800 w-full" />
               </div>
