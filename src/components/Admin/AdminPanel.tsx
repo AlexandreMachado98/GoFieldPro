@@ -29,7 +29,6 @@ import {
   Calendar,
   CheckCircle2,
   Clock,
-  ShieldAlert,
   UserCheck,
   UserX,
   Trash2,
@@ -39,14 +38,12 @@ import {
   Check,
   RefreshCw,
   Sparkles,
-  AlertTriangle,
   UserPlus,
   Plus,
   X,
   Briefcase,
   DollarSign,
   TrendingUp,
-  CreditCard,
   Send,
   Lock,
   Unlock,
@@ -54,10 +51,7 @@ import {
   Gift,
   Settings,
   QrCode,
-  FileText,
   AlertCircle,
-  Copy,
-  ExternalLink,
   Edit3,
 } from 'lucide-react';
 
@@ -74,7 +68,7 @@ const DEFAULT_BILLING_CONFIG: SystemBillingConfig = {
 
 export const AdminPanel: React.FC = () => {
   const { profile } = useAuth();
-  const { notifySuccess, notifyError, notifyInfo, showConfirm } = useApp();
+  const { notifySuccess, notifyError, showConfirm } = useApp();
 
   // Navigation subtabs inside Admin
   const [adminTab, setAdminTab] = useState<'users' | 'subscriptions' | 'plans' | 'billing_settings'>('users');
@@ -83,7 +77,6 @@ export const AdminPanel: React.FC = () => {
   const [users, setUsers] = useState<UserProfile[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [lastSyncTime, setLastSyncTime] = useState<string>(new Date().toLocaleTimeString('pt-BR'));
   const [filterStatus, setFilterStatus] = useState<'all' | 'pending' | 'active' | 'blocked'>('all');
   const [subscriptionFilter, setSubscriptionFilter] = useState<'all' | 'active' | 'trial' | 'overdue' | 'suspended'>('all');
   const [searchQuery, setSearchQuery] = useState('');
@@ -138,14 +131,14 @@ export const AdminPanel: React.FC = () => {
       }
 
       const rawStatus = data.subscriptionStatus || (isOwner ? 'active' : 'trial');
-      const planVal = typeof data.subscriptionValue === 'number' ? data.subscriptionValue : (isOwner ? 0 : 97);
+      const planVal = typeof data.subscriptionValue === 'number' ? data.subscriptionValue : isOwner ? 0 : 97;
 
       return {
         uid: docSnap.id || data.uid,
         email: data.email || '',
         name: data.name || data.email?.split('@')[0] || 'Usuário',
-        role: isOwner ? 'super_admin' : ((data.role as UserRole) || 'surveyor'),
-        status: isOwner ? 'active' : ((data.status as UserStatus) || 'pending'),
+        role: isOwner ? 'super_admin' : (data.role as UserRole) || 'surveyor',
+        status: isOwner ? 'active' : (data.status as UserStatus) || 'pending',
         company: data.company || '',
         companyCnpj: data.companyCnpj || '',
         phone: data.phone || '',
@@ -176,7 +169,7 @@ export const AdminPanel: React.FC = () => {
     return usersData;
   };
 
-  // Load Billing Config from Firestore
+  // Load Billing Config and Coupons from Firestore
   useEffect(() => {
     if (profile?.role !== 'super_admin') return;
 
@@ -218,7 +211,6 @@ export const AdminPanel: React.FC = () => {
       (snapshot) => {
         const usersData = parseUsersSnapshot(snapshot.docs);
         setUsers(usersData);
-        setLastSyncTime(new Date().toLocaleTimeString('pt-BR'));
         setLoading(false);
       },
       (error) => {
@@ -238,7 +230,6 @@ export const AdminPanel: React.FC = () => {
       const snapshot = await getDocs(usersRef);
       const list = parseUsersSnapshot(snapshot.docs);
       setUsers(list);
-      setLastSyncTime(new Date().toLocaleTimeString('pt-BR'));
       notifySuccess('Sincronização Concluída', `${list.length} usuário(s) sincronizados com o banco de dados.`);
     } catch (err: any) {
       console.error('Manual sync error:', err);
@@ -339,7 +330,6 @@ export const AdminPanel: React.FC = () => {
   const handleExtend7Days = async (targetUser: UserProfile) => {
     try {
       const currentExpiry = targetUser.subscriptionExpiresAt ? new Date(targetUser.subscriptionExpiresAt) : new Date();
-      // If already expired, start from today + 7, otherwise current expiry + 7
       const baseDate = currentExpiry.getTime() < Date.now() ? new Date() : currentExpiry;
       baseDate.setDate(baseDate.getDate() + 7);
       const newExpiryStr = baseDate.toISOString().split('T')[0];
@@ -527,10 +517,10 @@ export const AdminPanel: React.FC = () => {
   if (profile?.role !== 'super_admin') {
     return (
       <div className="h-full flex items-center justify-center p-4">
-        <div className="bg-slate-900 border border-slate-800 p-8 rounded-2xl max-w-md text-center">
+        <div className="bg-slate-900 border border-slate-800 p-6 sm:p-8 rounded-3xl max-w-md text-center shadow-2xl">
           <Shield className="w-12 h-12 text-red-500 mx-auto mb-4" />
           <h2 className="text-xl font-bold text-white mb-2">Acesso Negado</h2>
-          <p className="text-slate-400 text-sm">
+          <p className="text-slate-400 text-xs sm:text-sm">
             Você não possui permissões de Administrador para acessar o painel comercial e de controle.
           </p>
         </div>
@@ -538,13 +528,12 @@ export const AdminPanel: React.FC = () => {
     );
   }
 
-  // --- Financial & Metric Calculations ---
+  // Financial Calculations
   const activePayingUsers = users.filter(
     (u) => (u.subscriptionStatus === 'active' || u.status === 'active') && u.email !== 'alexandre1604981@gmail.com'
   );
   const trialUsers = users.filter((u) => u.subscriptionStatus === 'trial' || u.subscriptionPlan === 'free_trial');
 
-  // Overdue check: status is overdue OR expiry date is past today
   const overdueUsers = users.filter((u) => {
     if (u.email === 'alexandre1604981@gmail.com') return false;
     if (u.subscriptionStatus === 'overdue') return true;
@@ -557,14 +546,13 @@ export const AdminPanel: React.FC = () => {
 
   const suspendedUsers = users.filter((u) => u.subscriptionStatus === 'suspended' || u.status === 'blocked');
 
-  // MRR: Sum of monthly subscription values for active paying users
   const totalMrr = users
     .filter((u) => u.subscriptionStatus === 'active' && u.email !== 'alexandre1604981@gmail.com')
     .reduce((sum, u) => sum + (u.subscriptionValue || 0), 0);
 
   const projectedArr = totalMrr * 12;
 
-  // Filtered Users List for Users Tab
+  // Filtered Users List
   const filteredUsers = users
     .filter((u) => {
       if (filterStatus === 'pending') return u.status === 'pending';
@@ -583,7 +571,7 @@ export const AdminPanel: React.FC = () => {
       );
     });
 
-  // Filtered Users List for Subscriptions Tab
+  // Filtered Subscriptions List
   const filteredSubscriptions = users
     .filter((u) => {
       if (subscriptionFilter === 'active') return u.subscriptionStatus === 'active';
@@ -607,57 +595,57 @@ export const AdminPanel: React.FC = () => {
     });
 
   return (
-    <div className="h-full overflow-y-auto p-3 sm:p-5 space-y-5 max-w-6xl mx-auto text-slate-100 pb-32 sm:pb-20">
+    <div className="h-full overflow-y-auto overflow-x-hidden p-2.5 sm:p-5 space-y-4 sm:space-y-5 max-w-6xl mx-auto text-slate-100 pb-32 sm:pb-24 w-full">
       {/* Header Bar with Subtabs Navigation */}
-      <div className="bg-slate-900 border border-slate-800 p-4 sm:p-5 rounded-3xl shadow-2xl space-y-4">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div>
-            <div className="flex items-center gap-2">
-              <span className="text-[10px] font-black uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+      <div className="bg-slate-900 border border-slate-800 p-3.5 sm:p-5 rounded-2xl sm:rounded-3xl shadow-2xl space-y-3 sm:space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="min-w-0">
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
                 Central SuperAdmin
               </span>
-              <span className="text-xs text-slate-400">• AM TST Gestão & Cartografia</span>
+              <span className="text-[11px] text-slate-400 truncate">• AM TST Gestão</span>
             </div>
-            <h2 className="font-extrabold text-xl sm:text-2xl text-white tracking-tight mt-1 flex items-center gap-2">
-              <UserCog className="w-6 h-6 text-sky-400 shrink-0" />
-              Gestão Comercial & Controle de Acesso
+            <h2 className="font-extrabold text-lg sm:text-2xl text-white tracking-tight mt-1 flex items-center gap-2 truncate">
+              <UserCog className="w-5 h-5 sm:w-6 sm:h-6 text-sky-400 shrink-0" />
+              <span>Painel Comercial & Equipe</span>
             </h2>
           </div>
 
-          <div className="flex items-center gap-2 flex-wrap">
+          <div className="flex items-center gap-2 w-full sm:w-auto">
             <button
               onClick={() => setIsAddUserModalOpen(true)}
-              className="bg-sky-600 hover:bg-sky-500 text-white px-3.5 py-2 rounded-xl flex items-center gap-1.5 text-xs font-bold transition-all active:scale-95 shadow-lg shadow-sky-950/40"
+              className="flex-1 sm:flex-initial bg-sky-600 hover:bg-sky-500 text-white px-3 sm:px-3.5 py-2 rounded-xl flex items-center justify-center gap-1.5 text-xs font-bold transition-all active:scale-95 shadow-md"
             >
-              <UserPlus className="w-4 h-4" />
-              <span>Novo Cliente / Usuário</span>
+              <UserPlus className="w-3.5 h-3.5" />
+              <span>Novo Cliente</span>
             </button>
             <button
               onClick={manualSync}
               disabled={refreshing}
-              className="bg-slate-950 hover:bg-slate-800 border border-slate-700/80 px-3 py-2 rounded-xl flex items-center gap-1.5 text-xs font-bold text-sky-400 transition-all active:scale-95 shadow-md"
-              title="Sincronizar dados em tempo real"
+              className="bg-slate-950 hover:bg-slate-800 border border-slate-700/80 px-3 py-2 rounded-xl flex items-center justify-center gap-1.5 text-xs font-bold text-sky-400 transition-all active:scale-95 shadow-md shrink-0"
+              title="Atualizar dados"
             >
               <RefreshCw className={`w-3.5 h-3.5 ${refreshing ? 'animate-spin' : ''}`} />
-              <span>Atualizar</span>
+              <span className="hidden sm:inline">Atualizar</span>
             </button>
           </div>
         </div>
 
-        {/* Subtabs Buttons */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-2 border-t border-slate-800/80">
+        {/* Subtabs Buttons (Mobile Friendly Horizontal Scroll / Grid) */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 sm:gap-2 pt-2 border-t border-slate-800/80">
           <button
             onClick={() => setAdminTab('users')}
-            className={`p-2.5 rounded-2xl border text-xs font-bold flex items-center justify-center gap-2 transition-all ${
+            className={`p-2 sm:p-2.5 rounded-xl sm:rounded-2xl border text-[11px] sm:text-xs font-bold flex items-center justify-center gap-1.5 sm:gap-2 transition-all truncate ${
               adminTab === 'users'
                 ? 'bg-sky-600 border-sky-500 text-white shadow-lg shadow-sky-950/50'
                 : 'bg-slate-950/60 border-slate-800 text-slate-400 hover:text-white hover:bg-slate-950'
             }`}
           >
-            <Users className="w-4 h-4" />
-            <span>Usuários & Equipes</span>
+            <Users className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" />
+            <span className="truncate">Usuários & Equipe</span>
             {users.filter((u) => u.status === 'pending').length > 0 && (
-              <span className="px-1.5 py-0.5 rounded-full text-[10px] bg-amber-500 text-slate-950 font-black animate-pulse">
+              <span className="px-1.5 py-0.2 rounded-full text-[9px] bg-amber-500 text-slate-950 font-black animate-pulse">
                 {users.filter((u) => u.status === 'pending').length}
               </span>
             )}
@@ -665,16 +653,16 @@ export const AdminPanel: React.FC = () => {
 
           <button
             onClick={() => setAdminTab('subscriptions')}
-            className={`p-2.5 rounded-2xl border text-xs font-bold flex items-center justify-center gap-2 transition-all ${
+            className={`p-2 sm:p-2.5 rounded-xl sm:rounded-2xl border text-[11px] sm:text-xs font-bold flex items-center justify-center gap-1.5 sm:gap-2 transition-all truncate ${
               adminTab === 'subscriptions'
                 ? 'bg-emerald-600 border-emerald-500 text-white shadow-lg shadow-emerald-950/50'
                 : 'bg-slate-950/60 border-slate-800 text-slate-400 hover:text-white hover:bg-slate-950'
             }`}
           >
-            <DollarSign className="w-4 h-4" />
-            <span>Assinaturas & Receita</span>
+            <DollarSign className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" />
+            <span className="truncate">Assinaturas</span>
             {overdueUsers.length > 0 && (
-              <span className="px-1.5 py-0.5 rounded-full text-[10px] bg-red-500 text-white font-black animate-pulse">
+              <span className="px-1.5 py-0.2 rounded-full text-[9px] bg-red-500 text-white font-black animate-pulse">
                 {overdueUsers.length}
               </span>
             )}
@@ -682,26 +670,26 @@ export const AdminPanel: React.FC = () => {
 
           <button
             onClick={() => setAdminTab('plans')}
-            className={`p-2.5 rounded-2xl border text-xs font-bold flex items-center justify-center gap-2 transition-all ${
+            className={`p-2 sm:p-2.5 rounded-xl sm:rounded-2xl border text-[11px] sm:text-xs font-bold flex items-center justify-center gap-1.5 sm:gap-2 transition-all truncate ${
               adminTab === 'plans'
                 ? 'bg-indigo-600 border-indigo-500 text-white shadow-lg shadow-indigo-950/50'
                 : 'bg-slate-950/60 border-slate-800 text-slate-400 hover:text-white hover:bg-slate-950'
             }`}
           >
-            <Tag className="w-4 h-4" />
-            <span>Planos & Promoções</span>
+            <Tag className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" />
+            <span className="truncate">Planos & Cupons</span>
           </button>
 
           <button
             onClick={() => setAdminTab('billing_settings')}
-            className={`p-2.5 rounded-2xl border text-xs font-bold flex items-center justify-center gap-2 transition-all ${
+            className={`p-2 sm:p-2.5 rounded-xl sm:rounded-2xl border text-[11px] sm:text-xs font-bold flex items-center justify-center gap-1.5 sm:gap-2 transition-all truncate ${
               adminTab === 'billing_settings'
                 ? 'bg-amber-600 border-amber-500 text-white shadow-lg shadow-amber-950/50'
                 : 'bg-slate-950/60 border-slate-800 text-slate-400 hover:text-white hover:bg-slate-950'
             }`}
           >
-            <Settings className="w-4 h-4" />
-            <span>Dados de Cobrança (Pix)</span>
+            <Settings className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" />
+            <span className="truncate">Dados Pix</span>
           </button>
         </div>
       </div>
@@ -710,85 +698,92 @@ export const AdminPanel: React.FC = () => {
       {/* TAB 2: ASSINATURAS, RECEITA (MRR) E GESTÃO DE INADIMPLENTES               */}
       {/* ========================================================================= */}
       {adminTab === 'subscriptions' && (
-        <div className="space-y-5 animate-in fade-in duration-200">
-          {/* Financial KPI Summary Cards */}
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        <div className="space-y-4 animate-in fade-in duration-200">
+          {/* Financial KPI Summary Cards (2x2 on mobile, 4 in row on lg) */}
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3">
             {/* MRR Card */}
-            <div className="bg-slate-900 border border-emerald-500/40 rounded-2xl p-4 shadow-xl flex flex-col justify-between relative overflow-hidden">
-              <div className="absolute top-0 right-0 w-24 h-24 bg-emerald-500/10 rounded-full blur-2xl pointer-events-none" />
+            <div className="bg-slate-900 border border-emerald-500/40 rounded-2xl p-3 sm:p-4 shadow-xl flex flex-col justify-between relative overflow-hidden">
               <div className="flex items-center justify-between">
-                <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">MRR (Mensal)</span>
-                <div className="w-8 h-8 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center">
-                  <TrendingUp className="w-4 h-4" />
+                <span className="text-[10px] sm:text-[11px] font-bold text-slate-400 uppercase tracking-wider truncate">
+                  MRR (Mensal)
+                </span>
+                <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-emerald-500/20 text-emerald-400 flex items-center justify-center shrink-0">
+                  <TrendingUp className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                 </div>
               </div>
               <div className="mt-2">
-                <div className="text-xl sm:text-2xl font-black text-emerald-400 font-mono">
+                <div className="text-base sm:text-2xl font-black text-emerald-400 font-mono truncate">
                   R$ {totalMrr.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                 </div>
-                <div className="text-[10px] text-slate-400 mt-0.5">
-                  ARR Projetado: <b>R$ {projectedArr.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}/ano</b>
+                <div className="text-[9px] sm:text-[10px] text-slate-400 mt-0.5 truncate">
+                  ARR: R$ {projectedArr.toLocaleString('pt-BR', { minimumFractionDigits: 0 })}/ano
                 </div>
               </div>
             </div>
 
             {/* Ativos Card */}
-            <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 shadow-xl flex flex-col justify-between">
+            <div className="bg-slate-900 border border-slate-800 rounded-2xl p-3 sm:p-4 shadow-xl flex flex-col justify-between">
               <div className="flex items-center justify-between">
-                <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Clientes Ativos</span>
-                <div className="w-8 h-8 rounded-xl bg-sky-500/20 text-sky-400 flex items-center justify-center">
-                  <CheckCircle2 className="w-4 h-4" />
+                <span className="text-[10px] sm:text-[11px] font-bold text-slate-400 uppercase tracking-wider truncate">
+                  Adimplentes
+                </span>
+                <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-sky-500/20 text-sky-400 flex items-center justify-center shrink-0">
+                  <CheckCircle2 className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                 </div>
               </div>
               <div className="mt-2">
-                <div className="text-xl sm:text-2xl font-black text-white font-mono">{activePayingUsers.length}</div>
-                <div className="text-[10px] text-emerald-400 font-semibold mt-0.5">Assinaturas adimplentes</div>
+                <div className="text-lg sm:text-2xl font-black text-white font-mono">{activePayingUsers.length}</div>
+                <div className="text-[9px] sm:text-[10px] text-emerald-400 font-semibold mt-0.5 truncate">Contratos em dia</div>
               </div>
             </div>
 
             {/* Trial Card */}
-            <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 shadow-xl flex flex-col justify-between">
+            <div className="bg-slate-900 border border-slate-800 rounded-2xl p-3 sm:p-4 shadow-xl flex flex-col justify-between">
               <div className="flex items-center justify-between">
-                <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Em Teste Grátis</span>
-                <div className="w-8 h-8 rounded-xl bg-amber-500/20 text-amber-400 flex items-center justify-center">
-                  <Gift className="w-4 h-4" />
+                <span className="text-[10px] sm:text-[11px] font-bold text-slate-400 uppercase tracking-wider truncate">
+                  Em Teste
+                </span>
+                <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-amber-500/20 text-amber-400 flex items-center justify-center shrink-0">
+                  <Gift className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                 </div>
               </div>
               <div className="mt-2">
-                <div className="text-xl sm:text-2xl font-black text-amber-400 font-mono">{trialUsers.length}</div>
-                <div className="text-[10px] text-slate-400 mt-0.5">Potenciais conversões</div>
+                <div className="text-lg sm:text-2xl font-black text-amber-400 font-mono">{trialUsers.length}</div>
+                <div className="text-[9px] sm:text-[10px] text-slate-400 mt-0.5 truncate">Período grátis</div>
               </div>
             </div>
 
             {/* Overdue / Inadimplentes Card */}
             <div
-              className={`bg-slate-900 border rounded-2xl p-4 shadow-xl flex flex-col justify-between ${
-                overdueUsers.length > 0 ? 'border-red-500/60 bg-red-950/10' : 'border-slate-800'
+              className={`bg-slate-900 border rounded-2xl p-3 sm:p-4 shadow-xl flex flex-col justify-between ${
+                overdueUsers.length > 0 ? 'border-red-500/60 bg-red-950/20' : 'border-slate-800'
               }`}
             >
               <div className="flex items-center justify-between">
-                <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Inadimplentes</span>
-                <div className="w-8 h-8 rounded-xl bg-red-500/20 text-red-400 flex items-center justify-center">
-                  <AlertCircle className="w-4 h-4" />
+                <span className="text-[10px] sm:text-[11px] font-bold text-slate-400 uppercase tracking-wider truncate">
+                  Inadimplentes
+                </span>
+                <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-red-500/20 text-red-400 flex items-center justify-center shrink-0">
+                  <AlertCircle className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                 </div>
               </div>
               <div className="mt-2">
-                <div className="text-xl sm:text-2xl font-black text-red-400 font-mono">{overdueUsers.length}</div>
-                <div className="text-[10px] text-slate-400 mt-0.5">
-                  {overdueUsers.length > 0 ? 'Requer cobrança via WhatsApp' : 'Nenhuma fatura atrasada'}
+                <div className="text-lg sm:text-2xl font-black text-red-400 font-mono">{overdueUsers.length}</div>
+                <div className="text-[9px] sm:text-[10px] text-slate-400 mt-0.5 truncate">
+                  {overdueUsers.length > 0 ? 'Cobrança pendente' : 'Nenhum atraso'}
                 </div>
               </div>
             </div>
           </div>
 
           {/* Subscriptions Filter Bar & Search */}
-          <div className="bg-slate-900/80 border border-slate-800 p-3.5 rounded-2xl flex flex-col sm:flex-row items-center justify-between gap-3 shadow-lg">
-            <div className="flex items-center gap-1.5 overflow-x-auto w-full sm:w-auto pb-1 sm:pb-0 text-xs">
+          <div className="bg-slate-900/80 border border-slate-800 p-3 rounded-2xl flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 shadow-lg">
+            <div className="flex items-center gap-1.5 overflow-x-auto w-full pb-1 sm:pb-0 text-xs no-scrollbar">
               {(
                 [
-                  { id: 'all', label: 'Todos os Contratos', count: users.length },
-                  { id: 'active', label: 'Adimplentes (Ativos)', count: activePayingUsers.length },
-                  { id: 'trial', label: 'Em Teste (Trial)', count: trialUsers.length },
+                  { id: 'all', label: 'Todos', count: users.length },
+                  { id: 'active', label: 'Em Dia', count: activePayingUsers.length },
+                  { id: 'trial', label: 'Trial', count: trialUsers.length },
                   { id: 'overdue', label: 'Inadimplentes', count: overdueUsers.length },
                   { id: 'suspended', label: 'Suspensos', count: suspendedUsers.length },
                 ] as const
@@ -796,7 +791,7 @@ export const AdminPanel: React.FC = () => {
                 <button
                   key={f.id}
                   onClick={() => setSubscriptionFilter(f.id)}
-                  className={`px-3 py-1.5 rounded-xl font-bold whitespace-nowrap transition-all flex items-center gap-1.5 ${
+                  className={`px-2.5 py-1.5 rounded-xl font-bold whitespace-nowrap transition-all flex items-center gap-1 text-[11px] shrink-0 ${
                     subscriptionFilter === f.id
                       ? f.id === 'overdue'
                         ? 'bg-red-600 text-white'
@@ -810,20 +805,20 @@ export const AdminPanel: React.FC = () => {
               ))}
             </div>
 
-            <div className="relative w-full sm:w-64">
-              <Search className="w-4 h-4 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2" />
+            <div className="relative w-full sm:w-60 shrink-0">
+              <Search className="w-3.5 h-3.5 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2" />
               <input
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Buscar cliente, empresa..."
-                className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-9 pr-3 py-1.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500"
+                className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-8 pr-3 py-1.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500"
               />
             </div>
           </div>
 
           {/* Subscriptions Client Cards Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             {filteredSubscriptions.map((subUser) => {
               const isOverdue =
                 subUser.subscriptionStatus === 'overdue' ||
@@ -831,7 +826,6 @@ export const AdminPanel: React.FC = () => {
 
               const isOwner = subUser.email === 'alexandre1604981@gmail.com';
 
-              // Calculate days remaining or days in delay
               const expiryDate = subUser.subscriptionExpiresAt ? new Date(subUser.subscriptionExpiresAt) : null;
               const diffDays = expiryDate
                 ? Math.round((expiryDate.getTime() - Date.now()) / (1000 * 60 * 60 * 24))
@@ -840,7 +834,7 @@ export const AdminPanel: React.FC = () => {
               return (
                 <div
                   key={subUser.uid}
-                  className={`bg-slate-900/90 border rounded-2xl p-4 shadow-xl flex flex-col justify-between gap-3 transition-all ${
+                  className={`bg-slate-900/90 border rounded-2xl p-3.5 sm:p-4 shadow-xl flex flex-col justify-between gap-3 transition-all ${
                     isOverdue && !isOwner
                       ? 'border-red-500/60 bg-gradient-to-br from-red-950/20 to-slate-900'
                       : subUser.subscriptionStatus === 'suspended'
@@ -850,49 +844,51 @@ export const AdminPanel: React.FC = () => {
                 >
                   {/* Card Header: Client name, company, and status */}
                   <div className="flex items-start justify-between gap-2">
-                    <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-2.5 min-w-0">
                       <img
                         src={subUser.avatar}
                         alt={subUser.name}
-                        className="w-10 h-10 rounded-2xl object-cover border border-slate-700 bg-slate-950 shrink-0"
+                        className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl object-cover border border-slate-700 bg-slate-950 shrink-0"
                       />
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <h4 className="font-extrabold text-white text-sm leading-tight">{subUser.name}</h4>
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <h4 className="font-extrabold text-white text-xs sm:text-sm leading-tight truncate">
+                            {subUser.name}
+                          </h4>
                           {isOwner && (
-                            <span className="text-[9px] uppercase font-black px-1.5 py-0.5 rounded bg-sky-500/20 text-sky-400 border border-sky-500/30">
-                              Proprietário
+                            <span className="text-[8px] uppercase font-black px-1.5 py-0.2 rounded bg-sky-500/20 text-sky-400 border border-sky-500/30">
+                              Admin
                             </span>
                           )}
                         </div>
-                        <div className="text-[11px] text-slate-400 flex items-center gap-1.5 mt-0.5">
-                          <Building2 className="w-3 h-3 text-slate-500" />
-                          <span>{subUser.company || 'Empresa não informada'}</span>
+                        <div className="text-[10px] sm:text-[11px] text-slate-400 flex items-center gap-1 mt-0.5 truncate">
+                          <Building2 className="w-3 h-3 text-slate-500 shrink-0" />
+                          <span className="truncate">{subUser.company || 'Empresa não informada'}</span>
                         </div>
                       </div>
                     </div>
 
                     {/* Status Badge */}
-                    <div>
+                    <div className="shrink-0">
                       {isOwner ? (
-                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">
+                        <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">
                           Vitalício
                         </span>
                       ) : isOverdue ? (
-                        <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-red-500/20 text-red-400 border border-red-500/40 animate-pulse flex items-center gap-1">
-                          <AlertCircle className="w-3 h-3" />
+                        <span className="text-[9px] font-black px-2 py-0.5 rounded-full bg-red-500/20 text-red-400 border border-red-500/40 animate-pulse flex items-center gap-1">
+                          <AlertCircle className="w-2.5 h-2.5" />
                           Vencido ({Math.abs(diffDays)}d)
                         </span>
                       ) : subUser.subscriptionStatus === 'trial' ? (
-                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/40">
+                        <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/40">
                           Trial ({diffDays}d)
                         </span>
                       ) : subUser.subscriptionStatus === 'suspended' ? (
-                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-800 text-slate-400 border border-slate-700">
+                        <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-slate-800 text-slate-400 border border-slate-700">
                           Suspenso
                         </span>
                       ) : (
-                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/40">
+                        <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/40">
                           Em Dia ({diffDays}d)
                         </span>
                       )}
@@ -900,28 +896,28 @@ export const AdminPanel: React.FC = () => {
                   </div>
 
                   {/* Plan Details & Financial Information */}
-                  <div className="grid grid-cols-2 gap-2 bg-slate-950 p-2.5 rounded-xl border border-slate-800/80 text-xs">
-                    <div>
-                      <span className="text-[10px] text-slate-500 font-semibold uppercase block">Plano Contratado</span>
-                      <span className="font-bold text-white capitalize">
+                  <div className="grid grid-cols-2 gap-2 bg-slate-950 p-2.5 rounded-xl border border-slate-800/80 text-[11px]">
+                    <div className="min-w-0">
+                      <span className="text-[9px] text-slate-500 font-semibold uppercase block truncate">Plano</span>
+                      <span className="font-bold text-white capitalize truncate block">
                         {subUser.subscriptionPlan === 'free_trial'
-                          ? 'Teste Grátis (14d)'
+                          ? 'Teste Grátis'
                           : subUser.subscriptionPlan === 'equipe_mensal'
-                          ? 'Plano Equipe'
+                          ? 'Equipe'
                           : subUser.subscriptionPlan === 'florestal_corporativo'
-                          ? 'Florestal Corporativo'
-                          : 'Profissional Mensal'}
+                          ? 'Florestal'
+                          : 'Profissional'}
                       </span>
                     </div>
 
-                    <div className="text-right">
-                      <span className="text-[10px] text-slate-500 font-semibold uppercase block">Valor Mensalidade</span>
-                      <span className="font-extrabold text-emerald-400 font-mono text-sm">
+                    <div className="text-right min-w-0">
+                      <span className="text-[9px] text-slate-500 font-semibold uppercase block truncate">Valor</span>
+                      <span className="font-extrabold text-emerald-400 font-mono text-xs sm:text-sm">
                         R$ {(subUser.subscriptionValue || 0).toFixed(2)}
                       </span>
                     </div>
 
-                    <div className="col-span-2 pt-1.5 border-t border-slate-900 flex items-center justify-between text-[11px]">
+                    <div className="col-span-2 pt-1 border-t border-slate-900 flex items-center justify-between text-[10px]">
                       <span className="text-slate-400 flex items-center gap-1">
                         <Calendar className="w-3 h-3 text-slate-500" />
                         Vencimento:
@@ -934,70 +930,81 @@ export const AdminPanel: React.FC = () => {
                     </div>
                   </div>
 
-                  {/* Quick Action Buttons (1-Click) */}
-                  <div className="flex items-center gap-1.5 pt-1 flex-wrap">
+                  {/* Quick Action Buttons (Fully Responsive on Mobile) */}
+                  <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-1.5 pt-1 w-full">
                     {/* WhatsApp Billing Button */}
                     <button
                       type="button"
                       onClick={() => handleSendWhatsAppBilling(subUser)}
-                      title="Enviar cobrança personalizada no WhatsApp com Chave Pix"
-                      className="flex-1 bg-emerald-600/20 hover:bg-emerald-600/30 border border-emerald-500/50 text-emerald-300 font-bold text-xs py-2 px-2.5 rounded-xl flex items-center justify-center gap-1.5 active:scale-95 transition-all"
+                      className="w-full sm:flex-1 bg-emerald-600/20 hover:bg-emerald-600/30 border border-emerald-500/50 text-emerald-300 font-bold text-xs py-2 px-2.5 rounded-xl flex items-center justify-center gap-1.5 active:scale-95 transition-all"
                     >
                       <Send className="w-3.5 h-3.5" />
                       <span>Cobrar no WhatsApp</span>
                     </button>
 
-                    {/* +7 Days Extension */}
-                    <button
-                      type="button"
-                      onClick={() => handleExtend7Days(subUser)}
-                      title="Prorrogar assinatura por +7 dias de cortesia"
-                      className="bg-amber-600/20 hover:bg-amber-600/30 border border-amber-500/50 text-amber-300 font-bold text-xs py-2 px-2.5 rounded-xl flex items-center justify-center gap-1 active:scale-95 transition-all"
-                    >
-                      <Clock className="w-3.5 h-3.5" />
-                      <span>+7 Dias</span>
-                    </button>
-
-                    {/* Suspend / Resume Button */}
-                    {!isOwner && (
+                    {/* Secondary Actions Row on Mobile */}
+                    <div className="grid grid-cols-3 sm:flex sm:w-auto gap-1.5 w-full sm:w-auto">
+                      {/* +7 Days Extension */}
                       <button
                         type="button"
-                        onClick={() => handleToggleSuspension(subUser)}
-                        title={
-                          subUser.subscriptionStatus === 'suspended'
-                            ? 'Reativar acesso do cliente'
-                            : 'Suspender acesso por inadimplência'
-                        }
-                        className={`p-2 rounded-xl border text-xs font-bold transition-all active:scale-95 ${
-                          subUser.subscriptionStatus === 'suspended'
-                            ? 'bg-emerald-950 border-emerald-800 text-emerald-400 hover:bg-emerald-900'
-                            : 'bg-rose-950/40 border-rose-900 text-rose-300 hover:bg-rose-900'
-                        }`}
+                        onClick={() => handleExtend7Days(subUser)}
+                        title="Prorrogar por +7 dias"
+                        className="bg-amber-600/20 hover:bg-amber-600/30 border border-amber-500/50 text-amber-300 font-bold text-xs py-2 px-2 rounded-xl flex items-center justify-center gap-1 active:scale-95 transition-all"
                       >
-                        {subUser.subscriptionStatus === 'suspended' ? (
-                          <Unlock className="w-3.5 h-3.5" />
-                        ) : (
-                          <Lock className="w-3.5 h-3.5" />
-                        )}
+                        <Clock className="w-3.5 h-3.5" />
+                        <span>+7d</span>
                       </button>
-                    )}
 
-                    {/* Edit Full Subscription Modal */}
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setEditingUserSubscription(subUser);
-                        setSubModalPlan(subUser.subscriptionPlan || 'pro_mensal');
-                        setSubModalStatus(subUser.subscriptionStatus || 'active');
-                        setSubModalValue(subUser.subscriptionValue || 97);
-                        setSubModalExpiresAt(subUser.subscriptionExpiresAt || '');
-                        setSubModalNotes(subUser.billingNotes || '');
-                      }}
-                      title="Editar plano, valor e vencimento"
-                      className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 active:scale-95 transition-all"
-                    >
-                      <Edit3 className="w-3.5 h-3.5" />
-                    </button>
+                      {/* Suspend / Resume Button */}
+                      {!isOwner ? (
+                        <button
+                          type="button"
+                          onClick={() => handleToggleSuspension(subUser)}
+                          title={
+                            subUser.subscriptionStatus === 'suspended'
+                              ? 'Reativar acesso'
+                              : 'Suspender acesso'
+                          }
+                          className={`py-2 px-2 rounded-xl border text-xs font-bold transition-all active:scale-95 flex items-center justify-center gap-1 ${
+                            subUser.subscriptionStatus === 'suspended'
+                              ? 'bg-emerald-950 border-emerald-800 text-emerald-400'
+                              : 'bg-rose-950/40 border-rose-900 text-rose-300'
+                          }`}
+                        >
+                          {subUser.subscriptionStatus === 'suspended' ? (
+                            <>
+                              <Unlock className="w-3.5 h-3.5" />
+                              <span>Liberar</span>
+                            </>
+                          ) : (
+                            <>
+                              <Lock className="w-3.5 h-3.5" />
+                              <span>Bloq</span>
+                            </>
+                          )}
+                        </button>
+                      ) : (
+                        <div />
+                      )}
+
+                      {/* Edit Full Subscription Modal */}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setEditingUserSubscription(subUser);
+                          setSubModalPlan(subUser.subscriptionPlan || 'pro_mensal');
+                          setSubModalStatus(subUser.subscriptionStatus || 'active');
+                          setSubModalValue(subUser.subscriptionValue || 97);
+                          setSubModalExpiresAt(subUser.subscriptionExpiresAt || '');
+                          setSubModalNotes(subUser.billingNotes || '');
+                        }}
+                        title="Editar plano e valores"
+                        className="py-2 px-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 active:scale-95 transition-all flex items-center justify-center gap-1"
+                      >
+                        <Edit3 className="w-3.5 h-3.5" />
+                        <span>Editar</span>
+                      </button>
+                    </div>
                   </div>
                 </div>
               );
@@ -1010,22 +1017,22 @@ export const AdminPanel: React.FC = () => {
       {/* TAB 1: GESTÃO DE USUÁRIOS & PERMISSÕES (USUÁRIOS & EQUIPE)                 */}
       {/* ========================================================================= */}
       {adminTab === 'users' && (
-        <div className="space-y-4 animate-in fade-in duration-200">
+        <div className="space-y-3.5 animate-in fade-in duration-200">
           {/* Filter Bar */}
-          <div className="bg-slate-900/80 border border-slate-800 p-3.5 rounded-2xl flex flex-col sm:flex-row items-center justify-between gap-3 shadow-lg">
-            <div className="flex items-center gap-1.5 overflow-x-auto w-full sm:w-auto pb-1 sm:pb-0 text-xs">
+          <div className="bg-slate-900/80 border border-slate-800 p-3 rounded-2xl flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 shadow-lg">
+            <div className="flex items-center gap-1.5 overflow-x-auto w-full pb-1 sm:pb-0 text-xs no-scrollbar">
               {(
                 [
-                  { id: 'all', label: 'Todos os Usuários', count: users.length },
-                  { id: 'pending', label: 'Pendentes de Aprovação', count: users.filter((u) => u.status === 'pending').length },
-                  { id: 'active', label: 'Ativos / Liberados', count: users.filter((u) => u.status === 'active').length },
+                  { id: 'all', label: 'Todos', count: users.length },
+                  { id: 'pending', label: 'Pendentes', count: users.filter((u) => u.status === 'pending').length },
+                  { id: 'active', label: 'Liberados', count: users.filter((u) => u.status === 'active').length },
                   { id: 'blocked', label: 'Bloqueados', count: users.filter((u) => u.status === 'blocked').length },
                 ] as const
               ).map((f) => (
                 <button
                   key={f.id}
                   onClick={() => setFilterStatus(f.id)}
-                  className={`px-3 py-1.5 rounded-xl font-bold whitespace-nowrap transition-all flex items-center gap-1.5 ${
+                  className={`px-2.5 py-1.5 rounded-xl font-bold whitespace-nowrap transition-all flex items-center gap-1 text-[11px] shrink-0 ${
                     filterStatus === f.id
                       ? f.id === 'pending'
                         ? 'bg-amber-500 text-slate-950'
@@ -1039,27 +1046,27 @@ export const AdminPanel: React.FC = () => {
               ))}
             </div>
 
-            <div className="relative w-full sm:w-64">
-              <Search className="w-4 h-4 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2" />
+            <div className="relative w-full sm:w-60 shrink-0">
+              <Search className="w-3.5 h-3.5 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2" />
               <input
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Buscar por nome, e-mail..."
-                className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-9 pr-3 py-1.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-sky-500"
+                placeholder="Buscar usuário, e-mail..."
+                className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-8 pr-3 py-1.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-sky-500"
               />
             </div>
           </div>
 
-          {/* Users List Table / Cards */}
-          <div className="space-y-3">
+          {/* Users List Cards */}
+          <div className="space-y-2.5">
             {filteredUsers.map((u) => {
               const isOwner = u.email === 'alexandre1604981@gmail.com';
 
               return (
                 <div
                   key={u.uid}
-                  className={`bg-slate-900 border rounded-2xl p-4 shadow-xl flex flex-col sm:flex-row sm:items-center justify-between gap-4 transition-all ${
+                  className={`bg-slate-900 border rounded-2xl p-3 sm:p-4 shadow-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 transition-all ${
                     u.status === 'pending'
                       ? 'border-amber-500/80 bg-gradient-to-r from-amber-950/30 via-slate-900 to-slate-900 ring-1 ring-amber-500/50'
                       : u.status === 'blocked'
@@ -1067,22 +1074,24 @@ export const AdminPanel: React.FC = () => {
                       : 'border-slate-800 hover:border-slate-700'
                   }`}
                 >
-                  <div className="flex items-center gap-3.5">
+                  <div className="flex items-center gap-3 min-w-0">
                     <img
                       src={u.avatar}
                       alt={u.name}
-                      className="w-12 h-12 rounded-2xl object-cover border border-slate-700 bg-slate-950 shrink-0"
+                      className="w-10 h-10 sm:w-11 sm:h-11 rounded-xl object-cover border border-slate-700 bg-slate-950 shrink-0"
                     />
-                    <div>
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <h4 className="font-extrabold text-white text-sm sm:text-base">{u.name}</h4>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <h4 className="font-extrabold text-white text-xs sm:text-sm truncate max-w-[180px] sm:max-w-none">
+                          {u.name}
+                        </h4>
                         {isOwner && (
-                          <span className="text-[10px] uppercase font-black px-2 py-0.5 rounded-full bg-sky-500/20 text-sky-400 border border-sky-500/40">
+                          <span className="text-[9px] uppercase font-black px-1.5 py-0.2 rounded-full bg-sky-500/20 text-sky-400 border border-sky-500/40">
                             SuperAdmin
                           </span>
                         )}
                         <span
-                          className={`text-[10px] uppercase font-black px-2 py-0.5 rounded-full border ${
+                          className={`text-[9px] uppercase font-black px-1.5 py-0.2 rounded-full border ${
                             u.status === 'active'
                               ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30'
                               : u.status === 'pending'
@@ -1090,25 +1099,25 @@ export const AdminPanel: React.FC = () => {
                               : 'bg-red-500/20 text-red-400 border-red-500/30'
                           }`}
                         >
-                          {u.status === 'active' ? 'Ativo' : u.status === 'pending' ? 'Pendente de Aprovação' : 'Bloqueado'}
+                          {u.status === 'active' ? 'Ativo' : u.status === 'pending' ? 'Pendente' : 'Bloqueado'}
                         </span>
                       </div>
 
-                      <div className="text-xs text-slate-400 flex flex-wrap items-center gap-x-3 gap-y-1 mt-1">
-                        <span className="flex items-center gap-1 font-mono text-[11px] text-slate-300">
-                          <Mail className="w-3 h-3 text-slate-500" />
-                          {u.email}
+                      <div className="text-[11px] text-slate-400 flex flex-wrap items-center gap-x-2.5 gap-y-0.5 mt-0.5">
+                        <span className="flex items-center gap-1 font-mono text-[10px] text-slate-300 truncate max-w-[170px] sm:max-w-none">
+                          <Mail className="w-3 h-3 text-slate-500 shrink-0" />
+                          <span className="truncate">{u.email}</span>
                         </span>
                         {u.phone && (
-                          <span className="flex items-center gap-1 text-[11px] text-slate-300">
-                            <Phone className="w-3 h-3 text-slate-500" />
-                            {u.phone}
+                          <span className="flex items-center gap-1 text-[10px] text-slate-300 truncate">
+                            <Phone className="w-3 h-3 text-slate-500 shrink-0" />
+                            <span>{u.phone}</span>
                           </span>
                         )}
                         {u.company && (
-                          <span className="flex items-center gap-1 text-[11px] text-slate-300">
-                            <Building2 className="w-3 h-3 text-slate-500" />
-                            {u.company}
+                          <span className="flex items-center gap-1 text-[10px] text-slate-300 truncate">
+                            <Building2 className="w-3 h-3 text-slate-500 shrink-0" />
+                            <span className="truncate">{u.company}</span>
                           </span>
                         )}
                       </div>
@@ -1116,13 +1125,13 @@ export const AdminPanel: React.FC = () => {
                   </div>
 
                   {/* Actions for User */}
-                  <div className="flex items-center gap-2 shrink-0 flex-wrap">
+                  <div className="flex items-center justify-end gap-1.5 shrink-0 border-t sm:border-t-0 border-slate-800/80 pt-2 sm:pt-0">
                     {u.status === 'pending' ? (
                       <button
                         onClick={() => handleApproveUser(u)}
-                        className="bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2 rounded-xl text-xs font-black shadow-lg shadow-emerald-950/50 flex items-center gap-1.5 active:scale-95 transition-all"
+                        className="w-full sm:w-auto bg-emerald-600 hover:bg-emerald-500 text-white px-3.5 py-1.5 rounded-xl text-xs font-black shadow-md flex items-center justify-center gap-1.5 active:scale-95 transition-all"
                       >
-                        <CheckCircle2 className="w-4 h-4" />
+                        <CheckCircle2 className="w-3.5 h-3.5" />
                         <span>Aprovar Acesso</span>
                       </button>
                     ) : (
@@ -1137,7 +1146,7 @@ export const AdminPanel: React.FC = () => {
                             }`}
                             title={u.status === 'blocked' ? 'Desbloquear' : 'Bloquear'}
                           >
-                            {u.status === 'blocked' ? <UserCheck className="w-4 h-4" /> : <UserX className="w-4 h-4" />}
+                            {u.status === 'blocked' ? <UserCheck className="w-3.5 h-3.5" /> : <UserX className="w-3.5 h-3.5" />}
                           </button>
                         )}
                       </>
@@ -1149,7 +1158,7 @@ export const AdminPanel: React.FC = () => {
                         className="p-2 rounded-xl bg-slate-950 hover:bg-rose-950/60 border border-slate-800 hover:border-rose-800 text-slate-500 hover:text-rose-400 transition-colors"
                         title="Excluir cadastro"
                       >
-                        <Trash2 className="w-4 h-4" />
+                        <Trash2 className="w-3.5 h-3.5" />
                       </button>
                     )}
                   </div>
@@ -1164,70 +1173,70 @@ export const AdminPanel: React.FC = () => {
       {/* TAB 3: PLANOS & CUPONS PROMOCIONAIS                                       */}
       {/* ========================================================================= */}
       {adminTab === 'plans' && (
-        <div className="space-y-6 animate-in fade-in duration-200">
+        <div className="space-y-4 animate-in fade-in duration-200">
           {/* Official Plans Table */}
-          <div className="space-y-3">
-            <h3 className="text-sm font-extrabold text-white uppercase tracking-wider flex items-center gap-2">
+          <div className="space-y-2.5">
+            <h3 className="text-xs sm:text-sm font-extrabold text-white uppercase tracking-wider flex items-center gap-2">
               <Tag className="w-4 h-4 text-indigo-400" />
-              Tabela de Planos e Preços Oficiais do GoField Pro
+              Tabela de Planos do GoField Pro
             </h3>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
               {/* Plan 1 */}
-              <div className="bg-slate-900 border border-slate-800 rounded-3xl p-5 shadow-xl flex flex-col justify-between space-y-4">
+              <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 shadow-xl flex flex-col justify-between space-y-3">
                 <div>
-                  <span className="text-[10px] uppercase font-black px-2.5 py-0.5 rounded-full bg-sky-500/20 text-sky-300 border border-sky-500/30">
+                  <span className="text-[9px] uppercase font-black px-2 py-0.5 rounded-full bg-sky-500/20 text-sky-300 border border-sky-500/30">
                     Individual
                   </span>
-                  <h4 className="text-lg font-black text-white mt-2">Plano Profissional</h4>
-                  <div className="mt-2">
-                    <span className="text-2xl font-black text-sky-400 font-mono">R$ 97,00</span>
-                    <span className="text-xs text-slate-400"> / mês</span>
+                  <h4 className="text-base font-black text-white mt-1.5">Profissional</h4>
+                  <div className="mt-1">
+                    <span className="text-xl font-black text-sky-400 font-mono">R$ 97,00</span>
+                    <span className="text-[11px] text-slate-400"> / mês</span>
                   </div>
-                  <ul className="mt-4 space-y-2 text-xs text-slate-300">
-                    <li className="flex items-center gap-2">✓ 1 Operador de Campo</li>
-                    <li className="flex items-center gap-2">✓ Mapas PDF e GPS Ilimitados</li>
-                    <li className="flex items-center gap-2">✓ Medição de Pilha de Madeira (m³)</li>
-                    <li className="flex items-center gap-2">✓ Relatórios Técnicos em PDF</li>
+                  <ul className="mt-3 space-y-1.5 text-xs text-slate-300">
+                    <li className="flex items-center gap-1.5">✓ 1 Operador de Campo</li>
+                    <li className="flex items-center gap-1.5">✓ Mapas PDF e GPS Ilimitados</li>
+                    <li className="flex items-center gap-1.5">✓ Medição de Pilha de Madeira</li>
+                    <li className="flex items-center gap-1.5">✓ Laudos Técnicos em PDF</li>
                   </ul>
                 </div>
               </div>
 
               {/* Plan 2 */}
-              <div className="bg-slate-900 border border-emerald-500/50 rounded-3xl p-5 shadow-2xl flex flex-col justify-between space-y-4 ring-1 ring-emerald-500/30">
+              <div className="bg-slate-900 border border-emerald-500/50 rounded-2xl p-4 shadow-2xl flex flex-col justify-between space-y-3 ring-1 ring-emerald-500/30">
                 <div>
-                  <span className="text-[10px] uppercase font-black px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                  <span className="text-[9px] uppercase font-black px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
                     Mais Popular
                   </span>
-                  <h4 className="text-lg font-black text-white mt-2">Plano Equipe</h4>
-                  <div className="mt-2">
-                    <span className="text-2xl font-black text-emerald-400 font-mono">R$ 289,00</span>
-                    <span className="text-xs text-slate-400"> / mês</span>
+                  <h4 className="text-base font-black text-white mt-1.5">Plano Equipe</h4>
+                  <div className="mt-1">
+                    <span className="text-xl font-black text-emerald-400 font-mono">R$ 289,00</span>
+                    <span className="text-[11px] text-slate-400"> / mês</span>
                   </div>
-                  <ul className="mt-4 space-y-2 text-xs text-slate-300">
-                    <li className="flex items-center gap-2">✓ Até 5 Técnicos de Campo</li>
-                    <li className="flex items-center gap-2">✓ Painel de Gestão da Frota (Odômetro)</li>
-                    <li className="flex items-center gap-2">✓ Cubagem e Laudos em Lote</li>
-                    <li className="flex items-center gap-2">✓ Backup Seguro na Nuvem</li>
+                  <ul className="mt-3 space-y-1.5 text-xs text-slate-300">
+                    <li className="flex items-center gap-1.5">✓ Até 5 Técnicos de Campo</li>
+                    <li className="flex items-center gap-1.5">✓ Painel de Gestão da Frota</li>
+                    <li className="flex items-center gap-1.5">✓ Cubagem e Laudos em Lote</li>
+                    <li className="flex items-center gap-1.5">✓ Backup Seguro na Nuvem</li>
                   </ul>
                 </div>
               </div>
 
               {/* Plan 3 */}
-              <div className="bg-slate-900 border border-indigo-500/40 rounded-3xl p-5 shadow-xl flex flex-col justify-between space-y-4">
+              <div className="bg-slate-900 border border-indigo-500/40 rounded-2xl p-4 shadow-xl flex flex-col justify-between space-y-3">
                 <div>
-                  <span className="text-[10px] uppercase font-black px-2.5 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
+                  <span className="text-[9px] uppercase font-black px-2 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
                     Corporativo
                   </span>
-                  <h4 className="text-lg font-black text-white mt-2">Florestal & Usinas</h4>
-                  <div className="mt-2">
-                    <span className="text-2xl font-black text-indigo-400 font-mono">R$ 690,00</span>
-                    <span className="text-xs text-slate-400"> / mês</span>
+                  <h4 className="text-base font-black text-white mt-1.5">Florestal & Usinas</h4>
+                  <div className="mt-1">
+                    <span className="text-xl font-black text-indigo-400 font-mono">R$ 690,00</span>
+                    <span className="text-[11px] text-slate-400"> / mês</span>
                   </div>
-                  <ul className="mt-4 space-y-2 text-xs text-slate-300">
-                    <li className="flex items-center gap-2">✓ 15 a 30 Operadores simultâneos</li>
-                    <li className="flex items-center gap-2">✓ Logotipo da empresa cliente no PDF</li>
-                    <li className="flex items-center gap-2">✓ Treinamento e Suporte VIP</li>
+                  <ul className="mt-3 space-y-1.5 text-xs text-slate-300">
+                    <li className="flex items-center gap-1.5">✓ 15 a 30 Operadores</li>
+                    <li className="flex items-center gap-1.5">✓ Logotipo da empresa no PDF</li>
+                    <li className="flex items-center gap-1.5">✓ Treinamento e Suporte VIP</li>
                   </ul>
                 </div>
               </div>
@@ -1235,52 +1244,52 @@ export const AdminPanel: React.FC = () => {
           </div>
 
           {/* Promo Coupons Management */}
-          <div className="bg-slate-900 border border-slate-800 rounded-3xl p-5 shadow-xl space-y-4">
-            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl sm:rounded-3xl p-4 sm:p-5 shadow-xl space-y-3.5">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 border-b border-slate-800 pb-3">
               <div>
-                <h4 className="font-bold text-white text-sm flex items-center gap-2">
+                <h4 className="font-bold text-white text-xs sm:text-sm flex items-center gap-1.5">
                   <Gift className="w-4 h-4 text-amber-400" />
                   Cupons Promocionais & Descontos Regionais
                 </h4>
-                <p className="text-[11px] text-slate-400 mt-0.5">
-                  Crie cupons de lançamento para oferecer descontos às primeiras empresas contratantes.
+                <p className="text-[10px] sm:text-[11px] text-slate-400 mt-0.5">
+                  Crie cupons para atrair as primeiras empresas clientes.
                 </p>
               </div>
 
               <button
                 type="button"
                 onClick={() => setIsCouponModalOpen(true)}
-                className="bg-amber-600 hover:bg-amber-500 text-slate-950 font-black px-3.5 py-1.5 rounded-xl text-xs flex items-center gap-1.5 shadow-md active:scale-95 transition-all"
+                className="bg-amber-600 hover:bg-amber-500 text-slate-950 font-black px-3 py-1.5 rounded-xl text-xs flex items-center justify-center gap-1.5 shadow-md active:scale-95 transition-all"
               >
-                <Plus className="w-4 h-4" />
-                <span>Criar Novo Cupom</span>
+                <Plus className="w-3.5 h-3.5" />
+                <span>Novo Cupom</span>
               </button>
             </div>
 
             {coupons.length === 0 ? (
-              <div className="p-6 text-center text-slate-500 text-xs border border-dashed border-slate-800 rounded-2xl">
-                Nenhum cupom promocional ativo no momento. Clique no botão acima para criar o primeiro!
+              <div className="p-5 text-center text-slate-500 text-xs border border-dashed border-slate-800 rounded-2xl">
+                Nenhum cupom ativo. Clique acima para criar um cupom de lançamento.
               </div>
             ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2.5">
                 {coupons.map((coupon) => (
                   <div
                     key={coupon.id}
-                    className="bg-slate-950 border border-slate-800 rounded-2xl p-3.5 flex items-center justify-between"
+                    className="bg-slate-950 border border-slate-800 rounded-xl p-3 flex items-center justify-between"
                   >
                     <div>
-                      <span className="font-mono font-black text-amber-400 text-sm tracking-wider">{coupon.code}</span>
-                      <div className="text-[11px] text-slate-300 font-semibold mt-0.5">
+                      <span className="font-mono font-black text-amber-400 text-xs tracking-wider">{coupon.code}</span>
+                      <div className="text-[10px] text-slate-300 font-semibold mt-0.5">
                         {coupon.discountPercent}% de Desconto
                       </div>
-                      <div className="text-[10px] text-slate-500">Válido até {coupon.validUntil}</div>
+                      <div className="text-[9px] text-slate-500">Validade: {coupon.validUntil}</div>
                     </div>
                     <button
                       onClick={() => handleDeleteCoupon(coupon.id)}
-                      className="p-2 rounded-xl text-slate-500 hover:text-red-400 hover:bg-slate-900 transition-colors"
+                      className="p-1.5 rounded-lg text-slate-500 hover:text-red-400 hover:bg-slate-900 transition-colors"
                       title="Excluir cupom"
                     >
-                      <Trash2 className="w-4 h-4" />
+                      <Trash2 className="w-3.5 h-3.5" />
                     </button>
                   </div>
                 ))}
@@ -1294,27 +1303,27 @@ export const AdminPanel: React.FC = () => {
       {/* TAB 4: CONFIGURAÇÕES DE COBRANÇA (PIX & WHATSAPP)                         */}
       {/* ========================================================================= */}
       {adminTab === 'billing_settings' && (
-        <div className="bg-slate-900 border border-slate-800 rounded-3xl p-5 sm:p-7 shadow-2xl space-y-5 animate-in fade-in duration-200">
+        <div className="bg-slate-900 border border-slate-800 rounded-2xl sm:rounded-3xl p-4 sm:p-6 shadow-2xl space-y-4 animate-in fade-in duration-200">
           <div className="border-b border-slate-800 pb-3">
-            <h3 className="text-base font-extrabold text-white flex items-center gap-2">
-              <QrCode className="w-5 h-5 text-amber-400" />
+            <h3 className="text-sm sm:text-base font-extrabold text-white flex items-center gap-2">
+              <QrCode className="w-4 h-4 sm:w-5 sm:h-5 text-amber-400" />
               Configuração de Recebimento Pix & Cobrança Automática
             </h3>
-            <p className="text-xs text-slate-400 mt-1">
+            <p className="text-[11px] sm:text-xs text-slate-400 mt-1">
               Cadastre sua Chave Pix e o modelo de mensagem para que o botão "Cobrar no WhatsApp" funcione com 1 clique.
             </p>
           </div>
 
-          <form onSubmit={handleSaveBillingConfig} className="space-y-4">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <form onSubmit={handleSaveBillingConfig} className="space-y-3.5">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
-                <label className="block text-[11px] font-bold text-slate-300 uppercase mb-1">
+                <label className="block text-[10px] sm:text-[11px] font-bold text-slate-300 uppercase mb-1">
                   Tipo da Chave Pix
                 </label>
                 <select
                   value={billingConfig.pixKeyType}
                   onChange={(e) => setBillingConfig((p) => ({ ...p, pixKeyType: e.target.value as any }))}
-                  className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2.5 text-xs text-white focus:outline-none focus:border-amber-500"
+                  className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-amber-500"
                 >
                   <option value="cnpj">CNPJ</option>
                   <option value="email">E-mail</option>
@@ -1324,7 +1333,7 @@ export const AdminPanel: React.FC = () => {
               </div>
 
               <div>
-                <label className="block text-[11px] font-bold text-slate-300 uppercase mb-1">
+                <label className="block text-[10px] sm:text-[11px] font-bold text-slate-300 uppercase mb-1">
                   Sua Chave Pix *
                 </label>
                 <input
@@ -1333,12 +1342,12 @@ export const AdminPanel: React.FC = () => {
                   value={billingConfig.pixKey}
                   onChange={(e) => setBillingConfig((p) => ({ ...p, pixKey: e.target.value }))}
                   placeholder="Ex: 48.123.456/0001-90"
-                  className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2.5 text-xs text-white font-mono focus:outline-none focus:border-amber-500"
+                  className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white font-mono focus:outline-none focus:border-amber-500"
                 />
               </div>
 
               <div>
-                <label className="block text-[11px] font-bold text-slate-300 uppercase mb-1">
+                <label className="block text-[10px] sm:text-[11px] font-bold text-slate-300 uppercase mb-1">
                   Nome do Titular / Razão Social *
                 </label>
                 <input
@@ -1347,12 +1356,12 @@ export const AdminPanel: React.FC = () => {
                   value={billingConfig.beneficiaryName}
                   onChange={(e) => setBillingConfig((p) => ({ ...p, beneficiaryName: e.target.value }))}
                   placeholder="Ex: AM TST SAÚDE E SEGURANÇA"
-                  className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2.5 text-xs text-white focus:outline-none focus:border-amber-500"
+                  className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-amber-500"
                 />
               </div>
 
               <div>
-                <label className="block text-[11px] font-bold text-slate-300 uppercase mb-1">
+                <label className="block text-[10px] sm:text-[11px] font-bold text-slate-300 uppercase mb-1">
                   Banco de Recebimento
                 </label>
                 <input
@@ -1360,23 +1369,23 @@ export const AdminPanel: React.FC = () => {
                   value={billingConfig.bankName}
                   onChange={(e) => setBillingConfig((p) => ({ ...p, bankName: e.target.value }))}
                   placeholder="Ex: Banco Inter PJ / Nubank PJ"
-                  className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2.5 text-xs text-white focus:outline-none focus:border-amber-500"
+                  className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-amber-500"
                 />
               </div>
             </div>
 
             <div>
-              <label className="block text-[11px] font-bold text-slate-300 uppercase mb-1">
+              <label className="block text-[10px] sm:text-[11px] font-bold text-slate-300 uppercase mb-1">
                 Modelo da Mensagem de Cobrança WhatsApp
               </label>
               <textarea
-                rows={4}
+                rows={3}
                 value={billingConfig.customMessageTemplate}
                 onChange={(e) => setBillingConfig((p) => ({ ...p, customMessageTemplate: e.target.value }))}
-                className="w-full bg-slate-950 border border-slate-700 rounded-xl p-3 text-xs text-white focus:outline-none focus:border-amber-500 font-sans leading-relaxed"
+                className="w-full bg-slate-950 border border-slate-700 rounded-xl p-2.5 text-xs text-white focus:outline-none focus:border-amber-500 font-sans leading-relaxed"
               />
-              <p className="text-[10px] text-slate-500 mt-1">
-                Tags automáticas disponíveis: <b className="text-slate-400">{'{nome}'}</b>,{' '}
+              <p className="text-[9px] text-slate-500 mt-1">
+                Tags automáticas: <b className="text-slate-400">{'{nome}'}</b>,{' '}
                 <b className="text-slate-400">{'{empresa}'}</b>, <b className="text-slate-400">{'{valor}'}</b>,{' '}
                 <b className="text-slate-400">{'{vencimento}'}</b>, <b className="text-slate-400">{'{chave_pix}'}</b>.
               </p>
@@ -1386,7 +1395,7 @@ export const AdminPanel: React.FC = () => {
               <button
                 type="submit"
                 disabled={savingBilling}
-                className="bg-amber-600 hover:bg-amber-500 text-slate-950 font-black px-6 py-2.5 rounded-xl text-xs shadow-lg active:scale-95 transition-all flex items-center gap-2"
+                className="w-full sm:w-auto bg-amber-600 hover:bg-amber-500 text-slate-950 font-black px-5 py-2.5 rounded-xl text-xs shadow-lg active:scale-95 transition-all flex items-center justify-center gap-2"
               >
                 {savingBilling ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
                 <span>Salvar Configurações de Cobrança</span>
@@ -1400,22 +1409,24 @@ export const AdminPanel: React.FC = () => {
       {/* MODAL 1: EDIT SUBSCRIPTION / PLAN DETAILS                                 */}
       {/* ========================================================================= */}
       {editingUserSubscription && (
-        <div className="fixed inset-0 z-[99999] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in">
-          <div className="bg-slate-900 border border-slate-800 rounded-3xl w-full max-w-md p-6 shadow-2xl space-y-4">
-            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-              <div>
-                <h3 className="font-bold text-white text-base">Gerenciar Assinatura</h3>
-                <p className="text-xs text-slate-400">{editingUserSubscription.name} ({editingUserSubscription.company})</p>
+        <div className="fixed inset-0 z-[99999] flex items-center justify-center p-3 bg-black/80 backdrop-blur-md animate-in fade-in">
+          <div className="bg-slate-900 border border-slate-800 rounded-3xl w-full max-w-md max-h-[90dvh] flex flex-col p-4 sm:p-6 shadow-2xl overflow-hidden">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-3 shrink-0">
+              <div className="min-w-0">
+                <h3 className="font-bold text-white text-sm sm:text-base truncate">Gerenciar Assinatura</h3>
+                <p className="text-[11px] text-slate-400 truncate">
+                  {editingUserSubscription.name} ({editingUserSubscription.company || 'Empresa'})
+                </p>
               </div>
               <button
                 onClick={() => setEditingUserSubscription(null)}
-                className="p-1.5 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800"
+                className="p-1.5 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 shrink-0"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            <form onSubmit={handleSaveSubscriptionChanges} className="space-y-3.5 text-xs">
+            <form onSubmit={handleSaveSubscriptionChanges} className="space-y-3 text-xs overflow-y-auto py-3 flex-1">
               <div>
                 <label className="block text-slate-300 font-bold uppercase text-[10px] mb-1">Plano</label>
                 <select
@@ -1437,11 +1448,11 @@ export const AdminPanel: React.FC = () => {
                   <select
                     value={subModalStatus}
                     onChange={(e) => setSubModalStatus(e.target.value as any)}
-                    className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-white"
+                    className="w-full bg-slate-950 border border-slate-700 rounded-xl px-2.5 py-2 text-white"
                   >
-                    <option value="active">🟢 Ativo (Em Dia)</option>
-                    <option value="trial">🟡 Em Teste (Trial)</option>
-                    <option value="overdue">🔴 Inadimplente</option>
+                    <option value="active">🟢 Em Dia</option>
+                    <option value="trial">🟡 Trial</option>
+                    <option value="overdue">🔴 Vencido</option>
                     <option value="suspended">⚪ Suspenso</option>
                   </select>
                 </div>
@@ -1453,7 +1464,7 @@ export const AdminPanel: React.FC = () => {
                     step="0.01"
                     value={subModalValue}
                     onChange={(e) => setSubModalValue(Number(e.target.value))}
-                    className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-white font-mono"
+                    className="w-full bg-slate-950 border border-slate-700 rounded-xl px-2.5 py-2 text-white font-mono"
                   />
                 </div>
               </div>
@@ -1474,25 +1485,25 @@ export const AdminPanel: React.FC = () => {
                   rows={2}
                   value={subModalNotes}
                   onChange={(e) => setSubModalNotes(e.target.value)}
-                  placeholder="Ex: Contrato anual fechado com pagamento via Pix todo dia 10."
+                  placeholder="Ex: Contrato anual fechado com Pix todo dia 10."
                   className="w-full bg-slate-950 border border-slate-700 rounded-xl p-2.5 text-white"
                 />
               </div>
 
-              <div className="pt-2 flex items-center justify-end gap-2">
+              <div className="pt-2 flex items-center justify-end gap-2 shrink-0">
                 <button
                   type="button"
                   onClick={() => setEditingUserSubscription(null)}
-                  className="px-4 py-2 rounded-xl bg-slate-800 text-slate-300 font-bold"
+                  className="px-3.5 py-2 rounded-xl bg-slate-800 text-slate-300 font-bold text-xs"
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
                   disabled={savingSubChanges}
-                  className="px-5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold"
+                  className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs"
                 >
-                  {savingSubChanges ? 'Salvando...' : 'Salvar Alterações'}
+                  {savingSubChanges ? 'Salvando...' : 'Salvar'}
                 </button>
               </div>
             </form>
@@ -1504,23 +1515,23 @@ export const AdminPanel: React.FC = () => {
       {/* MODAL 2: ADD / PRE-AUTHORIZE NEW CLIENT MODAL                             */}
       {/* ========================================================================= */}
       {isAddUserModalOpen && (
-        <div className="fixed inset-0 z-[99999] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in">
-          <div className="bg-slate-900 border border-slate-800 rounded-3xl w-full max-w-lg p-6 shadow-2xl space-y-4">
-            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-              <div>
-                <h3 className="font-bold text-white text-base">Cadastrar Novo Cliente / Colaborador</h3>
-                <p className="text-xs text-slate-400">Pré-autorize o acesso ou cadastre uma nova empresa</p>
+        <div className="fixed inset-0 z-[99999] flex items-center justify-center p-3 bg-black/80 backdrop-blur-md animate-in fade-in">
+          <div className="bg-slate-900 border border-slate-800 rounded-3xl w-full max-w-lg max-h-[90dvh] flex flex-col p-4 sm:p-6 shadow-2xl overflow-hidden">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-3 shrink-0">
+              <div className="min-w-0">
+                <h3 className="font-bold text-white text-sm sm:text-base truncate">Cadastrar Novo Cliente</h3>
+                <p className="text-[11px] text-slate-400 truncate">Pré-autorize o acesso ou cadastre uma nova empresa</p>
               </div>
               <button
                 onClick={() => setIsAddUserModalOpen(false)}
-                className="p-1.5 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800"
+                className="p-1.5 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 shrink-0"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            <form onSubmit={handleCreateOrAuthorizeUser} className="space-y-3.5 text-xs">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <form onSubmit={handleCreateOrAuthorizeUser} className="space-y-3 text-xs overflow-y-auto py-3 flex-1">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                 <div>
                   <label className="block text-slate-300 font-bold uppercase text-[10px] mb-1">Nome Completo *</label>
                   <input
@@ -1592,25 +1603,25 @@ export const AdminPanel: React.FC = () => {
                     onChange={(e) => setNewUserRole(e.target.value as UserRole)}
                     className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-white"
                   >
-                    <option value="surveyor">Coletor de Campo (GPS / Trilhas / Madeira)</option>
-                    <option value="field_lead">Líder de Equipe (Edição Geral)</option>
-                    <option value="auditor">Auditor (Visualizador de Laudos)</option>
+                    <option value="surveyor">Coletor de Campo</option>
+                    <option value="field_lead">Líder de Equipe</option>
+                    <option value="auditor">Auditor (Visualizador)</option>
                   </select>
                 </div>
               </div>
 
-              <div className="pt-3 border-t border-slate-800 flex items-center justify-end gap-2">
+              <div className="pt-2 border-t border-slate-800 flex items-center justify-end gap-2 shrink-0">
                 <button
                   type="button"
                   onClick={() => setIsAddUserModalOpen(false)}
-                  className="px-4 py-2 rounded-xl bg-slate-800 text-slate-300 font-bold"
+                  className="px-3.5 py-2 rounded-xl bg-slate-800 text-slate-300 font-bold text-xs"
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
                   disabled={savingUser}
-                  className="px-5 py-2 rounded-xl bg-sky-600 hover:bg-sky-500 text-white font-bold"
+                  className="px-4 py-2 rounded-xl bg-sky-600 hover:bg-sky-500 text-white font-bold text-xs"
                 >
                   {savingUser ? 'Salvando...' : 'Cadastrar e Liberar'}
                 </button>
@@ -1624,12 +1635,12 @@ export const AdminPanel: React.FC = () => {
       {/* MODAL 3: CREATE PROMO COUPON MODAL                                        */}
       {/* ========================================================================= */}
       {isCouponModalOpen && (
-        <div className="fixed inset-0 z-[99999] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in">
-          <div className="bg-slate-900 border border-slate-800 rounded-3xl w-full max-w-md p-6 shadow-2xl space-y-4">
+        <div className="fixed inset-0 z-[99999] flex items-center justify-center p-3 bg-black/80 backdrop-blur-md animate-in fade-in">
+          <div className="bg-slate-900 border border-slate-800 rounded-3xl w-full max-w-md p-4 sm:p-6 shadow-2xl space-y-3.5">
             <div className="flex items-center justify-between border-b border-slate-800 pb-3">
               <div>
-                <h3 className="font-bold text-white text-base">Criar Cupom Promocional</h3>
-                <p className="text-xs text-slate-400">Gere códigos de desconto para clientes regionais</p>
+                <h3 className="font-bold text-white text-sm sm:text-base">Criar Cupom Promocional</h3>
+                <p className="text-[11px] text-slate-400">Gere códigos de desconto para clientes regionais</p>
               </div>
               <button
                 onClick={() => setIsCouponModalOpen(false)}
@@ -1639,7 +1650,7 @@ export const AdminPanel: React.FC = () => {
               </button>
             </div>
 
-            <form onSubmit={handleCreateCoupon} className="space-y-3.5 text-xs">
+            <form onSubmit={handleCreateCoupon} className="space-y-3 text-xs">
               <div>
                 <label className="block text-slate-300 font-bold uppercase text-[10px] mb-1">
                   Código do Cupom *
@@ -1649,7 +1660,7 @@ export const AdminPanel: React.FC = () => {
                   required
                   value={newCouponCode}
                   onChange={(e) => setNewCouponCode(e.target.value.toUpperCase())}
-                  placeholder="Ex: REGIAO20 ou LANCAMENTO"
+                  placeholder="Ex: REGIAO20"
                   className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-white font-mono uppercase font-bold"
                 />
               </div>
@@ -1687,14 +1698,14 @@ export const AdminPanel: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => setIsCouponModalOpen(false)}
-                  className="px-4 py-2 rounded-xl bg-slate-800 text-slate-300 font-bold"
+                  className="px-3.5 py-2 rounded-xl bg-slate-800 text-slate-300 font-bold text-xs"
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
                   disabled={savingCoupon}
-                  className="px-5 py-2 rounded-xl bg-amber-600 hover:bg-amber-500 text-slate-950 font-black"
+                  className="px-4 py-2 rounded-xl bg-amber-600 hover:bg-amber-500 text-slate-950 font-black text-xs"
                 >
                   {savingCoupon ? 'Criando...' : 'Ativar Cupom'}
                 </button>
