@@ -197,24 +197,47 @@ export function calculatePolygonArea(coords: GeoCoordinate[]): { m2: number; hec
 }
 
 /**
- * Formats distance always in Kilometers (KM) with clean Brazilian Portuguese formatting:
- * - Integers: e.g. "159 km", "2.450 km"
- * - Decimals: e.g. "12,5 km", "0,16 km"
+ * Safely parses odometer string or number into clean whole integer KM:
+ * Handles "123.450", "123450", "123,450", "123450.5", "0.159", etc.
+ */
+export function parseOdometerKm(val: string | number | undefined | null): number {
+  if (val === undefined || val === null) return 0;
+  if (typeof val === 'number') {
+    if (isNaN(val) || val <= 0) return 0;
+    return Math.round(val);
+  }
+  
+  const clean = String(val).trim();
+  if (!clean) return 0;
+
+  let normalized = clean;
+  // If string contains dots (e.g. 123.450 or 5.200)
+  if (normalized.includes('.')) {
+    normalized = normalized.replace(/\./g, '');
+  }
+  if (normalized.includes(',')) {
+    normalized = normalized.replace(/,/g, '.');
+  }
+
+  const num = parseFloat(normalized);
+  return isNaN(num) || num <= 0 ? 0 : Math.round(num);
+}
+
+/**
+ * Formats distance always in whole Kilometers (KM) with clean integer format without decimals:
+ * e.g. "159 KM", "2.450 KM", "0 KM"
  */
 export function formatFieldDistance(km: number | undefined | null): { value: string; unit: string; full: string } {
   if (km === undefined || km === null || isNaN(km) || km <= 0) {
-    return { value: '0', unit: 'km', full: '0 km' };
+    return { value: '0', unit: 'KM', full: '0 KM' };
   }
 
-  const isWhole = Number.isInteger(km);
-  const formatted = km.toLocaleString('pt-BR', {
-    minimumFractionDigits: 0,
-    maximumFractionDigits: isWhole ? 0 : 2,
-  });
+  const wholeKm = Math.round(km);
+  const formatted = wholeKm.toLocaleString('pt-BR');
 
   return {
     value: formatted,
-    unit: 'km',
-    full: `${formatted} km`,
+    unit: 'KM',
+    full: `${formatted} KM`,
   };
 }

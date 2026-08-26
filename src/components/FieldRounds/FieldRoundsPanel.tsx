@@ -1,4 +1,4 @@
-import { formatFieldDistance } from '../../utils/geoUtils';
+import { formatFieldDistance, parseOdometerKm } from '../../utils/geoUtils';
 import React, { useState, useRef } from 'react';
 import { useApp } from '../../context/AppContext';
 import { useAuth } from '../../context/AuthContext';
@@ -273,7 +273,7 @@ export const FieldRoundsPanel: React.FC = () => {
     e.preventDefault();
     if (!finishingRound) return;
 
-    const finKm = parseFloat(quickFinalKm);
+    const finKm = parseOdometerKm(quickFinalKm);
     if (isNaN(finKm) || finKm <= finishingRound.initialKm) {
       notifyWarning('KM Inválido', `O KM Final deve ser maior que o KM Inicial (${finishingRound.initialKm} KM).`);
       return;

@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useRef, ReactNode, useCallback } from 'react';
+import { parseOdometerKm } from '../utils/geoUtils';
 import { saveAppState, loadAppState } from '../utils/stateStorage';
 import {
   ProjectFolder,
