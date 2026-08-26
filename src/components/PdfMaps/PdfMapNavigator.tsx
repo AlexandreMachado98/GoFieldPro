@@ -296,7 +296,8 @@ export const PdfMapNavigator: React.FC = () => {
               notes: feat.description || '',
               category: 'checkpoint',
               color: feat.color || '#10b981',
-              createdAt: new Date().toISOString()
+              createdAt: new Date().toISOString(),
+              photos: feat.photos || []
             });
           }
         } else if (feat.type === 'LineString' && Array.isArray(feat.coordinates)) {

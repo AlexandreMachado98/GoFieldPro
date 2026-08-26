@@ -125,6 +125,7 @@ export interface KMLFeature {
   strokeWidth?: number;
   properties?: Record<string, any>;
   layerId: string;
+  photos?: string[];
 }
 
 export interface LayerItem {
