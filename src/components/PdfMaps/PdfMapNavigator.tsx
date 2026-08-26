@@ -2065,7 +2065,7 @@ export const PdfMapNavigator: React.FC = () => {
             className="flex items-center gap-1.5 text-xs font-extrabold text-white hover:text-emerald-400 transition-colors"
             title="Abrir Camadas, Mapas, Pontos e Rotas"
           >
-            <List className="w-4 h-4 text-emerald-400 shrink-0" />
+            <List className="w-4 h-4 shrink-0 text-emerald-400 shrink-0" />
             <span className="truncate max-w-[110px] sm:max-w-[180px]">
               {activeDoc ? activeDoc.name : 'Nenhum Mapa'}
             </span>
@@ -2131,7 +2131,7 @@ export const PdfMapNavigator: React.FC = () => {
               className="px-3 py-1.5 rounded-2xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white border border-emerald-400/60 text-xs font-extrabold flex items-center gap-1.5 shadow-2xl transition-all active:scale-95"
               title="Exportar e Compartilhar Mapa com Marcações (KML, GPX, GeoJSON, PDF)"
             >
-              <Share2 className="w-4 h-4" />
+              <Share2 className="w-4 h-4 shrink-0" />
               <span className="hidden md:inline">Exportar</span>
             </button>
           )}
@@ -2154,14 +2154,14 @@ export const PdfMapNavigator: React.FC = () => {
               className="p-1.5 text-slate-300 hover:text-white hover:bg-slate-800 rounded-xl transition-colors"
               title="Aproximar Zoom"
             >
-              <ZoomIn className="w-4 h-4" />
+              <ZoomIn className="w-4 h-4 shrink-0" />
             </button>
             <button
               onClick={handleZoomOut}
               className="p-1.5 text-slate-300 hover:text-white hover:bg-slate-800 rounded-xl transition-colors"
               title="Afastar Zoom"
             >
-              <ZoomOut className="w-4 h-4" />
+              <ZoomOut className="w-4 h-4 shrink-0" />
             </button>
             <button
               onClick={handleFitBounds}
@@ -2639,7 +2639,7 @@ export const PdfMapNavigator: React.FC = () => {
                     : 'text-slate-400 hover:text-rose-400 hover:bg-slate-800/60'
                 }`}
               >
-                <Ruler className="w-5 h-5 text-rose-400 mb-0.5" />
+                <Ruler className="w-5 h-5 shrink-0 text-rose-400 mb-0.5" />
                 <span className="text-[10px] font-extrabold tracking-tight">Medir</span>
                 {measurementPoints.length > 0 && activeTool === 'measure' && (
                   <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-amber-500 text-slate-950 text-[9px] font-black flex items-center justify-center">
@@ -2682,7 +2682,7 @@ export const PdfMapNavigator: React.FC = () => {
                 title="Exportar Dados do Mapa (KML, GPX, GeoJSON, PDF)"
                 className="flex flex-col items-center justify-center p-2.5 rounded-xl text-slate-400 hover:text-emerald-400 hover:bg-slate-800 transition-all active:scale-95"
               >
-                <Share2 className="w-5 h-5 text-emerald-400 mb-0.5" />
+                <Share2 className="w-5 h-5 shrink-0 text-emerald-400 mb-0.5" />
                 <span className="text-[10px] font-extrabold tracking-tight">Exportar</span>
               </button>
 
@@ -2692,7 +2692,7 @@ export const PdfMapNavigator: React.FC = () => {
                 title="Abrir Camadas"
                 className="flex flex-col items-center justify-center p-2.5 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition-all active:scale-95"
               >
-                <Layers className="w-5 h-5 text-teal-400 mb-0.5" />
+                <Layers className="w-5 h-5 shrink-0 text-teal-400 mb-0.5" />
                 <span className="text-[10px] font-extrabold tracking-tight">Camadas</span>
               </button>
             </div>
@@ -2759,7 +2759,7 @@ export const PdfMapNavigator: React.FC = () => {
             
             <div className="p-4 border-b border-slate-800 flex items-center justify-between bg-slate-950 shrink-0">
               <div className="flex items-center gap-2">
-                <MapPin className="w-5 h-5 text-emerald-400" />
+                <MapPin className="w-5 h-5 shrink-0 text-emerald-400" />
                 <h3 className="text-sm font-extrabold text-white">Novo Ponto de Campo</h3>
               </div>
               <button
@@ -3468,9 +3468,9 @@ export const PdfMapNavigator: React.FC = () => {
                 {isProcessing ? (
                   <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
                 ) : (
-                  <UploadCloud className="w-4 h-4" />
+                  <UploadCloud className="w-4 h-4 shrink-0" />
                 )}
-                <span>{isProcessing ? 'Renderizando...' : 'Importar Novo Mapa PDF'}</span>
+                <span className="text-center leading-tight">{isProcessing ? 'Renderizando...' : 'Importar Novo Mapa PDF'}</span>
               </button>
 
               {activeDoc && (
@@ -3481,7 +3481,7 @@ export const PdfMapNavigator: React.FC = () => {
                   }}
                   className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-slate-800 hover:bg-slate-700 border border-emerald-500/40 text-emerald-400 font-extrabold rounded-xl shadow transition-all active:scale-98"
                 >
-                  <Share2 className="w-4 h-4" />
+                  <Share2 className="w-4 h-4 shrink-0" />
                   <span>Exportar & Compartilhar Este Mapa</span>
                 </button>
               )}
