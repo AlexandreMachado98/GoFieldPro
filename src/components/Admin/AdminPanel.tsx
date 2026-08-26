@@ -42,7 +42,6 @@ import {
   UserPlus,
   Plus,
   X,
-  Briefcase,
   DollarSign,
   TrendingUp,
   Send,
@@ -136,8 +135,24 @@ export const AdminPanel: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
 
   // Billing & Plans Config State
-  const [billingConfig, setBillingConfig] = useState<SystemBillingConfig>(DEFAULT_BILLING_CONFIG);
-  const [plans, setPlans] = useState<PlanItemConfig[]>(DEFAULT_PLANS);
+  const [billingConfig, setBillingConfig] = useState<SystemBillingConfig>(() => {
+    try {
+      const saved = localStorage.getItem('gofield_billing_config');
+      return saved ? JSON.parse(saved) : DEFAULT_BILLING_CONFIG;
+    } catch {
+      return DEFAULT_BILLING_CONFIG;
+    }
+  });
+
+  const [plans, setPlans] = useState<PlanItemConfig[]>(() => {
+    try {
+      const saved = localStorage.getItem('gofield_custom_plans');
+      return saved ? JSON.parse(saved) : DEFAULT_PLANS;
+    } catch {
+      return DEFAULT_PLANS;
+    }
+  });
+
   const [savingBilling, setSavingBilling] = useState(false);
 
   // Edit Plan Modal State
@@ -233,7 +248,7 @@ export const AdminPanel: React.FC = () => {
     return usersData;
   };
 
-  // Load Billing Config, Plans, and Coupons from Firestore
+  // Load Billing Config, Plans, and Coupons from Firestore & localStorage
   useEffect(() => {
     if (profile?.role !== 'super_admin') return;
 
@@ -242,9 +257,11 @@ export const AdminPanel: React.FC = () => {
         const configDoc = await getDoc(doc(db, 'system_config', 'billing'));
         if (configDoc.exists()) {
           const data = configDoc.data() as SystemBillingConfig;
-          setBillingConfig({ ...DEFAULT_BILLING_CONFIG, ...data });
+          setBillingConfig((prev) => ({ ...prev, ...data }));
+          localStorage.setItem('gofield_billing_config', JSON.stringify(data));
           if (data.plans && Array.isArray(data.plans) && data.plans.length > 0) {
             setPlans(data.plans);
+            localStorage.setItem('gofield_custom_plans', JSON.stringify(data.plans));
           }
         }
       } catch (e) {
@@ -313,8 +330,17 @@ export const AdminPanel: React.FC = () => {
     e.preventDefault();
     setSavingBilling(true);
     try {
-      await setDoc(doc(db, 'system_config', 'billing'), { ...billingConfig, plans }, { merge: true });
-      notifySuccess('Configurações Salvas!', 'Os dados de cobrança Pix e mensagens foram atualizados na nuvem.');
+      const newConfig = { ...billingConfig, plans };
+      localStorage.setItem('gofield_billing_config', JSON.stringify(newConfig));
+      localStorage.setItem('gofield_custom_plans', JSON.stringify(plans));
+
+      try {
+        await setDoc(doc(db, 'system_config', 'billing'), newConfig, { merge: true });
+      } catch (cloudErr) {
+        console.warn('Firestore write notice (saved locally):', cloudErr);
+      }
+
+      notifySuccess('Configurações Salvas!', 'Os dados de cobrança Pix e mensagens foram atualizados.');
     } catch (err: any) {
       console.error('Error saving billing config:', err);
       notifyError('Erro ao Salvar', 'Não foi possível atualizar as configurações de cobrança.');
@@ -323,7 +349,7 @@ export const AdminPanel: React.FC = () => {
     }
   };
 
-  // Save Plan Changes Modal
+  // Save Plan Changes (Resilient to Firestore / Offline)
   const handleSavePlanChanges = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingPlan) return;
@@ -350,20 +376,26 @@ export const AdminPanel: React.FC = () => {
         return p;
       });
 
+      // 1. Update State immediately
       setPlans(updatedPlans);
 
-      // Persist directly to Firestore
-      await setDoc(
-        doc(db, 'system_config', 'billing'),
-        { ...billingConfig, plans: updatedPlans },
-        { merge: true }
-      );
+      // 2. Persist to localStorage
+      localStorage.setItem('gofield_custom_plans', JSON.stringify(updatedPlans));
+      const updatedConfig = { ...billingConfig, plans: updatedPlans };
+      localStorage.setItem('gofield_billing_config', JSON.stringify(updatedConfig));
 
-      notifySuccess('Plano Atualizado!', `O ${planModalName} agora está com novos valores e serviços salvos na nuvem.`);
+      // 3. Persist to Firestore
+      try {
+        await setDoc(doc(db, 'system_config', 'billing'), updatedConfig, { merge: true });
+      } catch (cloudErr) {
+        console.warn('Saved plans locally (cloud notice):', cloudErr);
+      }
+
+      notifySuccess('Plano Atualizado com Sucesso!', `O ${planModalName} agora está com novos valores e serviços.`);
       setEditingPlan(null);
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error saving plan changes:', err);
-      notifyError('Erro ao Salvar Plano', 'Não foi possível salvar as alterações do plano.');
+      notifyError('Erro ao Salvar Plano', 'Ocorreu um erro ao salvar as alterações do plano.');
     } finally {
       setSavingPlanChanges(false);
     }
@@ -815,7 +847,6 @@ export const AdminPanel: React.FC = () => {
         <div className="space-y-4 animate-in fade-in duration-200">
           {/* Financial KPI Summary Cards */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3">
-            {/* MRR Card */}
             <div className="bg-slate-900 border border-emerald-500/40 rounded-2xl p-3 sm:p-4 shadow-xl flex flex-col justify-between relative overflow-hidden">
               <div className="flex items-center justify-between">
                 <span className="text-[10px] sm:text-[11px] font-bold text-slate-400 uppercase tracking-wider truncate">
@@ -835,7 +866,6 @@ export const AdminPanel: React.FC = () => {
               </div>
             </div>
 
-            {/* Ativos Card */}
             <div className="bg-slate-900 border border-slate-800 rounded-2xl p-3 sm:p-4 shadow-xl flex flex-col justify-between">
               <div className="flex items-center justify-between">
                 <span className="text-[10px] sm:text-[11px] font-bold text-slate-400 uppercase tracking-wider truncate">
@@ -851,7 +881,6 @@ export const AdminPanel: React.FC = () => {
               </div>
             </div>
 
-            {/* Trial Card */}
             <div className="bg-slate-900 border border-slate-800 rounded-2xl p-3 sm:p-4 shadow-xl flex flex-col justify-between">
               <div className="flex items-center justify-between">
                 <span className="text-[10px] sm:text-[11px] font-bold text-slate-400 uppercase tracking-wider truncate">
@@ -867,7 +896,6 @@ export const AdminPanel: React.FC = () => {
               </div>
             </div>
 
-            {/* Overdue / Inadimplentes Card */}
             <div
               className={`bg-slate-900 border rounded-2xl p-3 sm:p-4 shadow-xl flex flex-col justify-between ${
                 overdueUsers.length > 0 ? 'border-red-500/60 bg-red-950/20' : 'border-slate-800'
@@ -956,7 +984,6 @@ export const AdminPanel: React.FC = () => {
                       : 'border-slate-800 hover:border-emerald-500/40'
                   }`}
                 >
-                  {/* Card Header: Client name, company, and status */}
                   <div className="flex items-start justify-between gap-2">
                     <div className="flex items-center gap-2.5 min-w-0">
                       <img
@@ -982,7 +1009,6 @@ export const AdminPanel: React.FC = () => {
                       </div>
                     </div>
 
-                    {/* Status Badge */}
                     <div className="shrink-0">
                       {isOwner ? (
                         <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">
@@ -1009,7 +1035,6 @@ export const AdminPanel: React.FC = () => {
                     </div>
                   </div>
 
-                  {/* Plan Details & Financial Information */}
                   <div className="grid grid-cols-2 gap-2 bg-slate-950 p-2.5 rounded-xl border border-slate-800/80 text-[11px]">
                     <div className="min-w-0">
                       <span className="text-[9px] text-slate-500 font-semibold uppercase block truncate">Plano</span>
@@ -1044,9 +1069,7 @@ export const AdminPanel: React.FC = () => {
                     </div>
                   </div>
 
-                  {/* Quick Action Buttons */}
                   <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-1.5 pt-1 w-full">
-                    {/* WhatsApp Billing Button */}
                     <button
                       type="button"
                       onClick={() => handleSendWhatsAppBilling(subUser)}
@@ -1056,7 +1079,6 @@ export const AdminPanel: React.FC = () => {
                       <span>Cobrar no WhatsApp</span>
                     </button>
 
-                    {/* Secondary Actions Row */}
                     <div className="grid grid-cols-3 sm:flex sm:w-auto gap-1.5 w-full sm:w-auto">
                       <button
                         type="button"
@@ -1129,7 +1151,6 @@ export const AdminPanel: React.FC = () => {
       {/* ========================================================================= */}
       {adminTab === 'users' && (
         <div className="space-y-3.5 animate-in fade-in duration-200">
-          {/* Filter Bar */}
           <div className="bg-slate-900/80 border border-slate-800 p-3 rounded-2xl flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 shadow-lg">
             <div className="flex items-center gap-1.5 overflow-x-auto w-full pb-1 sm:pb-0 text-xs no-scrollbar">
               {(
@@ -1169,7 +1190,6 @@ export const AdminPanel: React.FC = () => {
             </div>
           </div>
 
-          {/* Users List Cards */}
           <div className="space-y-2.5">
             {filteredUsers.map((u) => {
               const isOwner = u.email === 'alexandre1604981@gmail.com';
@@ -1235,7 +1255,6 @@ export const AdminPanel: React.FC = () => {
                     </div>
                   </div>
 
-                  {/* Actions for User */}
                   <div className="flex items-center justify-end gap-1.5 shrink-0 border-t sm:border-t-0 border-slate-800/80 pt-2 sm:pt-0">
                     {u.status === 'pending' ? (
                       <button
@@ -1285,7 +1304,6 @@ export const AdminPanel: React.FC = () => {
       {/* ========================================================================= */}
       {adminTab === 'plans' && (
         <div className="space-y-5 animate-in fade-in duration-200">
-          {/* Dynamic Plans Grid with Discount Options */}
           <div className="space-y-3">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
               <div>
@@ -1302,10 +1320,6 @@ export const AdminPanel: React.FC = () => {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
               {plans.map((plan) => {
                 const discountAmount = plan.originalPrice > plan.price ? plan.originalPrice - plan.price : 0;
-                const discountPercentCalc =
-                  plan.originalPrice > 0
-                    ? Math.round(((plan.originalPrice - plan.price) / plan.originalPrice) * 100)
-                    : 0;
 
                 return (
                   <div
@@ -1317,7 +1331,6 @@ export const AdminPanel: React.FC = () => {
                     }`}
                   >
                     <div>
-                      {/* Top Badges */}
                       <div className="flex items-center justify-between gap-1.5 flex-wrap mb-2">
                         <span className="text-[9px] uppercase font-black px-2 py-0.5 rounded-full bg-slate-800 text-slate-300 border border-slate-700">
                           {plan.tag}
@@ -1332,7 +1345,6 @@ export const AdminPanel: React.FC = () => {
 
                       <h4 className="text-base sm:text-lg font-black text-white">{plan.name}</h4>
 
-                      {/* Pricing Display with Original Crossed-Out Price and Discounted Price */}
                       <div className="mt-2.5 bg-slate-950 p-3 rounded-2xl border border-slate-800">
                         {plan.originalPrice > plan.price && (
                           <div className="flex items-center gap-2 text-[11px] text-slate-400">
@@ -1354,7 +1366,6 @@ export const AdminPanel: React.FC = () => {
                         </div>
                       </div>
 
-                      {/* Features / Services Included */}
                       <div className="mt-3.5 space-y-1.5">
                         <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
                           Serviços & Recursos Incluídos:
@@ -1370,7 +1381,6 @@ export const AdminPanel: React.FC = () => {
                       </div>
                     </div>
 
-                    {/* Edit Plan Button */}
                     <div className="pt-2 border-t border-slate-800">
                       <button
                         type="button"
@@ -1395,7 +1405,6 @@ export const AdminPanel: React.FC = () => {
             </div>
           </div>
 
-          {/* Promo Coupons Management */}
           <div className="bg-slate-900 border border-slate-800 rounded-2xl sm:rounded-3xl p-4 sm:p-5 shadow-xl space-y-3.5">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 border-b border-slate-800 pb-3">
               <div>
@@ -1576,7 +1585,7 @@ export const AdminPanel: React.FC = () => {
               </button>
             </div>
 
-            <form onSubmit={handleSavePlanChanges} className="space-y-3.5 text-xs overflow-y-auto py-3 flex-1">
+            <form onSubmit={handleSavePlanChanges} className="space-y-3 text-xs overflow-y-auto py-3 flex-1">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                 <div>
                   <label className="block text-slate-300 font-bold uppercase text-[10px] mb-1">Nome do Plano *</label>

@@ -74,7 +74,14 @@ const FALLBACK_PLANS: PlanItemConfig[] = [
 export const PendingApprovalScreen: React.FC = () => {
   const { profile, logout, refreshProfile } = useAuth();
   const [checking, setChecking] = useState(false);
-  const [plans, setPlans] = useState<PlanItemConfig[]>(FALLBACK_PLANS);
+  const [plans, setPlans] = useState<PlanItemConfig[]>(() => {
+    try {
+      const saved = localStorage.getItem('gofield_custom_plans');
+      return saved ? JSON.parse(saved) : FALLBACK_PLANS;
+    } catch {
+      return FALLBACK_PLANS;
+    }
+  });
   const [selectedPlanId, setSelectedPlanId] = useState<string>('equipe');
   const [supportPhone, setSupportPhone] = useState('5511999999999');
 
@@ -99,6 +106,7 @@ export const PendingApprovalScreen: React.FC = () => {
           }
           if (data.plans && Array.isArray(data.plans) && data.plans.length > 0) {
             setPlans(data.plans);
+            localStorage.setItem('gofield_custom_plans', JSON.stringify(data.plans));
           }
         }
       } catch (e) {
