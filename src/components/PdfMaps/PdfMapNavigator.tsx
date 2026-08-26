@@ -332,48 +332,67 @@ export const PdfMapNavigator: React.FC = () => {
         }
       }
       
-      features.forEach((feat) => {
-        if (feat.type === 'Point' && !Array.isArray(feat.coordinates)) {
-          const coord = feat.coordinates as GeoCoordinate;
-          if (coord.lat !== undefined && coord.lng !== undefined) {
-            const pdfCoord = gpsToPdf(coord.lat, coord.lng, activeDoc);
-            if (!isNaN(pdfCoord.x) && !isNaN(pdfCoord.y)) {
-              newMarkers.push({
-                id: `kmz-pt-${Date.now()}-${Math.random().toString(36).substr(2,9)}`,
-                x: pdfCoord.x,
-                y: pdfCoord.y,
-                lat: coord.lat,
-                lng: coord.lng,
-                title: feat.name || 'Ponto Importado',
-                notes: feat.description || '',
-                category: 'checkpoint',
-                color: feat.color || '#10b981',
+        let markersAdded = 0;
+        let tracksAdded = 0;
+        let wasTruncated = false;
+
+        features.forEach((feat) => {
+          if (feat.type === 'Point' && !Array.isArray(feat.coordinates)) {
+            if (markersAdded >= 300) {
+              wasTruncated = true;
+              return;
+            }
+            const coord = feat.coordinates as GeoCoordinate;
+            if (coord.lat !== undefined && coord.lng !== undefined) {
+              const pdfCoord = gpsToPdf(coord.lat, coord.lng, activeDoc);
+              if (!isNaN(pdfCoord.x) && !isNaN(pdfCoord.y)) {
+                newMarkers.push({
+                  id: `kmz-pt-${Date.now()}-${Math.random().toString(36).substr(2,9)}`,
+                  x: pdfCoord.x,
+                  y: pdfCoord.y,
+                  lat: coord.lat,
+                  lng: coord.lng,
+                  title: feat.name || 'Ponto Importado',
+                  notes: feat.description || '',
+                  category: 'checkpoint',
+                  color: feat.color || '#10b981',
+                  createdAt: new Date().toISOString(),
+                  photos: feat.photos || []
+                });
+                markersAdded++;
+              }
+            }
+          } else if (feat.type === 'LineString' && Array.isArray(feat.coordinates)) {
+            if (tracksAdded >= 100) {
+              wasTruncated = true;
+              return;
+            }
+            let pts = (feat.coordinates as GeoCoordinate[])
+              .filter(c => c.lat !== undefined && c.lng !== undefined)
+              .map(c => {
+                 const pc = gpsToPdf(c.lat, c.lng, activeDoc);
+                 return { x: pc.x, y: pc.y, lat: c.lat, lng: c.lng };
+              }).filter(p => !isNaN(p.x) && !isNaN(p.y));
+            
+            if (pts.length > 500) {
+              const step = Math.ceil(pts.length / 500);
+              pts = pts.filter((_, idx) => idx % step === 0);
+            }
+            
+            if (pts.length > 1) {
+              newTracks.push({
+                id: `kmz-trk-${Date.now()}-${Math.random().toString(36).substr(2,9)}`,
+                name: feat.name || 'Trilha Importada',
+                points: pts,
+                color: feat.strokeWidth ? (feat.color || '#3b82f6') : '#3b82f6',
                 createdAt: new Date().toISOString(),
-                photos: feat.photos || []
+                isRecorded: false
               });
+              tracksAdded++;
             }
           }
-        } else if (feat.type === 'LineString' && Array.isArray(feat.coordinates)) {
-          const pts = (feat.coordinates as GeoCoordinate[])
-            .filter(c => c.lat !== undefined && c.lng !== undefined)
-            .map(c => {
-               const pc = gpsToPdf(c.lat, c.lng, activeDoc);
-               return { x: pc.x, y: pc.y, lat: c.lat, lng: c.lng };
-            }).filter(p => !isNaN(p.x) && !isNaN(p.y));
-          
-          if (pts.length > 1) {
-            newTracks.push({
-              id: `kmz-trk-${Date.now()}-${Math.random().toString(36).substr(2,9)}`,
-              name: feat.name || 'Trilha Importada',
-              points: pts,
-              color: feat.strokeWidth ? (feat.color || '#3b82f6') : '#3b82f6',
-              createdAt: new Date().toISOString(),
-              isRecorded: false
-            });
-          }
-        }
-      });
-      
+        });
+
       const updatedDoc = {
          ...activeDoc,
          markers: newMarkers,
@@ -383,7 +402,7 @@ export const PdfMapNavigator: React.FC = () => {
       updateDocumentInStore(updatedDoc);
       notifySuccess(
         isAutoCalibrated ? 'Mapa Auto-Calibrado e Importado' : 'Importação Concluída', 
-        `${features.length} elementos foram projetados neste mapa PDF.`
+        wasTruncated ? `Importação otimizada: ${markersAdded} pontos e ${tracksAdded} trilhas (o arquivo é muito grande, itens extras foram ignorados para evitar travamentos).` : `${markersAdded} pontos e ${tracksAdded} trilhas foram projetados.`
       );
       
     } catch(err) {
