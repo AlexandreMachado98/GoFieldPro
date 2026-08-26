@@ -3,6 +3,8 @@ import { collection, onSnapshot, query, where } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { useApp } from '../context/AppContext';
 import { useAuth } from '../context/AuthContext';
+import { useUpdate } from '../context/UpdateContext';
+import { APP_VERSION } from '../config/version';
 import { PwaInstallButton } from './PWA/PwaInstallButton';
 import {
   Map,
@@ -15,7 +17,9 @@ import {
   FileText,
   Settings,
   LogOut,
-  X
+  X,
+  Sparkles,
+  RefreshCw
 } from 'lucide-react';
 
 export const Sidebar: React.FC = () => {
@@ -29,6 +33,7 @@ export const Sidebar: React.FC = () => {
     showConfirm
   } = useApp();
   const { profile, logout } = useAuth();
+  const { isUpdateAvailable, latestVersion, applyUpdate } = useUpdate();
   const [pendingCount, setPendingCount] = useState(0);
 
   useEffect(() => {
@@ -155,8 +160,25 @@ export const Sidebar: React.FC = () => {
           </div>
         </nav>
 
-        {/* Sidebar Footer with prominent Logout Button */}
+        {/* Sidebar Footer with prominent Logout Button and App Version */}
         <div className="p-3 border-t border-slate-800/80 bg-slate-950 shrink-0 space-y-2">
+          {/* Update Available Badge */}
+          {isUpdateAvailable && (
+            <button
+              type="button"
+              onClick={applyUpdate}
+              className="w-full flex items-center justify-between px-3 py-2 rounded-xl bg-gradient-to-r from-sky-600/30 to-emerald-600/30 border border-sky-500/50 text-sky-300 text-xs font-bold transition-all hover:scale-[1.02] active:scale-95 animate-pulse"
+            >
+              <div className="flex items-center gap-1.5">
+                <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+                <span>Atualização {latestVersion}</span>
+              </div>
+              <span className="text-[10px] bg-sky-500 text-slate-950 px-2 py-0.5 rounded-full font-black">
+                Instalar
+              </span>
+            </button>
+          )}
+
           <button
             type="button"
             onClick={handleLogout}
@@ -165,9 +187,22 @@ export const Sidebar: React.FC = () => {
             <LogOut className="w-4 h-4" />
             <span>Sair do Aplicativo</span>
           </button>
-          <p className="text-[10px] text-slate-500 font-medium text-center">
-            GoField Pro • Sistema de Campo
-          </p>
+
+          {/* App Version Info */}
+          <button
+            type="button"
+            onClick={() => {
+              setIsMobileMenuOpen(false);
+              setIsSettingsModalOpen(true);
+            }}
+            className="w-full flex items-center justify-between text-[10px] text-slate-400 hover:text-slate-200 px-1 py-0.5 rounded transition-colors group"
+          >
+            <span className="font-semibold text-slate-500 group-hover:text-slate-400">GoField Pro</span>
+            <span className="flex items-center gap-1.5 font-mono text-emerald-400 font-bold">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+              {APP_VERSION}
+            </span>
+          </button>
         </div>
       </aside>
     </>

@@ -2,6 +2,7 @@ import React, { useState, useRef } from 'react';
 import { useApp } from '../../context/AppContext';
 import { useAuth } from '../../context/AuthContext';
 import { FieldRound } from '../../types';
+import { APP_VERSION } from '../../config/version';
 import { generateFieldRoundsPdf } from '../../utils/fieldRoundsPdfReport';
 import { PwaInstallButton } from '../PWA/PwaInstallButton';
 import { 
@@ -681,10 +682,13 @@ export const HomeDashboard: React.FC = () => {
           </div>
         </div>
 
-        {/* Corporate Copyright Footer */}
+        {/* Corporate Copyright Footer with App Version */}
         <footer className="pt-6 pb-2 border-t border-slate-800/80 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-500">
           <div className="flex items-center gap-2">
             <span className="font-bold text-slate-400">GoField Pro</span>
+            <span className="font-mono text-emerald-400 font-bold px-2 py-0.5 rounded-full bg-emerald-950/60 border border-emerald-800/60 text-[10px]">
+              {APP_VERSION}
+            </span>
             <span>•</span>
             <span>AM TST SAÚDE E SEGURANÇA DO TRABALHO</span>
           </div>

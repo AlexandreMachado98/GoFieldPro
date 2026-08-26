@@ -1,4 +1,5 @@
 import React from 'react';
+import { APP_VERSION } from '../../config/version';
 import {
   Download,
   Smartphone,
@@ -165,7 +166,12 @@ export const PwaInstallModal: React.FC<PwaInstallModalProps> = ({
           </div>
         )}
 
-        <div className="mt-5 pt-3 border-t border-slate-800 flex justify-end">
+        <div className="mt-5 pt-3 border-t border-slate-800 flex items-center justify-between">
+          <div className="text-[11px] text-slate-400 flex items-center gap-1.5">
+            <span className="font-mono text-emerald-400 font-bold">{APP_VERSION}</span>
+            <span>•</span>
+            <span className="text-slate-500">Auto-Update Ativo</span>
+          </div>
           <button
             onClick={onClose}
             className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold rounded-xl text-xs transition-colors"

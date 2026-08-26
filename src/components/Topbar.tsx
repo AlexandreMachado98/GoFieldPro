@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { useApp } from '../context/AppContext';
 import { useAuth } from '../context/AuthContext';
+import { useUpdate } from '../context/UpdateContext';
+import { APP_VERSION } from '../config/version';
 import { Language } from '../types';
 import { PwaInstallButton } from './PWA/PwaInstallButton';
 import {
@@ -19,7 +21,8 @@ import {
   CheckCheck,
   Trash2,
   Sun,
-  Moon
+  Moon,
+  Sparkles
 } from 'lucide-react';
 
 export const Topbar: React.FC = () => {
@@ -48,6 +51,7 @@ export const Topbar: React.FC = () => {
   } = useApp();
 
   const { profile, logout } = useAuth();
+  const { isUpdateAvailable, latestVersion, applyUpdate } = useUpdate();
   const [isProjectsDropdownOpen, setIsProjectsDropdownOpen] = useState(false);
   const [isLangDropdownOpen, setIsLangDropdownOpen] = useState(false);
   const [isNotifDropdownOpen, setIsNotifDropdownOpen] = useState(false);
@@ -261,6 +265,39 @@ export const Topbar: React.FC = () => {
                     <Settings className="w-4 h-4 text-sky-400" />
                     <span>Configurações do Sistema</span>
                   </button>
+
+                  {/* App Version Info / Update Action in User Dropdown */}
+                  {isUpdateAvailable ? (
+                    <button
+                      onClick={() => {
+                        setIsUserDropdownOpen(false);
+                        applyUpdate();
+                      }}
+                      className="w-full text-left p-2.5 rounded-xl text-xs font-bold flex items-center justify-between bg-sky-950/60 border border-sky-500 text-sky-300 hover:bg-sky-900/60 transition-all animate-pulse"
+                    >
+                      <div className="flex items-center gap-2">
+                        <Sparkles className="w-4 h-4 text-amber-400" />
+                        <span>Atualizar ({latestVersion})</span>
+                      </div>
+                      <span className="text-[10px] bg-sky-500 text-slate-950 px-2 py-0.5 rounded-full font-black">
+                        Novo
+                      </span>
+                    </button>
+                  ) : (
+                    <div
+                      onClick={() => {
+                        setIsUserDropdownOpen(false);
+                        setIsSettingsModalOpen(true);
+                      }}
+                      className="w-full text-left px-3 py-2 rounded-xl text-[11px] flex items-center justify-between text-slate-400 bg-slate-950/40 border border-slate-800/80 cursor-pointer hover:border-slate-700 transition-colors"
+                    >
+                      <span>Versão Instalada</span>
+                      <span className="font-mono text-emerald-400 font-bold flex items-center gap-1">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+                        {APP_VERSION}
+                      </span>
+                    </div>
+                  )}
 
                   <button
                     type="button"

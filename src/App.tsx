@@ -2,6 +2,7 @@ import React from 'react';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { AppProvider, useApp } from './context/AppContext';
 import { AuthProvider, useAuth } from './context/AuthContext';
+import { UpdateProvider } from './context/UpdateContext';
 import { Sidebar } from './components/Sidebar';
 import { Topbar } from './components/Topbar';
 import { MapViewer } from './components/Map/MapViewer';
@@ -18,6 +19,7 @@ import { PendingApprovalScreen } from './components/Auth/PendingApprovalScreen';
 import { ToastContainer } from './components/Common/ToastContainer';
 import { ConfirmModal } from './components/Common/ConfirmModal';
 import { SettingsModal } from './components/Settings/SettingsModal';
+import { AppUpdateBanner } from './components/Common/AppUpdateBanner';
 
 const MainAppContent: React.FC = () => {
   const { activeTab, isSettingsModalOpen, setIsSettingsModalOpen } = useApp();
@@ -67,7 +69,8 @@ const MainAppContent: React.FC = () => {
         </main>
       </div>
 
-      {/* Global Modals & Notifications */}
+      {/* Global Modals, Notifications & Auto-Update Banner */}
+      <AppUpdateBanner />
       <AddWaypointModal />
       <LayerManagerModal />
       <SettingsModal isOpen={isSettingsModalOpen} onClose={() => setIsSettingsModalOpen(false)} />
@@ -82,7 +85,9 @@ export default function App() {
     <ErrorBoundary>
       <AuthProvider>
         <AppProvider>
-          <MainAppContent />
+          <UpdateProvider>
+            <MainAppContent />
+          </UpdateProvider>
         </AppProvider>
       </AuthProvider>
     </ErrorBoundary>

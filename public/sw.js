@@ -1,51 +1,80 @@
 // Service Worker for GoField Pro PWA
-const CACHE_NAME = 'gofield-pro-v5';
+// Version: v2.4.0 - Auto-Update and Offline Resilient Engine
+const CACHE_NAME = 'gofield-pro-v2.4.0';
 const OFFLINE_URLS = [
   '/',
   '/index.html',
   '/manifest.json',
+  '/version.json',
   '/icon.svg',
   '/icon-192.png',
   '/icon-512.png'
 ];
 
+// Install: Pre-cache core shell and activate immediately
 self.addEventListener('install', (event) => {
   self.skipWaiting();
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
       return cache.addAll(OFFLINE_URLS).catch((err) => {
-        console.warn('SW pre-cache non-fatal error:', err);
+        console.warn('SW pre-cache non-fatal warning:', err);
       });
     })
   );
 });
 
+// Activate: Clear ALL outdated caches from previous versions and claim clients
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys().then((keyList) => {
       return Promise.all(
         keyList.map((key) => {
           if (key !== CACHE_NAME) {
+            console.log('[SW] Deletando cache antigo:', key);
             return caches.delete(key);
           }
         })
       );
-    })
+    }).then(() => self.clients.claim())
   );
-  self.clients.claim();
 });
 
+// Listen for explicit SKIP_WAITING or CHECK_VERSION commands from client
+self.addEventListener('message', (event) => {
+  if (event.data && (event.data.type === 'SKIP_WAITING' || event.data === 'SKIP_WAITING')) {
+    self.skipWaiting();
+  }
+});
+
+// Fetch Interception
 self.addEventListener('fetch', (event) => {
   if (event.request.method !== 'GET') return;
   const url = new URL(event.request.url);
-  if (url.protocol.startsWith('chrome-extension')) return;
 
-  // Firebase/Firestore/Google API calls should not be intercepted by SW
-  if (url.hostname.includes('firebase') || url.hostname.includes('googleapis') || url.hostname.includes('firestore')) {
+  // Ignore chrome extension & non-http schemes
+  if (url.protocol.startsWith('chrome-extension') || !url.protocol.startsWith('http')) return;
+
+  // Firebase/Firestore/Google Auth/APIs should never be cached by SW
+  if (
+    url.hostname.includes('firebase') ||
+    url.hostname.includes('googleapis') ||
+    url.hostname.includes('firestore') ||
+    url.hostname.includes('identitytoolkit')
+  ) {
     return;
   }
 
-  // Network-first strategy for navigation and HTML to guarantee latest version
+  // Version.json: Network ONLY / No-Store to guarantee instant update detection
+  if (url.pathname === '/version.json') {
+    event.respondWith(
+      fetch(event.request, { cache: 'no-store' }).catch(() => {
+        return caches.match('/version.json') || new Response(JSON.stringify({ version: 'offline' }));
+      })
+    );
+    return;
+  }
+
+  // Navigation & HTML: Network-First with offline cache fallback
   if (event.request.mode === 'navigate' || url.pathname === '/' || url.pathname.endsWith('.html')) {
     event.respondWith(
       fetch(event.request)
@@ -63,7 +92,7 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Stale-while-revalidate for other assets
+  // Static Assets (Hashed JS, CSS, Images, Fonts): Stale-While-Revalidate
   event.respondWith(
     caches.match(event.request).then((cachedResponse) => {
       const fetchPromise = fetch(event.request)

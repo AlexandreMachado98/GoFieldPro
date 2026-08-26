@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
 import { useAuth } from '../../context/AuthContext';
+import { useUpdate } from '../../context/UpdateContext';
+import { APP_VERSION, APP_BUILD_DATE, APP_BUILD_NUMBER, APP_CHANGELOG } from '../../config/version';
 import { AppSettings } from '../../types';
 import {
   X,
@@ -22,7 +24,11 @@ import {
   LogOut,
   Sun,
   Moon,
-  Monitor
+  Monitor,
+  CheckCircle2,
+  ArrowUpCircle,
+  HelpCircle,
+  Clock
 } from 'lucide-react';
 
 interface SettingsModalProps {
@@ -40,10 +46,30 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
     showConfirm
   } = useApp();
   const { profile, logout } = useAuth();
+  const {
+    isUpdateAvailable,
+    latestVersion,
+    isCheckingUpdate,
+    isApplyingUpdate,
+    checkForUpdates,
+    applyUpdate,
+    forceCleanUpdate,
+    lastCheckedTime
+  } = useUpdate();
 
   const [activeTab, setActiveTab] = useState<'gps' | 'coords' | 'maps' | 'field' | 'appearance' | 'system'>('gps');
   const [cachedMapSize, setCachedMapSize] = useState<string>('Calculando...');
   const [isCleaning, setIsCleaning] = useState(false);
+  const [showChangelog, setShowChangelog] = useState(false);
+
+  const handleManualCheckUpdates = async () => {
+    const hasNew = await checkForUpdates(true);
+    if (hasNew) {
+      notifySuccess('Nova Versão Encontrada!', `A versão ${latestVersion} está pronta para ser instalada.`);
+    } else {
+      notifyInfo('Aplicativo Atualizado', `Você já está executando a versão mais recente (${APP_VERSION}).`);
+    }
+  };
 
   // Estimate local storage / IndexedDB cache size
   useEffect(() => {
@@ -585,7 +611,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
             </div>
           )}
 
-          {/* TAB 5: REDE & DESEMPENHO */}
+          {/* TAB 5: REDE, SISTEMA & ATUALIZAÇÕES */}
           {activeTab === 'system' && (
             <div className="space-y-4">
               <div className="bg-slate-950/60 border border-slate-800 rounded-2xl p-4 space-y-3">
@@ -595,7 +621,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
                 </h4>
                 <div className="space-y-2 text-xs text-slate-300 leading-relaxed">
                   <p>
-                    • <b>Execução 100% no Dispositivo:</b> Toda a navegação GPS, posicionamento vetorial, conversão de coordenadas e renderização de PDFs operam <b>diretamente no navegador/hardware do seu celular</b>.
+                    • <b>Execução 100% no Dispositivo:</b> Toda a navegação GPS, posicionamento vetorial, cubagem de madeira e renderização de PDFs operam <b>diretamente no navegador/hardware do seu celular</b>.
                   </p>
                   <p>
                     • <b>Latência do GPS: 0 ms</b> (sem delay de rede para mapas e navegação local).
@@ -606,14 +632,132 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
                 </div>
               </div>
 
-              <div className="bg-slate-950/60 border border-slate-800 rounded-2xl p-4 flex items-center justify-between">
-                <div>
-                  <div className="text-xs font-bold text-white">Versão do Aplicativo</div>
-                  <div className="text-[11px] text-slate-400 mt-0.5">GoField Pro v2.4 (PWA Offline-Ready)</div>
+              {/* Version & Live Auto-Update Center */}
+              <div className="bg-slate-950/80 border border-sky-500/40 rounded-2xl p-4 space-y-3.5 shadow-lg">
+                <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-9 h-9 rounded-xl bg-sky-500/20 border border-sky-500/30 flex items-center justify-center text-sky-400">
+                      <Sparkles className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <div className="text-xs font-black text-white flex items-center gap-2">
+                        <span>Versão do Aplicativo</span>
+                        <span className="font-mono text-emerald-400 bg-emerald-950/80 border border-emerald-800/80 px-2 py-0.5 rounded-full text-[10px]">
+                          {APP_VERSION}
+                        </span>
+                      </div>
+                      <div className="text-[10px] text-slate-400 mt-0.5">
+                        Build #{APP_BUILD_NUMBER} • Lançamento: {APP_BUILD_DATE}
+                      </div>
+                    </div>
+                  </div>
+
+                  <span className="text-[10px] font-bold text-emerald-400 bg-emerald-950/80 border border-emerald-800 px-2.5 py-1 rounded-full flex items-center gap-1 shrink-0">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                    Operacional
+                  </span>
                 </div>
-                <span className="text-[10px] font-bold text-emerald-400 bg-emerald-950/80 border border-emerald-800 px-2.5 py-1 rounded-full">
-                  Status: Operacional
-                </span>
+
+                {/* Update Available Banner (if detected) */}
+                {isUpdateAvailable && (
+                  <div className="p-3 rounded-xl bg-gradient-to-r from-sky-950/80 to-emerald-950/80 border border-sky-500/80 flex flex-col sm:flex-row items-center justify-between gap-2.5 animate-in fade-in">
+                    <div>
+                      <div className="text-xs font-black text-white flex items-center gap-1.5">
+                        <ArrowUpCircle className="w-4 h-4 text-emerald-400" />
+                        <span>Nova versão {latestVersion} pronta para instalação!</span>
+                      </div>
+                      <p className="text-[10px] text-slate-300 mt-0.5">
+                        Clique abaixo para aplicar a atualização imediatamente sem perder dados locais.
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={applyUpdate}
+                      disabled={isApplyingUpdate}
+                      className="w-full sm:w-auto px-4 py-2 bg-gradient-to-r from-sky-500 to-emerald-500 hover:from-sky-400 hover:to-emerald-400 text-slate-950 font-black text-xs rounded-xl shadow-lg flex items-center justify-center gap-1.5 active:scale-95 transition-all"
+                    >
+                      <RefreshCw className={`w-3.5 h-3.5 ${isApplyingUpdate ? 'animate-spin' : ''}`} />
+                      <span>Atualizar Agora</span>
+                    </button>
+                  </div>
+                )}
+
+                {/* Update Action Buttons */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={handleManualCheckUpdates}
+                    disabled={isCheckingUpdate}
+                    className="flex items-center justify-center gap-2 p-2.5 rounded-xl bg-slate-900 hover:bg-slate-850 border border-slate-700 text-sky-400 hover:text-sky-300 font-bold text-xs active:scale-95 transition-all"
+                  >
+                    <RefreshCw className={`w-3.5 h-3.5 ${isCheckingUpdate ? 'animate-spin text-sky-400' : ''}`} />
+                    <span>{isCheckingUpdate ? 'Verificando Servidor...' : 'Verificar Atualizações'}</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      showConfirm({
+                        title: 'Forçar Atualização Limpa?',
+                        message: 'Isso reiniciará os componentes de cache do aplicativo no celular para forçar o download dos arquivos mais recentes da versão. Seus pontos, mapas e vistorias permanecerão intactos.',
+                        confirmText: 'Forçar Atualização',
+                        cancelText: 'Cancelar',
+                        type: 'info',
+                        onConfirm: forceCleanUpdate,
+                      });
+                    }}
+                    className="flex items-center justify-center gap-2 p-2.5 rounded-xl bg-slate-900 hover:bg-slate-850 border border-slate-700 text-amber-400 hover:text-amber-300 font-bold text-xs active:scale-95 transition-all"
+                  >
+                    <Zap className="w-3.5 h-3.5" />
+                    <span>Forçar Recarga Limpa</span>
+                  </button>
+                </div>
+
+                {lastCheckedTime && (
+                  <div className="text-[10px] text-slate-500 text-center flex items-center justify-center gap-1">
+                    <Clock className="w-3 h-3" />
+                    <span>Última verificação: {lastCheckedTime.toLocaleTimeString('pt-BR')}</span>
+                  </div>
+                )}
+              </div>
+
+              {/* Changelog / Novidades da Versão */}
+              <div className="bg-slate-950/60 border border-slate-800 rounded-2xl p-4 space-y-2.5">
+                <button
+                  type="button"
+                  onClick={() => setShowChangelog(!showChangelog)}
+                  className="w-full flex items-center justify-between text-xs font-bold text-slate-300 hover:text-white"
+                >
+                  <span className="flex items-center gap-1.5">
+                    <HelpCircle className="w-4 h-4 text-teal-400" />
+                    Novidades & Registro de Versões (Changelog)
+                  </span>
+                  <span className="text-[10px] font-bold text-sky-400">
+                    {showChangelog ? 'Ocultar' : 'Ver Detalhes'}
+                  </span>
+                </button>
+
+                {showChangelog && (
+                  <div className="space-y-3 pt-2 border-t border-slate-800/80 animate-in fade-in">
+                    {APP_CHANGELOG.map((item) => (
+                      <div key={item.version} className="bg-slate-900/80 p-3 rounded-xl border border-slate-800 space-y-1.5">
+                        <div className="flex items-center justify-between">
+                          <span className="font-bold text-white text-xs">
+                            {item.version} - {item.title}
+                          </span>
+                          <span className="text-[10px] text-slate-400 font-mono">{item.date}</span>
+                        </div>
+                        <ul className="space-y-1 text-[11px] text-slate-300 list-disc list-inside">
+                          {item.highlights.map((h, i) => (
+                            <li key={i} className="leading-snug text-slate-300">
+                              {h}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
 
               {/* Account Logout Box */}
