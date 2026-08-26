@@ -1,9 +1,26 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { collection, onSnapshot, doc, updateDoc, deleteDoc, getDocs, setDoc } from 'firebase/firestore';
+import {
+  collection,
+  onSnapshot,
+  doc,
+  updateDoc,
+  deleteDoc,
+  getDocs,
+  setDoc,
+  getDoc,
+} from 'firebase/firestore';
 import { db } from '../../lib/firebase';
 import { useAuth } from '../../context/AuthContext';
 import { useApp } from '../../context/AppContext';
-import { UserProfile, UserRole, UserStatus } from '../../types';
+import {
+  UserProfile,
+  UserRole,
+  UserStatus,
+  SubscriptionPlanType,
+  SubscriptionStatusType,
+  PromoCoupon,
+  SystemBillingConfig,
+} from '../../types';
 import {
   Users,
   Shield,
@@ -26,18 +43,72 @@ import {
   UserPlus,
   Plus,
   X,
-  Briefcase
+  Briefcase,
+  DollarSign,
+  TrendingUp,
+  CreditCard,
+  Send,
+  Lock,
+  Unlock,
+  Tag,
+  Gift,
+  Settings,
+  QrCode,
+  FileText,
+  AlertCircle,
+  Copy,
+  ExternalLink,
+  Edit3,
 } from 'lucide-react';
+
+const DEFAULT_BILLING_CONFIG: SystemBillingConfig = {
+  pixKey: '48.123.456/0001-90',
+  pixKeyType: 'cnpj',
+  beneficiaryName: 'AM TST SAÚDE E SEGURANÇA DO TRABALHO',
+  bankName: 'Banco Inter PJ / Nubank PJ',
+  defaultTrialDays: 14,
+  whatsappSupportNumber: '5511999999999',
+  customMessageTemplate:
+    'Olá {nome} ({empresa}), tudo bem? Sua assinatura do GoField Pro no valor de R$ {valor} vence em {vencimento}. Segue nossa Chave Pix ({chave_tipo}) para renovação: {chave_pix} ({titular}). Qualquer dúvida estamos à disposição!',
+};
 
 export const AdminPanel: React.FC = () => {
   const { profile } = useAuth();
-  const { notifySuccess, notifyError, showConfirm } = useApp();
+  const { notifySuccess, notifyError, notifyInfo, showConfirm } = useApp();
+
+  // Navigation subtabs inside Admin
+  const [adminTab, setAdminTab] = useState<'users' | 'subscriptions' | 'plans' | 'billing_settings'>('users');
+
+  // Users State
   const [users, setUsers] = useState<UserProfile[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [lastSyncTime, setLastSyncTime] = useState<string>(new Date().toLocaleTimeString('pt-BR'));
   const [filterStatus, setFilterStatus] = useState<'all' | 'pending' | 'active' | 'blocked'>('all');
+  const [subscriptionFilter, setSubscriptionFilter] = useState<'all' | 'active' | 'trial' | 'overdue' | 'suspended'>('all');
   const [searchQuery, setSearchQuery] = useState('');
+
+  // Billing Config State
+  const [billingConfig, setBillingConfig] = useState<SystemBillingConfig>(DEFAULT_BILLING_CONFIG);
+  const [savingBilling, setSavingBilling] = useState(false);
+
+  // Promo Coupons State
+  const [coupons, setCoupons] = useState<PromoCoupon[]>([]);
+  const [isCouponModalOpen, setIsCouponModalOpen] = useState(false);
+  const [newCouponCode, setNewCouponCode] = useState('');
+  const [newCouponDiscount, setNewCouponDiscount] = useState<number>(20);
+  const [newCouponMaxUses, setNewCouponMaxUses] = useState<number>(50);
+  const [newCouponDays, setNewCouponDays] = useState<number>(30);
+  const [savingCoupon, setSavingCoupon] = useState(false);
+
+  // Edit Subscription Modal State
+  const [editingUserSubscription, setEditingUserSubscription] = useState<UserProfile | null>(null);
+  const [subModalPlan, setSubModalPlan] = useState<SubscriptionPlanType>('pro_mensal');
+  const [subModalStatus, setSubModalStatus] = useState<SubscriptionStatusType>('active');
+  const [subModalValue, setSubModalValue] = useState<number>(97);
+  const [subModalExpiresAt, setSubModalExpiresAt] = useState<string>('');
+  const [subModalNotes, setSubModalNotes] = useState<string>('');
+  const [savingSubChanges, setSavingSubChanges] = useState(false);
 
   // Modal State for Adding/Pre-authorizing users
   const [isAddUserModalOpen, setIsAddUserModalOpen] = useState(false);
@@ -47,61 +118,28 @@ export const AdminPanel: React.FC = () => {
   const [newUserPhone, setNewUserPhone] = useState('');
   const [newUserRole, setNewUserRole] = useState<UserRole>('surveyor');
   const [newUserStatus, setNewUserStatus] = useState<UserStatus>('active');
+  const [newUserPlan, setNewUserPlan] = useState<SubscriptionPlanType>('free_trial');
+  const [newUserSubValue, setNewUserSubValue] = useState<number>(97);
   const [savingUser, setSavingUser] = useState(false);
 
-  const handleCreateOrAuthorizeUser = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newUserEmail.trim()) {
-      notifyError("Campo Obrigatório", "Por favor, informe o e-mail do colaborador.");
-      return;
-    }
-    setSavingUser(true);
-    try {
-      const emailClean = newUserEmail.trim().toLowerCase();
-      const existingUser = users.find(u => u.email.toLowerCase() === emailClean);
-      const targetUid = existingUser ? existingUser.uid : `user_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`;
-      const userRef = doc(db, 'users', targetUid);
-
-      const newUserData: UserProfile = {
-        uid: targetUid,
-        email: emailClean,
-        name: newUserName.trim() || emailClean.split('@')[0] || 'Operador de Campo',
-        role: newUserRole,
-        status: newUserStatus,
-        company: newUserCompany.trim() || 'AM TST SAÚDE E SEGURANÇA DO TRABALHO',
-        phone: newUserPhone.trim(),
-        requestedRole: newUserRole,
-        avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(newUserName.trim() || emailClean)}&background=0284c7&color=fff`,
-        createdAt: existingUser?.createdAt || new Date().toISOString(),
-        approvedAt: newUserStatus === 'active' ? new Date().toISOString() : undefined,
-        approvedBy: newUserStatus === 'active' ? (profile?.name || 'Administrador') : undefined,
-      };
-
-      await setDoc(userRef, newUserData, { merge: true });
-      notifySuccess(
-        newUserStatus === 'active' ? "Usuário Liberado com Sucesso!" : "Solicitação Registrada!",
-        `${newUserData.name} (${newUserData.email}) foi salvo no banco de dados.`
-      );
-      setIsAddUserModalOpen(false);
-      setNewUserName('');
-      setNewUserEmail('');
-      setNewUserCompany('');
-      setNewUserPhone('');
-      setNewUserRole('surveyor');
-      setNewUserStatus('active');
-      manualSync();
-    } catch (err: any) {
-      console.error("Error creating user:", err);
-      notifyError("Erro ao Salvar", "Não foi possível registrar o usuário no banco de dados.");
-    } finally {
-      setSavingUser(false);
-    }
-  };
-
+  // Helper to parse snapshot with subscription defaults
   const parseUsersSnapshot = (snapshotDocs: any[]): UserProfile[] => {
     const usersData = snapshotDocs.map((docSnap) => {
       const data = typeof docSnap.data === 'function' ? docSnap.data() : docSnap;
       const isOwner = (data.email || '').toLowerCase() === 'alexandre1604981@gmail.com';
+
+      // Default calculation for expiry date if not set (default 14 days trial from creation)
+      let defaultExpires = data.subscriptionExpiresAt;
+      if (!defaultExpires) {
+        const createdDate = data.createdAt ? new Date(data.createdAt) : new Date();
+        const expiry = new Date(createdDate);
+        expiry.setDate(expiry.getDate() + 14);
+        defaultExpires = expiry.toISOString().split('T')[0];
+      }
+
+      const rawStatus = data.subscriptionStatus || (isOwner ? 'active' : 'trial');
+      const planVal = typeof data.subscriptionValue === 'number' ? data.subscriptionValue : (isOwner ? 0 : 97);
+
       return {
         uid: docSnap.id || data.uid,
         email: data.email || '',
@@ -109,12 +147,23 @@ export const AdminPanel: React.FC = () => {
         role: isOwner ? 'super_admin' : ((data.role as UserRole) || 'surveyor'),
         status: isOwner ? 'active' : ((data.status as UserStatus) || 'pending'),
         company: data.company || '',
+        companyCnpj: data.companyCnpj || '',
         phone: data.phone || '',
         requestedRole: data.requestedRole || data.role || 'surveyor',
-        avatar: data.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(data.name || 'U')}&background=0284c7&color=fff`,
+        avatar:
+          data.avatar ||
+          `https://ui-avatars.com/api/?name=${encodeURIComponent(data.name || 'U')}&background=0284c7&color=fff`,
         createdAt: data.createdAt || new Date().toISOString(),
         approvedAt: data.approvedAt,
         approvedBy: data.approvedBy,
+        subscriptionPlan: data.subscriptionPlan || (isOwner ? 'florestal_corporativo' : 'free_trial'),
+        subscriptionStatus: isOwner ? 'active' : rawStatus,
+        subscriptionExpiresAt: defaultExpires,
+        subscriptionValue: planVal,
+        paymentMethod: data.paymentMethod || 'pix',
+        billingNotes: data.billingNotes || '',
+        maxUsersAllowed: data.maxUsersAllowed || 5,
+        lastPaymentDate: data.lastPaymentDate,
       } as UserProfile;
     });
 
@@ -127,23 +176,34 @@ export const AdminPanel: React.FC = () => {
     return usersData;
   };
 
-  const manualSync = useCallback(async () => {
-    setRefreshing(true);
-    try {
-      const usersRef = collection(db, 'users');
-      const snapshot = await getDocs(usersRef);
-      const list = parseUsersSnapshot(snapshot.docs);
-      setUsers(list);
-      setLastSyncTime(new Date().toLocaleTimeString('pt-BR'));
-      notifySuccess("Sincronização Concluída", `${list.length} usuário(s) sincronizados com o banco de dados.`);
-    } catch (err: any) {
-      console.error("Manual sync error:", err);
-      notifyError("Erro de Sincronização", "Não foi possível carregar a lista de usuários.");
-    } finally {
-      setRefreshing(false);
-      setLoading(false);
-    }
-  }, [notifySuccess, notifyError]);
+  // Load Billing Config from Firestore
+  useEffect(() => {
+    if (profile?.role !== 'super_admin') return;
+
+    const loadBillingConfig = async () => {
+      try {
+        const configDoc = await getDoc(doc(db, 'system_config', 'billing'));
+        if (configDoc.exists()) {
+          setBillingConfig({ ...DEFAULT_BILLING_CONFIG, ...configDoc.data() });
+        }
+      } catch (e) {
+        console.warn('Could not load billing config from Firestore, using local defaults', e);
+      }
+    };
+
+    const loadCoupons = async () => {
+      try {
+        const couponsSnap = await getDocs(collection(db, 'coupons'));
+        const couponList = couponsSnap.docs.map((d) => ({ id: d.id, ...d.data() } as PromoCoupon));
+        setCoupons(couponList);
+      } catch (e) {
+        console.warn('Could not load coupons from Firestore', e);
+      }
+    };
+
+    loadBillingConfig();
+    loadCoupons();
+  }, [profile]);
 
   // Real-time synchronization of all registered users
   useEffect(() => {
@@ -162,13 +222,250 @@ export const AdminPanel: React.FC = () => {
         setLoading(false);
       },
       (error) => {
-        console.error("Error with real-time users listener:", error);
+        console.error('Error with real-time users listener:', error);
         setLoading(false);
       }
     );
 
     return () => unsubscribe();
   }, [profile]);
+
+  // Manual Sync
+  const manualSync = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      const usersRef = collection(db, 'users');
+      const snapshot = await getDocs(usersRef);
+      const list = parseUsersSnapshot(snapshot.docs);
+      setUsers(list);
+      setLastSyncTime(new Date().toLocaleTimeString('pt-BR'));
+      notifySuccess('Sincronização Concluída', `${list.length} usuário(s) sincronizados com o banco de dados.`);
+    } catch (err: any) {
+      console.error('Manual sync error:', err);
+      notifyError('Erro de Sincronização', 'Não foi possível carregar a lista de usuários.');
+    } finally {
+      setRefreshing(false);
+      setLoading(false);
+    }
+  }, [notifySuccess, notifyError]);
+
+  // Save Billing Configuration
+  const handleSaveBillingConfig = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSavingBilling(true);
+    try {
+      await setDoc(doc(db, 'system_config', 'billing'), billingConfig, { merge: true });
+      notifySuccess('Configurações Salvas!', 'Os dados de cobrança Pix e mensagens foram atualizados na nuvem.');
+    } catch (err: any) {
+      console.error('Error saving billing config:', err);
+      notifyError('Erro ao Salvar', 'Não foi possível atualizar as configurações de cobrança.');
+    } finally {
+      setSavingBilling(false);
+    }
+  };
+
+  // Create Promo Coupon
+  const handleCreateCoupon = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newCouponCode.trim()) return;
+    setSavingCoupon(true);
+    try {
+      const expiry = new Date();
+      expiry.setDate(expiry.getDate() + (newCouponDays || 30));
+      const cleanCode = newCouponCode.trim().toUpperCase().replace(/\s+/g, '');
+
+      const newCouponData: PromoCoupon = {
+        id: `coupon_${cleanCode}`,
+        code: cleanCode,
+        discountPercent: Number(newCouponDiscount) || 10,
+        validUntil: expiry.toISOString().split('T')[0],
+        maxUses: Number(newCouponMaxUses) || 50,
+        usedCount: 0,
+        active: true,
+        notes: `Criado em ${new Date().toLocaleDateString('pt-BR')}`,
+      };
+
+      await setDoc(doc(db, 'coupons', newCouponData.id), newCouponData);
+      setCoupons((prev) => [newCouponData, ...prev.filter((c) => c.id !== newCouponData.id)]);
+      notifySuccess('Cupom Criado com Sucesso!', `O código ${cleanCode} está ativo com ${newCouponDiscount}% OFF.`);
+      setIsCouponModalOpen(false);
+      setNewCouponCode('');
+    } catch (err: any) {
+      console.error('Error creating coupon:', err);
+      notifyError('Erro ao Criar Cupom', 'Não foi possível salvar o cupom no banco.');
+    } finally {
+      setSavingCoupon(false);
+    }
+  };
+
+  const handleDeleteCoupon = async (couponId: string) => {
+    try {
+      await deleteDoc(doc(db, 'coupons', couponId));
+      setCoupons((prev) => prev.filter((c) => c.id !== couponId));
+      notifySuccess('Cupom Removido', 'O cupom foi excluído com sucesso.');
+    } catch (err) {
+      notifyError('Erro', 'Não foi possível excluir o cupom.');
+    }
+  };
+
+  // 1-Click WhatsApp Billing
+  const handleSendWhatsAppBilling = (targetUser: UserProfile) => {
+    if (!targetUser.phone) {
+      notifyError('WhatsApp Indisponível', `O cliente ${targetUser.name} não possui telefone/WhatsApp cadastrado.`);
+      return;
+    }
+
+    const cleanPhone = targetUser.phone.replace(/\D/g, '');
+    const phoneWithCountry = cleanPhone.startsWith('55') ? cleanPhone : `55${cleanPhone}`;
+
+    const formattedExpiry = targetUser.subscriptionExpiresAt
+      ? new Date(targetUser.subscriptionExpiresAt).toLocaleDateString('pt-BR')
+      : 'hoje';
+
+    const message = billingConfig.customMessageTemplate
+      .replace('{nome}', targetUser.name || 'Cliente')
+      .replace('{empresa}', targetUser.company || 'sua empresa')
+      .replace('{valor}', (targetUser.subscriptionValue || 97).toFixed(2))
+      .replace('{vencimento}', formattedExpiry)
+      .replace('{chave_pix}', billingConfig.pixKey)
+      .replace('{chave_tipo}', billingConfig.pixKeyType.toUpperCase())
+      .replace('{titular}', billingConfig.beneficiaryName);
+
+    const whatsappUrl = `https://wa.me/${phoneWithCountry}?text=${encodeURIComponent(message)}`;
+    window.open(whatsappUrl, '_blank');
+  };
+
+  // 1-Click +7 Days Extension (Cortesia)
+  const handleExtend7Days = async (targetUser: UserProfile) => {
+    try {
+      const currentExpiry = targetUser.subscriptionExpiresAt ? new Date(targetUser.subscriptionExpiresAt) : new Date();
+      // If already expired, start from today + 7, otherwise current expiry + 7
+      const baseDate = currentExpiry.getTime() < Date.now() ? new Date() : currentExpiry;
+      baseDate.setDate(baseDate.getDate() + 7);
+      const newExpiryStr = baseDate.toISOString().split('T')[0];
+
+      const userRef = doc(db, 'users', targetUser.uid);
+      await updateDoc(userRef, {
+        subscriptionExpiresAt: newExpiryStr,
+        subscriptionStatus: 'active',
+      });
+
+      notifySuccess(
+        '+7 Dias Concedidos!',
+        `A assinatura de ${targetUser.name} foi prorrogada até ${baseDate.toLocaleDateString('pt-BR')}.`
+      );
+    } catch (err) {
+      console.error('Error extending days:', err);
+      notifyError('Erro ao Prorrogar', 'Não foi possível atualizar a data de vencimento.');
+    }
+  };
+
+  // 1-Click Toggle Suspension
+  const handleToggleSuspension = async (targetUser: UserProfile) => {
+    const isCurrentlySuspended = targetUser.subscriptionStatus === 'suspended' || targetUser.status === 'blocked';
+    const newSubStatus: SubscriptionStatusType = isCurrentlySuspended ? 'active' : 'suspended';
+    const newStatus: UserStatus = isCurrentlySuspended ? 'active' : 'blocked';
+
+    try {
+      const userRef = doc(db, 'users', targetUser.uid);
+      await updateDoc(userRef, {
+        subscriptionStatus: newSubStatus,
+        status: newStatus,
+      });
+
+      notifySuccess(
+        isCurrentlySuspended ? 'Acesso Reativado!' : 'Acesso Suspenso!',
+        `${targetUser.name} agora está com status ${isCurrentlySuspended ? 'Ativo' : 'Suspenso'}.`
+      );
+    } catch (err) {
+      console.error('Error toggling suspension:', err);
+      notifyError('Erro', 'Não foi possível alterar o status de acesso.');
+    }
+  };
+
+  // Save Full Subscription Modal
+  const handleSaveSubscriptionChanges = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingUserSubscription) return;
+
+    setSavingSubChanges(true);
+    try {
+      const userRef = doc(db, 'users', editingUserSubscription.uid);
+      await updateDoc(userRef, {
+        subscriptionPlan: subModalPlan,
+        subscriptionStatus: subModalStatus,
+        subscriptionValue: Number(subModalValue) || 0,
+        subscriptionExpiresAt: subModalExpiresAt,
+        billingNotes: subModalNotes.trim(),
+        status: subModalStatus === 'suspended' ? 'blocked' : 'active',
+      });
+
+      notifySuccess('Assinatura Atualizada!', `Os dados comerciais de ${editingUserSubscription.name} foram salvos.`);
+      setEditingUserSubscription(null);
+    } catch (err) {
+      console.error('Error saving subscription changes:', err);
+      notifyError('Erro ao Salvar', 'Não foi possível salvar as alterações da assinatura.');
+    } finally {
+      setSavingSubChanges(false);
+    }
+  };
+
+  // Create Or Authorize User
+  const handleCreateOrAuthorizeUser = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newUserEmail.trim()) {
+      notifyError('Campo Obrigatório', 'Por favor, informe o e-mail do colaborador.');
+      return;
+    }
+    setSavingUser(true);
+    try {
+      const emailClean = newUserEmail.trim().toLowerCase();
+      const existingUser = users.find((u) => u.email.toLowerCase() === emailClean);
+      const targetUid = existingUser ? existingUser.uid : `user_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`;
+      const userRef = doc(db, 'users', targetUid);
+
+      const expiry = new Date();
+      expiry.setDate(expiry.getDate() + (newUserPlan === 'free_trial' ? billingConfig.defaultTrialDays : 30));
+
+      const newUserData: UserProfile = {
+        uid: targetUid,
+        email: emailClean,
+        name: newUserName.trim() || emailClean.split('@')[0] || 'Operador de Campo',
+        role: newUserRole,
+        status: newUserStatus,
+        company: newUserCompany.trim() || 'AM TST SAÚDE E SEGURANÇA DO TRABALHO',
+        phone: newUserPhone.trim(),
+        requestedRole: newUserRole,
+        avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(newUserName.trim() || emailClean)}&background=0284c7&color=fff`,
+        createdAt: existingUser?.createdAt || new Date().toISOString(),
+        approvedAt: newUserStatus === 'active' ? new Date().toISOString() : undefined,
+        approvedBy: newUserStatus === 'active' ? profile?.name || 'Administrador' : undefined,
+        subscriptionPlan: newUserPlan,
+        subscriptionStatus: newUserPlan === 'free_trial' ? 'trial' : 'active',
+        subscriptionValue: Number(newUserSubValue) || 97,
+        subscriptionExpiresAt: expiry.toISOString().split('T')[0],
+      };
+
+      await setDoc(userRef, newUserData, { merge: true });
+      notifySuccess(
+        newUserStatus === 'active' ? 'Usuário Liberado com Sucesso!' : 'Solicitação Registrada!',
+        `${newUserData.name} (${newUserData.email}) foi salvo com plano ${newUserPlan}.`
+      );
+      setIsAddUserModalOpen(false);
+      setNewUserName('');
+      setNewUserEmail('');
+      setNewUserCompany('');
+      setNewUserPhone('');
+      setNewUserRole('surveyor');
+      setNewUserStatus('active');
+      manualSync();
+    } catch (err: any) {
+      console.error('Error creating user:', err);
+      notifyError('Erro ao Salvar', 'Não foi possível registrar o usuário no banco de dados.');
+    } finally {
+      setSavingUser(false);
+    }
+  };
 
   const handleApproveUser = async (userToApprove: UserProfile, assignedRole?: UserRole) => {
     try {
@@ -180,10 +477,10 @@ export const AdminPanel: React.FC = () => {
         approvedAt: new Date().toISOString(),
         approvedBy: profile?.name || 'Administrador',
       });
-      notifySuccess("Acesso Liberado!", `${userToApprove.name} agora tem acesso ao GoField Pro.`);
+      notifySuccess('Acesso Liberado!', `${userToApprove.name} agora tem acesso ao GoField Pro.`);
     } catch (error) {
-      console.error("Error approving user:", error);
-      notifyError("Falha na Liberação", "Não foi possível liberar o acesso do usuário.");
+      console.error('Error approving user:', error);
+      notifyError('Falha na Liberação', 'Não foi possível liberar o acesso do usuário.');
     }
   };
 
@@ -197,25 +494,14 @@ export const AdminPanel: React.FC = () => {
       onConfirm: async () => {
         try {
           const userRef = doc(db, 'users', userToBlock.uid);
-          await updateDoc(userRef, { status: 'blocked' });
-          notifySuccess("Usuário Bloqueado", `O acesso de ${userToBlock.name} foi bloqueado.`);
+          await updateDoc(userRef, { status: 'blocked', subscriptionStatus: 'suspended' });
+          notifySuccess('Usuário Bloqueado', `O acesso de ${userToBlock.name} foi bloqueado.`);
         } catch (error) {
-          console.error("Error blocking user:", error);
-          notifyError("Erro ao bloquear", "Não foi possível alterar o status do usuário.");
+          console.error('Error blocking user:', error);
+          notifyError('Erro ao bloquear', 'Não foi possível alterar o status do usuário.');
         }
       },
     });
-  };
-
-  const handleRoleChange = async (uid: string, newRole: UserRole) => {
-    try {
-      const userRef = doc(db, 'users', uid);
-      await updateDoc(userRef, { role: newRole });
-      notifySuccess("Nível de Acesso Atualizado", `Permissão alterada com sucesso.`);
-    } catch (error) {
-      console.error("Error updating role:", error);
-      notifyError("Falha na Permissão", "Não foi possível atualizar o nível de acesso.");
-    }
   };
 
   const handleDeleteUser = async (userToDelete: UserProfile) => {
@@ -229,10 +515,10 @@ export const AdminPanel: React.FC = () => {
         try {
           const userRef = doc(db, 'users', userToDelete.uid);
           await deleteDoc(userRef);
-          notifySuccess("Cadastro Removido", `O registro de ${userToDelete.name} foi apagado.`);
+          notifySuccess('Cadastro Removido', `O registro de ${userToDelete.name} foi apagado.`);
         } catch (error) {
-          console.error("Error deleting user:", error);
-          notifyError("Erro ao excluir", "Não foi possível remover o registro do usuário.");
+          console.error('Error deleting user:', error);
+          notifyError('Erro ao excluir', 'Não foi possível remover o registro do usuário.');
         }
       },
     });
@@ -245,672 +531,968 @@ export const AdminPanel: React.FC = () => {
           <Shield className="w-12 h-12 text-red-500 mx-auto mb-4" />
           <h2 className="text-xl font-bold text-white mb-2">Acesso Negado</h2>
           <p className="text-slate-400 text-sm">
-            Você não possui permissões de Administrador para acessar o painel de controle de usuários.
+            Você não possui permissões de Administrador para acessar o painel comercial e de controle.
           </p>
         </div>
       </div>
     );
   }
 
-  const pendingUsers = users.filter((u) => u.status === 'pending');
-  const activeUsers = users.filter((u) => u.status === 'active');
-  const blockedUsers = users.filter((u) => u.status === 'blocked');
+  // --- Financial & Metric Calculations ---
+  const activePayingUsers = users.filter(
+    (u) => (u.subscriptionStatus === 'active' || u.status === 'active') && u.email !== 'alexandre1604981@gmail.com'
+  );
+  const trialUsers = users.filter((u) => u.subscriptionStatus === 'trial' || u.subscriptionPlan === 'free_trial');
 
-  const filteredUsers = users.filter((u) => {
-    if (filterStatus === 'pending') return u.status === 'pending';
-    if (filterStatus === 'active') return u.status === 'active';
-    if (filterStatus === 'blocked') return u.status === 'blocked';
-    return true;
-  }).filter((u) => {
-    if (!searchQuery.trim()) return true;
-    const query = searchQuery.toLowerCase();
-    return (
-      u.name?.toLowerCase().includes(query) ||
-      u.email?.toLowerCase().includes(query) ||
-      u.company?.toLowerCase().includes(query) ||
-      u.phone?.toLowerCase().includes(query)
-    );
+  // Overdue check: status is overdue OR expiry date is past today
+  const overdueUsers = users.filter((u) => {
+    if (u.email === 'alexandre1604981@gmail.com') return false;
+    if (u.subscriptionStatus === 'overdue') return true;
+    if (u.subscriptionExpiresAt) {
+      const expDate = new Date(u.subscriptionExpiresAt).getTime();
+      return expDate < Date.now() && u.subscriptionStatus !== 'suspended';
+    }
+    return false;
   });
+
+  const suspendedUsers = users.filter((u) => u.subscriptionStatus === 'suspended' || u.status === 'blocked');
+
+  // MRR: Sum of monthly subscription values for active paying users
+  const totalMrr = users
+    .filter((u) => u.subscriptionStatus === 'active' && u.email !== 'alexandre1604981@gmail.com')
+    .reduce((sum, u) => sum + (u.subscriptionValue || 0), 0);
+
+  const projectedArr = totalMrr * 12;
+
+  // Filtered Users List for Users Tab
+  const filteredUsers = users
+    .filter((u) => {
+      if (filterStatus === 'pending') return u.status === 'pending';
+      if (filterStatus === 'active') return u.status === 'active';
+      if (filterStatus === 'blocked') return u.status === 'blocked';
+      return true;
+    })
+    .filter((u) => {
+      if (!searchQuery.trim()) return true;
+      const query = searchQuery.toLowerCase();
+      return (
+        u.name?.toLowerCase().includes(query) ||
+        u.email?.toLowerCase().includes(query) ||
+        u.company?.toLowerCase().includes(query) ||
+        u.phone?.toLowerCase().includes(query)
+      );
+    });
+
+  // Filtered Users List for Subscriptions Tab
+  const filteredSubscriptions = users
+    .filter((u) => {
+      if (subscriptionFilter === 'active') return u.subscriptionStatus === 'active';
+      if (subscriptionFilter === 'trial') return u.subscriptionStatus === 'trial';
+      if (subscriptionFilter === 'overdue') {
+        const isExp = u.subscriptionExpiresAt ? new Date(u.subscriptionExpiresAt).getTime() < Date.now() : false;
+        return u.subscriptionStatus === 'overdue' || isExp;
+      }
+      if (subscriptionFilter === 'suspended') return u.subscriptionStatus === 'suspended' || u.status === 'blocked';
+      return true;
+    })
+    .filter((u) => {
+      if (!searchQuery.trim()) return true;
+      const query = searchQuery.toLowerCase();
+      return (
+        u.name?.toLowerCase().includes(query) ||
+        u.email?.toLowerCase().includes(query) ||
+        u.company?.toLowerCase().includes(query) ||
+        u.phone?.toLowerCase().includes(query)
+      );
+    });
 
   return (
     <div className="h-full overflow-y-auto p-3 sm:p-5 space-y-5 max-w-6xl mx-auto text-slate-100 pb-32 sm:pb-20">
-      {/* Header Bar */}
-      <div className="bg-slate-900 border border-slate-800 p-4 sm:p-5 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-xl">
-        <div>
-          <h2 className="font-extrabold text-lg sm:text-xl text-white flex items-center gap-2.5">
-            <UserCog className="w-6 h-6 text-sky-400 shrink-0" />
-            Controle de Acessos & Equipe
-          </h2>
-          <p className="text-xs text-slate-400 mt-1">
-            Libere novos cadastros de operadores, atribua cargos e gerencie a equipe de campo em tempo real.
-          </p>
+      {/* Header Bar with Subtabs Navigation */}
+      <div className="bg-slate-900 border border-slate-800 p-4 sm:p-5 rounded-3xl shadow-2xl space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] font-black uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                Central SuperAdmin
+              </span>
+              <span className="text-xs text-slate-400">• AM TST Gestão & Cartografia</span>
+            </div>
+            <h2 className="font-extrabold text-xl sm:text-2xl text-white tracking-tight mt-1 flex items-center gap-2">
+              <UserCog className="w-6 h-6 text-sky-400 shrink-0" />
+              Gestão Comercial & Controle de Acesso
+            </h2>
+          </div>
+
+          <div className="flex items-center gap-2 flex-wrap">
+            <button
+              onClick={() => setIsAddUserModalOpen(true)}
+              className="bg-sky-600 hover:bg-sky-500 text-white px-3.5 py-2 rounded-xl flex items-center gap-1.5 text-xs font-bold transition-all active:scale-95 shadow-lg shadow-sky-950/40"
+            >
+              <UserPlus className="w-4 h-4" />
+              <span>Novo Cliente / Usuário</span>
+            </button>
+            <button
+              onClick={manualSync}
+              disabled={refreshing}
+              className="bg-slate-950 hover:bg-slate-800 border border-slate-700/80 px-3 py-2 rounded-xl flex items-center gap-1.5 text-xs font-bold text-sky-400 transition-all active:scale-95 shadow-md"
+              title="Sincronizar dados em tempo real"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${refreshing ? 'animate-spin' : ''}`} />
+              <span>Atualizar</span>
+            </button>
+          </div>
         </div>
 
-        <div className="flex items-center gap-2 flex-wrap">
+        {/* Subtabs Buttons */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-2 border-t border-slate-800/80">
           <button
-            onClick={() => setIsAddUserModalOpen(true)}
-            className="bg-sky-600 hover:bg-sky-500 text-white px-3.5 py-1.5 rounded-xl flex items-center gap-1.5 text-xs font-bold transition-all active:scale-95 shadow-lg shadow-sky-950/40"
+            onClick={() => setAdminTab('users')}
+            className={`p-2.5 rounded-2xl border text-xs font-bold flex items-center justify-center gap-2 transition-all ${
+              adminTab === 'users'
+                ? 'bg-sky-600 border-sky-500 text-white shadow-lg shadow-sky-950/50'
+                : 'bg-slate-950/60 border-slate-800 text-slate-400 hover:text-white hover:bg-slate-950'
+            }`}
           >
-            <UserPlus className="w-4 h-4" />
-            <span>Cadastrar / Liberar Usuário</span>
+            <Users className="w-4 h-4" />
+            <span>Usuários & Equipes</span>
+            {users.filter((u) => u.status === 'pending').length > 0 && (
+              <span className="px-1.5 py-0.5 rounded-full text-[10px] bg-amber-500 text-slate-950 font-black animate-pulse">
+                {users.filter((u) => u.status === 'pending').length}
+              </span>
+            )}
           </button>
+
           <button
-            onClick={manualSync}
-            disabled={refreshing}
-            className="bg-slate-950 hover:bg-slate-800 border border-slate-700/80 hover:border-sky-500/60 px-3 py-1.5 rounded-xl flex items-center gap-2 text-xs font-bold text-sky-400 transition-all active:scale-95 shadow-md"
-            title="Forçar sincronização imediata com o Firestore"
+            onClick={() => setAdminTab('subscriptions')}
+            className={`p-2.5 rounded-2xl border text-xs font-bold flex items-center justify-center gap-2 transition-all ${
+              adminTab === 'subscriptions'
+                ? 'bg-emerald-600 border-emerald-500 text-white shadow-lg shadow-emerald-950/50'
+                : 'bg-slate-950/60 border-slate-800 text-slate-400 hover:text-white hover:bg-slate-950'
+            }`}
           >
-            <RefreshCw className={`w-3.5 h-3.5 ${refreshing ? 'animate-spin text-sky-300' : ''}`} />
-            <span>{refreshing ? 'Sincronizando...' : 'Sincronizar Banco'}</span>
-            <span className="text-[10px] text-slate-500 font-normal ml-0.5">({lastSyncTime})</span>
+            <DollarSign className="w-4 h-4" />
+            <span>Assinaturas & Receita</span>
+            {overdueUsers.length > 0 && (
+              <span className="px-1.5 py-0.5 rounded-full text-[10px] bg-red-500 text-white font-black animate-pulse">
+                {overdueUsers.length}
+              </span>
+            )}
           </button>
-          <div className="bg-amber-950/60 border border-amber-800/80 px-3 py-1.5 rounded-xl flex items-center gap-2 text-xs font-bold text-amber-300">
-            <Clock className="w-4 h-4" />
-            <span>{pendingUsers.length} Pendentes</span>
-          </div>
-          <div className="bg-emerald-950/60 border border-emerald-800/80 px-3 py-1.5 rounded-xl flex items-center gap-2 text-xs font-bold text-emerald-300">
-            <CheckCircle2 className="w-4 h-4" />
-            <span>{activeUsers.length} Ativos</span>
-          </div>
+
+          <button
+            onClick={() => setAdminTab('plans')}
+            className={`p-2.5 rounded-2xl border text-xs font-bold flex items-center justify-center gap-2 transition-all ${
+              adminTab === 'plans'
+                ? 'bg-indigo-600 border-indigo-500 text-white shadow-lg shadow-indigo-950/50'
+                : 'bg-slate-950/60 border-slate-800 text-slate-400 hover:text-white hover:bg-slate-950'
+            }`}
+          >
+            <Tag className="w-4 h-4" />
+            <span>Planos & Promoções</span>
+          </button>
+
+          <button
+            onClick={() => setAdminTab('billing_settings')}
+            className={`p-2.5 rounded-2xl border text-xs font-bold flex items-center justify-center gap-2 transition-all ${
+              adminTab === 'billing_settings'
+                ? 'bg-amber-600 border-amber-500 text-white shadow-lg shadow-amber-950/50'
+                : 'bg-slate-950/60 border-slate-800 text-slate-400 hover:text-white hover:bg-slate-950'
+            }`}
+          >
+            <Settings className="w-4 h-4" />
+            <span>Dados de Cobrança (Pix)</span>
+          </button>
         </div>
       </div>
 
-      {/* PENDING APPROVALS ALERT BANNER (If any users are waiting) */}
-      {pendingUsers.length > 0 && (
-        <div className="bg-gradient-to-r from-amber-950/80 via-slate-900 to-amber-950/80 border-2 border-amber-500/60 p-4 sm:p-5 rounded-2xl shadow-2xl space-y-3.5">
-          <div className="flex items-center justify-between gap-3">
-            <div className="flex items-center gap-2.5">
-              <div className="w-9 h-9 rounded-xl bg-amber-500/20 border border-amber-500/40 flex items-center justify-center text-amber-400 shrink-0">
-                <Clock className="w-5 h-5 animate-pulse" />
+      {/* ========================================================================= */}
+      {/* TAB 2: ASSINATURAS, RECEITA (MRR) E GESTÃO DE INADIMPLENTES               */}
+      {/* ========================================================================= */}
+      {adminTab === 'subscriptions' && (
+        <div className="space-y-5 animate-in fade-in duration-200">
+          {/* Financial KPI Summary Cards */}
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+            {/* MRR Card */}
+            <div className="bg-slate-900 border border-emerald-500/40 rounded-2xl p-4 shadow-xl flex flex-col justify-between relative overflow-hidden">
+              <div className="absolute top-0 right-0 w-24 h-24 bg-emerald-500/10 rounded-full blur-2xl pointer-events-none" />
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">MRR (Mensal)</span>
+                <div className="w-8 h-8 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center">
+                  <TrendingUp className="w-4 h-4" />
+                </div>
               </div>
-              <div>
-                <h3 className="font-bold text-sm sm:text-base text-amber-300">
-                  {pendingUsers.length} {pendingUsers.length === 1 ? 'Solicitação de Acesso Aguardando Liberação' : 'Solicitações de Acesso Aguardando Liberação'}
-                </h3>
-                <p className="text-xs text-amber-200/80">
-                  Novos operadores se cadastraram no aplicativo e precisam que você libere o acesso.
-                </p>
+              <div className="mt-2">
+                <div className="text-xl sm:text-2xl font-black text-emerald-400 font-mono">
+                  R$ {totalMrr.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                </div>
+                <div className="text-[10px] text-slate-400 mt-0.5">
+                  ARR Projetado: <b>R$ {projectedArr.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}/ano</b>
+                </div>
               </div>
             </div>
-            <button
-              onClick={() => setFilterStatus('pending')}
-              className="hidden sm:inline-flex text-xs font-bold px-3 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 transition-all"
+
+            {/* Ativos Card */}
+            <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 shadow-xl flex flex-col justify-between">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Clientes Ativos</span>
+                <div className="w-8 h-8 rounded-xl bg-sky-500/20 text-sky-400 flex items-center justify-center">
+                  <CheckCircle2 className="w-4 h-4" />
+                </div>
+              </div>
+              <div className="mt-2">
+                <div className="text-xl sm:text-2xl font-black text-white font-mono">{activePayingUsers.length}</div>
+                <div className="text-[10px] text-emerald-400 font-semibold mt-0.5">Assinaturas adimplentes</div>
+              </div>
+            </div>
+
+            {/* Trial Card */}
+            <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 shadow-xl flex flex-col justify-between">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Em Teste Grátis</span>
+                <div className="w-8 h-8 rounded-xl bg-amber-500/20 text-amber-400 flex items-center justify-center">
+                  <Gift className="w-4 h-4" />
+                </div>
+              </div>
+              <div className="mt-2">
+                <div className="text-xl sm:text-2xl font-black text-amber-400 font-mono">{trialUsers.length}</div>
+                <div className="text-[10px] text-slate-400 mt-0.5">Potenciais conversões</div>
+              </div>
+            </div>
+
+            {/* Overdue / Inadimplentes Card */}
+            <div
+              className={`bg-slate-900 border rounded-2xl p-4 shadow-xl flex flex-col justify-between ${
+                overdueUsers.length > 0 ? 'border-red-500/60 bg-red-950/10' : 'border-slate-800'
+              }`}
             >
-              Ver Todas
-            </button>
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Inadimplentes</span>
+                <div className="w-8 h-8 rounded-xl bg-red-500/20 text-red-400 flex items-center justify-center">
+                  <AlertCircle className="w-4 h-4" />
+                </div>
+              </div>
+              <div className="mt-2">
+                <div className="text-xl sm:text-2xl font-black text-red-400 font-mono">{overdueUsers.length}</div>
+                <div className="text-[10px] text-slate-400 mt-0.5">
+                  {overdueUsers.length > 0 ? 'Requer cobrança via WhatsApp' : 'Nenhuma fatura atrasada'}
+                </div>
+              </div>
+            </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-1">
-            {pendingUsers.map((pendingUser) => (
-              <div
-                key={pendingUser.uid}
-                className="bg-slate-950/90 border border-amber-500/40 p-4 rounded-xl flex flex-col justify-between gap-3 shadow-lg hover:border-amber-400 transition-all"
-              >
-                <div className="flex items-start justify-between gap-2">
-                  <div className="flex items-center gap-3">
-                    <img
-                      src={pendingUser.avatar}
-                      alt={pendingUser.name}
-                      className="w-10 h-10 rounded-full border-2 border-amber-500/60 object-cover shrink-0"
-                    />
-                    <div>
-                      <div className="font-bold text-sm text-white flex items-center gap-2">
-                        <span>{pendingUser.name}</span>
-                        <span className="text-[10px] px-2 py-0.2 bg-amber-900/60 border border-amber-700 text-amber-300 rounded-md font-semibold">
-                          Novo
-                        </span>
-                      </div>
-                      <div className="text-xs text-slate-400 flex items-center gap-1 mt-0.5">
-                        <Mail className="w-3.5 h-3.5 text-slate-500" />
-                        <span>{pendingUser.email}</span>
-                      </div>
-                      {pendingUser.company && (
-                        <div className="text-[11px] text-slate-400 flex items-center gap-1 mt-0.5">
+          {/* Subscriptions Filter Bar & Search */}
+          <div className="bg-slate-900/80 border border-slate-800 p-3.5 rounded-2xl flex flex-col sm:flex-row items-center justify-between gap-3 shadow-lg">
+            <div className="flex items-center gap-1.5 overflow-x-auto w-full sm:w-auto pb-1 sm:pb-0 text-xs">
+              {(
+                [
+                  { id: 'all', label: 'Todos os Contratos', count: users.length },
+                  { id: 'active', label: 'Adimplentes (Ativos)', count: activePayingUsers.length },
+                  { id: 'trial', label: 'Em Teste (Trial)', count: trialUsers.length },
+                  { id: 'overdue', label: 'Inadimplentes', count: overdueUsers.length },
+                  { id: 'suspended', label: 'Suspensos', count: suspendedUsers.length },
+                ] as const
+              ).map((f) => (
+                <button
+                  key={f.id}
+                  onClick={() => setSubscriptionFilter(f.id)}
+                  className={`px-3 py-1.5 rounded-xl font-bold whitespace-nowrap transition-all flex items-center gap-1.5 ${
+                    subscriptionFilter === f.id
+                      ? f.id === 'overdue'
+                        ? 'bg-red-600 text-white'
+                        : 'bg-emerald-600 text-white'
+                      : 'bg-slate-950 text-slate-400 hover:text-slate-200 border border-slate-800'
+                  }`}
+                >
+                  <span>{f.label}</span>
+                  <span className="text-[10px] opacity-75 font-mono">({f.count})</span>
+                </button>
+              ))}
+            </div>
+
+            <div className="relative w-full sm:w-64">
+              <Search className="w-4 h-4 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2" />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Buscar cliente, empresa..."
+                className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-9 pr-3 py-1.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500"
+              />
+            </div>
+          </div>
+
+          {/* Subscriptions Client Cards Grid */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+            {filteredSubscriptions.map((subUser) => {
+              const isOverdue =
+                subUser.subscriptionStatus === 'overdue' ||
+                (subUser.subscriptionExpiresAt && new Date(subUser.subscriptionExpiresAt).getTime() < Date.now());
+
+              const isOwner = subUser.email === 'alexandre1604981@gmail.com';
+
+              // Calculate days remaining or days in delay
+              const expiryDate = subUser.subscriptionExpiresAt ? new Date(subUser.subscriptionExpiresAt) : null;
+              const diffDays = expiryDate
+                ? Math.round((expiryDate.getTime() - Date.now()) / (1000 * 60 * 60 * 24))
+                : 0;
+
+              return (
+                <div
+                  key={subUser.uid}
+                  className={`bg-slate-900/90 border rounded-2xl p-4 shadow-xl flex flex-col justify-between gap-3 transition-all ${
+                    isOverdue && !isOwner
+                      ? 'border-red-500/60 bg-gradient-to-br from-red-950/20 to-slate-900'
+                      : subUser.subscriptionStatus === 'suspended'
+                      ? 'border-slate-800 opacity-60'
+                      : 'border-slate-800 hover:border-emerald-500/40'
+                  }`}
+                >
+                  {/* Card Header: Client name, company, and status */}
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex items-center gap-3">
+                      <img
+                        src={subUser.avatar}
+                        alt={subUser.name}
+                        className="w-10 h-10 rounded-2xl object-cover border border-slate-700 bg-slate-950 shrink-0"
+                      />
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <h4 className="font-extrabold text-white text-sm leading-tight">{subUser.name}</h4>
+                          {isOwner && (
+                            <span className="text-[9px] uppercase font-black px-1.5 py-0.5 rounded bg-sky-500/20 text-sky-400 border border-sky-500/30">
+                              Proprietário
+                            </span>
+                          )}
+                        </div>
+                        <div className="text-[11px] text-slate-400 flex items-center gap-1.5 mt-0.5">
                           <Building2 className="w-3 h-3 text-slate-500" />
-                          <span>{pendingUser.company}</span>
+                          <span>{subUser.company || 'Empresa não informada'}</span>
                         </div>
-                      )}
-                      {pendingUser.phone && (
-                        <div className="text-[11px] text-slate-400 flex items-center gap-1 mt-0.5">
-                          <Phone className="w-3 h-3 text-slate-500" />
-                          <span>{pendingUser.phone}</span>
-                        </div>
+                      </div>
+                    </div>
+
+                    {/* Status Badge */}
+                    <div>
+                      {isOwner ? (
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">
+                          Vitalício
+                        </span>
+                      ) : isOverdue ? (
+                        <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-red-500/20 text-red-400 border border-red-500/40 animate-pulse flex items-center gap-1">
+                          <AlertCircle className="w-3 h-3" />
+                          Vencido ({Math.abs(diffDays)}d)
+                        </span>
+                      ) : subUser.subscriptionStatus === 'trial' ? (
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/40">
+                          Trial ({diffDays}d)
+                        </span>
+                      ) : subUser.subscriptionStatus === 'suspended' ? (
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-800 text-slate-400 border border-slate-700">
+                          Suspenso
+                        </span>
+                      ) : (
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/40">
+                          Em Dia ({diffDays}d)
+                        </span>
                       )}
                     </div>
                   </div>
-                </div>
 
-                <div className="pt-2 border-t border-slate-800/80 flex items-center justify-between gap-2">
-                  <div className="text-[11px] text-slate-400">
-                    Função pedida: <span className="font-bold text-sky-400">
-                      {pendingUser.requestedRole === 'field_lead' ? 'Líder de Equipe' :
-                       pendingUser.requestedRole === 'auditor' ? 'Auditor' : 'Coletor de Campo'}
-                    </span>
+                  {/* Plan Details & Financial Information */}
+                  <div className="grid grid-cols-2 gap-2 bg-slate-950 p-2.5 rounded-xl border border-slate-800/80 text-xs">
+                    <div>
+                      <span className="text-[10px] text-slate-500 font-semibold uppercase block">Plano Contratado</span>
+                      <span className="font-bold text-white capitalize">
+                        {subUser.subscriptionPlan === 'free_trial'
+                          ? 'Teste Grátis (14d)'
+                          : subUser.subscriptionPlan === 'equipe_mensal'
+                          ? 'Plano Equipe'
+                          : subUser.subscriptionPlan === 'florestal_corporativo'
+                          ? 'Florestal Corporativo'
+                          : 'Profissional Mensal'}
+                      </span>
+                    </div>
+
+                    <div className="text-right">
+                      <span className="text-[10px] text-slate-500 font-semibold uppercase block">Valor Mensalidade</span>
+                      <span className="font-extrabold text-emerald-400 font-mono text-sm">
+                        R$ {(subUser.subscriptionValue || 0).toFixed(2)}
+                      </span>
+                    </div>
+
+                    <div className="col-span-2 pt-1.5 border-t border-slate-900 flex items-center justify-between text-[11px]">
+                      <span className="text-slate-400 flex items-center gap-1">
+                        <Calendar className="w-3 h-3 text-slate-500" />
+                        Vencimento:
+                      </span>
+                      <span className="font-mono font-bold text-slate-200">
+                        {subUser.subscriptionExpiresAt
+                          ? new Date(subUser.subscriptionExpiresAt).toLocaleDateString('pt-BR')
+                          : 'Sem data'}
+                      </span>
+                    </div>
                   </div>
 
-                  <div className="flex items-center gap-1.5">
+                  {/* Quick Action Buttons (1-Click) */}
+                  <div className="flex items-center gap-1.5 pt-1 flex-wrap">
+                    {/* WhatsApp Billing Button */}
                     <button
-                      onClick={() => handleApproveUser(pendingUser)}
-                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold shadow-md active:scale-95 transition-all"
+                      type="button"
+                      onClick={() => handleSendWhatsAppBilling(subUser)}
+                      title="Enviar cobrança personalizada no WhatsApp com Chave Pix"
+                      className="flex-1 bg-emerald-600/20 hover:bg-emerald-600/30 border border-emerald-500/50 text-emerald-300 font-bold text-xs py-2 px-2.5 rounded-xl flex items-center justify-center gap-1.5 active:scale-95 transition-all"
                     >
-                      <UserCheck className="w-3.5 h-3.5" />
-                      <span>Liberar Acesso</span>
+                      <Send className="w-3.5 h-3.5" />
+                      <span>Cobrar no WhatsApp</span>
                     </button>
+
+                    {/* +7 Days Extension */}
                     <button
-                      onClick={() => handleDeleteUser(pendingUser)}
-                      className="p-1.5 rounded-lg bg-slate-800 hover:bg-rose-950 text-slate-400 hover:text-rose-400 border border-slate-700 transition-colors"
-                      title="Recusar cadastro"
+                      type="button"
+                      onClick={() => handleExtend7Days(subUser)}
+                      title="Prorrogar assinatura por +7 dias de cortesia"
+                      className="bg-amber-600/20 hover:bg-amber-600/30 border border-amber-500/50 text-amber-300 font-bold text-xs py-2 px-2.5 rounded-xl flex items-center justify-center gap-1 active:scale-95 transition-all"
                     >
-                      <Trash2 className="w-4 h-4" />
+                      <Clock className="w-3.5 h-3.5" />
+                      <span>+7 Dias</span>
+                    </button>
+
+                    {/* Suspend / Resume Button */}
+                    {!isOwner && (
+                      <button
+                        type="button"
+                        onClick={() => handleToggleSuspension(subUser)}
+                        title={
+                          subUser.subscriptionStatus === 'suspended'
+                            ? 'Reativar acesso do cliente'
+                            : 'Suspender acesso por inadimplência'
+                        }
+                        className={`p-2 rounded-xl border text-xs font-bold transition-all active:scale-95 ${
+                          subUser.subscriptionStatus === 'suspended'
+                            ? 'bg-emerald-950 border-emerald-800 text-emerald-400 hover:bg-emerald-900'
+                            : 'bg-rose-950/40 border-rose-900 text-rose-300 hover:bg-rose-900'
+                        }`}
+                      >
+                        {subUser.subscriptionStatus === 'suspended' ? (
+                          <Unlock className="w-3.5 h-3.5" />
+                        ) : (
+                          <Lock className="w-3.5 h-3.5" />
+                        )}
+                      </button>
+                    )}
+
+                    {/* Edit Full Subscription Modal */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setEditingUserSubscription(subUser);
+                        setSubModalPlan(subUser.subscriptionPlan || 'pro_mensal');
+                        setSubModalStatus(subUser.subscriptionStatus || 'active');
+                        setSubModalValue(subUser.subscriptionValue || 97);
+                        setSubModalExpiresAt(subUser.subscriptionExpiresAt || '');
+                        setSubModalNotes(subUser.billingNotes || '');
+                      }}
+                      title="Editar plano, valor e vencimento"
+                      className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 active:scale-95 transition-all"
+                    >
+                      <Edit3 className="w-3.5 h-3.5" />
                     </button>
                   </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       )}
 
-      {/* Filter and Search Bar */}
-      <div className="bg-slate-900 border border-slate-800 p-3 sm:p-4 rounded-2xl flex flex-col sm:flex-row items-center justify-between gap-3 shadow-lg">
-        {/* Status Tabs */}
-        <div className="flex items-center gap-1.5 bg-slate-950 p-1 rounded-xl border border-slate-800 w-full sm:w-auto overflow-x-auto">
-          <button
-            onClick={() => setFilterStatus('all')}
-            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all shrink-0 ${
-              filterStatus === 'all'
-                ? 'bg-sky-600 text-white shadow-sm'
-                : 'text-slate-400 hover:text-white hover:bg-slate-900'
-            }`}
-          >
-            Todos ({users.length})
-          </button>
-          <button
-            onClick={() => setFilterStatus('pending')}
-            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all shrink-0 flex items-center gap-1.5 ${
-              filterStatus === 'pending'
-                ? 'bg-amber-600 text-white shadow-sm'
-                : 'text-slate-400 hover:text-white hover:bg-slate-900'
-            }`}
-          >
-            <Clock className="w-3.5 h-3.5" />
-            Pendentes ({pendingUsers.length})
-          </button>
-          <button
-            onClick={() => setFilterStatus('active')}
-            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all shrink-0 flex items-center gap-1.5 ${
-              filterStatus === 'active'
-                ? 'bg-emerald-600 text-white shadow-sm'
-                : 'text-slate-400 hover:text-white hover:bg-slate-900'
-            }`}
-          >
-            <CheckCircle2 className="w-3.5 h-3.5" />
-            Ativos ({activeUsers.length})
-          </button>
-          <button
-            onClick={() => setFilterStatus('blocked')}
-            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all shrink-0 flex items-center gap-1.5 ${
-              filterStatus === 'blocked'
-                ? 'bg-rose-600 text-white shadow-sm'
-                : 'text-slate-400 hover:text-white hover:bg-slate-900'
-            }`}
-          >
-            <ShieldAlert className="w-3.5 h-3.5" />
-            Bloqueados ({blockedUsers.length})
-          </button>
-        </div>
+      {/* ========================================================================= */}
+      {/* TAB 1: GESTÃO DE USUÁRIOS & PERMISSÕES (USUÁRIOS & EQUIPE)                 */}
+      {/* ========================================================================= */}
+      {adminTab === 'users' && (
+        <div className="space-y-4 animate-in fade-in duration-200">
+          {/* Filter Bar */}
+          <div className="bg-slate-900/80 border border-slate-800 p-3.5 rounded-2xl flex flex-col sm:flex-row items-center justify-between gap-3 shadow-lg">
+            <div className="flex items-center gap-1.5 overflow-x-auto w-full sm:w-auto pb-1 sm:pb-0 text-xs">
+              {(
+                [
+                  { id: 'all', label: 'Todos os Usuários', count: users.length },
+                  { id: 'pending', label: 'Pendentes de Aprovação', count: users.filter((u) => u.status === 'pending').length },
+                  { id: 'active', label: 'Ativos / Liberados', count: users.filter((u) => u.status === 'active').length },
+                  { id: 'blocked', label: 'Bloqueados', count: users.filter((u) => u.status === 'blocked').length },
+                ] as const
+              ).map((f) => (
+                <button
+                  key={f.id}
+                  onClick={() => setFilterStatus(f.id)}
+                  className={`px-3 py-1.5 rounded-xl font-bold whitespace-nowrap transition-all flex items-center gap-1.5 ${
+                    filterStatus === f.id
+                      ? f.id === 'pending'
+                        ? 'bg-amber-500 text-slate-950'
+                        : 'bg-sky-600 text-white'
+                      : 'bg-slate-950 text-slate-400 hover:text-slate-200 border border-slate-800'
+                  }`}
+                >
+                  <span>{f.label}</span>
+                  <span className="text-[10px] opacity-75 font-mono">({f.count})</span>
+                </button>
+              ))}
+            </div>
 
-        {/* Search Input */}
-        <div className="relative w-full sm:w-72">
-          <Search className="w-4 h-4 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2" />
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Buscar por nome, e-mail..."
-            className="w-full bg-slate-950 border border-slate-700/80 rounded-xl pl-9 pr-4 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-sky-500 transition-colors"
-          />
-        </div>
-      </div>
-
-      {/* Main Users List (Cards on Mobile, Rich Table on Desktop) */}
-      <div className="space-y-3">
-        {loading ? (
-          <div className="bg-slate-900 border border-slate-800 p-12 rounded-2xl text-center text-slate-400 space-y-2">
-            <div className="w-8 h-8 border-3 border-sky-500 border-t-transparent rounded-full animate-spin mx-auto"></div>
-            <p className="text-xs font-semibold">Carregando usuários do Firebase em tempo real...</p>
+            <div className="relative w-full sm:w-64">
+              <Search className="w-4 h-4 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2" />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Buscar por nome, e-mail..."
+                className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-9 pr-3 py-1.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-sky-500"
+              />
+            </div>
           </div>
-        ) : filteredUsers.length === 0 ? (
-          <div className="bg-slate-900 border border-slate-800 p-12 rounded-2xl text-center text-slate-400 space-y-2">
-            <Users className="w-10 h-10 text-slate-600 mx-auto mb-2" />
-            <h4 className="font-bold text-white text-sm">Nenhum usuário encontrado</h4>
-            <p className="text-xs text-slate-500">
-              {searchQuery ? 'Tente ajustar os termos da sua busca.' : 'Não há registros com o filtro selecionado.'}
-            </p>
-          </div>
-        ) : (
-          <>
-            {/* Mobile Cards */}
-            <div className="md:hidden space-y-3">
-              {filteredUsers.map((u) => {
-                const isPending = u.status === 'pending';
-                const isBlocked = u.status === 'blocked';
-                const isSelf = u.uid === profile?.uid;
 
-                return (
-                  <div
-                    key={u.uid}
-                    className={`bg-slate-900 border rounded-2xl p-4 shadow-lg space-y-3 ${
-                      isPending
-                        ? 'border-amber-500/50 bg-slate-900/90'
-                        : isBlocked
-                        ? 'border-rose-900/50 opacity-80'
-                        : 'border-slate-800'
-                    }`}
-                  >
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="flex items-center gap-3">
-                        <img
-                          src={u.avatar}
-                          alt={u.name}
-                          className="w-10 h-10 rounded-full border border-slate-700 object-cover shrink-0"
-                        />
-                        <div>
-                          <div className="font-bold text-sm text-slate-100 flex items-center gap-1.5">
-                            <span>{u.name}</span>
-                            {isSelf && (
-                              <span className="text-[10px] px-1.5 py-0.2 bg-sky-950 text-sky-400 border border-sky-800 rounded font-semibold">
-                                Você
-                              </span>
-                            )}
-                          </div>
-                          <div className="text-xs text-slate-400 flex items-center gap-1 mt-0.5">
-                            <Mail className="w-3 h-3 text-slate-500" />
-                            <span className="truncate max-w-[190px]">{u.email}</span>
-                          </div>
-                        </div>
+          {/* Users List Table / Cards */}
+          <div className="space-y-3">
+            {filteredUsers.map((u) => {
+              const isOwner = u.email === 'alexandre1604981@gmail.com';
+
+              return (
+                <div
+                  key={u.uid}
+                  className={`bg-slate-900 border rounded-2xl p-4 shadow-xl flex flex-col sm:flex-row sm:items-center justify-between gap-4 transition-all ${
+                    u.status === 'pending'
+                      ? 'border-amber-500/80 bg-gradient-to-r from-amber-950/30 via-slate-900 to-slate-900 ring-1 ring-amber-500/50'
+                      : u.status === 'blocked'
+                      ? 'border-red-950/60 opacity-60'
+                      : 'border-slate-800 hover:border-slate-700'
+                  }`}
+                >
+                  <div className="flex items-center gap-3.5">
+                    <img
+                      src={u.avatar}
+                      alt={u.name}
+                      className="w-12 h-12 rounded-2xl object-cover border border-slate-700 bg-slate-950 shrink-0"
+                    />
+                    <div>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <h4 className="font-extrabold text-white text-sm sm:text-base">{u.name}</h4>
+                        {isOwner && (
+                          <span className="text-[10px] uppercase font-black px-2 py-0.5 rounded-full bg-sky-500/20 text-sky-400 border border-sky-500/40">
+                            SuperAdmin
+                          </span>
+                        )}
+                        <span
+                          className={`text-[10px] uppercase font-black px-2 py-0.5 rounded-full border ${
+                            u.status === 'active'
+                              ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30'
+                              : u.status === 'pending'
+                              ? 'bg-amber-500/20 text-amber-400 border-amber-500/30 animate-pulse'
+                              : 'bg-red-500/20 text-red-400 border-red-500/30'
+                          }`}
+                        >
+                          {u.status === 'active' ? 'Ativo' : u.status === 'pending' ? 'Pendente de Aprovação' : 'Bloqueado'}
+                        </span>
                       </div>
 
-                      <span
-                        className={`text-[10px] font-bold px-2 py-0.5 rounded-full border uppercase tracking-wider shrink-0 ${
-                          isPending
-                            ? 'bg-amber-950 text-amber-300 border-amber-800'
-                            : isBlocked
-                            ? 'bg-rose-950 text-rose-300 border-rose-800'
-                            : 'bg-emerald-950 text-emerald-300 border-emerald-800'
-                        }`}
-                      >
-                        {isPending ? 'Pendente' : isBlocked ? 'Bloqueado' : 'Ativo'}
-                      </span>
-                    </div>
-
-                    {/* Role selector */}
-                    <div className="pt-2 border-t border-slate-800/80 flex flex-col gap-1.5">
-                      <label className="text-[11px] font-semibold text-slate-400">Nível de Acesso (Cargo):</label>
-                      <select
-                        value={u.role}
-                        onChange={(e) => handleRoleChange(u.uid, e.target.value as UserRole)}
-                        disabled={isSelf}
-                        className={`w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-xs font-semibold text-slate-200 focus:outline-none focus:border-sky-500 transition-colors ${
-                          isSelf ? 'opacity-50 cursor-not-allowed' : ''
-                        }`}
-                      >
-                        <option value="super_admin">Super Admin (Acesso Total)</option>
-                        <option value="field_lead">Líder de Campo (Gestão e Edição)</option>
-                        <option value="surveyor">Coletor (GPS, Trilhas, Alfinetes)</option>
-                        <option value="auditor">Auditor (Somente Leitura)</option>
-                      </select>
-                    </div>
-
-                    {/* Action buttons */}
-                    <div className="pt-2 border-t border-slate-800/80 flex items-center justify-between gap-2">
-                      <div className="text-[10px] text-slate-500 flex items-center gap-1">
-                        <Calendar className="w-3 h-3" />
-                        <span>{new Date(u.createdAt).toLocaleDateString('pt-BR')}</span>
-                      </div>
-
-                      <div className="flex items-center gap-1.5">
-                        {isPending && (
-                          <button
-                            onClick={() => handleApproveUser(u)}
-                            className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold flex items-center gap-1"
-                          >
-                            <Check className="w-3.5 h-3.5" />
-                            <span>Liberar</span>
-                          </button>
+                      <div className="text-xs text-slate-400 flex flex-wrap items-center gap-x-3 gap-y-1 mt-1">
+                        <span className="flex items-center gap-1 font-mono text-[11px] text-slate-300">
+                          <Mail className="w-3 h-3 text-slate-500" />
+                          {u.email}
+                        </span>
+                        {u.phone && (
+                          <span className="flex items-center gap-1 text-[11px] text-slate-300">
+                            <Phone className="w-3 h-3 text-slate-500" />
+                            {u.phone}
+                          </span>
                         )}
-
-                        {!isPending && !isSelf && (
-                          <button
-                            onClick={() => (isBlocked ? handleApproveUser(u) : handleBlockUser(u))}
-                            className={`p-1.5 rounded-lg border text-xs font-bold transition-all ${
-                              isBlocked
-                                ? 'bg-emerald-950/60 border-emerald-800 text-emerald-300'
-                                : 'bg-slate-800 hover:bg-amber-950/60 border-slate-700 text-slate-400 hover:text-amber-300'
-                            }`}
-                            title={isBlocked ? 'Desbloquear usuário' : 'Suspender/Bloquear'}
-                          >
-                            {isBlocked ? <CheckCircle2 className="w-4 h-4" /> : <UserX className="w-4 h-4" />}
-                          </button>
-                        )}
-
-                        {!isSelf && (
-                          <button
-                            onClick={() => handleDeleteUser(u)}
-                            className="p-1.5 rounded-lg bg-slate-800 hover:bg-rose-950 text-slate-400 hover:text-rose-400 border border-slate-700 transition-colors"
-                            title="Excluir cadastro"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
+                        {u.company && (
+                          <span className="flex items-center gap-1 text-[11px] text-slate-300">
+                            <Building2 className="w-3 h-3 text-slate-500" />
+                            {u.company}
+                          </span>
                         )}
                       </div>
                     </div>
                   </div>
-                );
-              })}
-            </div>
 
-            {/* Desktop Table */}
-            <div className="hidden md:block bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-xl">
-              <div className="overflow-x-auto">
-                <table className="w-full text-left text-sm whitespace-nowrap">
-                  <thead className="bg-slate-950 border-b border-slate-800 text-slate-400 text-xs">
-                    <tr>
-                      <th className="px-4 py-3.5 font-bold">Usuário / Nome</th>
-                      <th className="px-4 py-3.5 font-bold">Contato / Empresa</th>
-                      <th className="px-4 py-3.5 font-bold">Status</th>
-                      <th className="px-4 py-3.5 font-bold">Nível de Acesso (Role)</th>
-                      <th className="px-4 py-3.5 font-bold text-right">Ações</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-800">
-                    {filteredUsers.map((u) => {
-                      const isPending = u.status === 'pending';
-                      const isBlocked = u.status === 'blocked';
-                      const isSelf = u.uid === profile?.uid;
+                  {/* Actions for User */}
+                  <div className="flex items-center gap-2 shrink-0 flex-wrap">
+                    {u.status === 'pending' ? (
+                      <button
+                        onClick={() => handleApproveUser(u)}
+                        className="bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2 rounded-xl text-xs font-black shadow-lg shadow-emerald-950/50 flex items-center gap-1.5 active:scale-95 transition-all"
+                      >
+                        <CheckCircle2 className="w-4 h-4" />
+                        <span>Aprovar Acesso</span>
+                      </button>
+                    ) : (
+                      <>
+                        {!isOwner && (
+                          <button
+                            onClick={() => handleBlockUser(u)}
+                            className={`p-2 rounded-xl border text-xs font-bold transition-all ${
+                              u.status === 'blocked'
+                                ? 'bg-emerald-950 border-emerald-800 text-emerald-300'
+                                : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-red-400'
+                            }`}
+                            title={u.status === 'blocked' ? 'Desbloquear' : 'Bloquear'}
+                          >
+                            {u.status === 'blocked' ? <UserCheck className="w-4 h-4" /> : <UserX className="w-4 h-4" />}
+                          </button>
+                        )}
+                      </>
+                    )}
 
-                      return (
-                        <tr
-                          key={u.uid}
-                          className={`hover:bg-slate-800/50 transition-colors ${
-                            isPending ? 'bg-amber-950/20' : ''
-                          }`}
-                        >
-                          <td className="px-4 py-3.5">
-                            <div className="flex items-center gap-3">
-                              <img
-                                src={u.avatar}
-                                alt={u.name}
-                                className="w-9 h-9 rounded-full border border-slate-700 object-cover shrink-0"
-                              />
-                              <div>
-                                <div className="font-bold text-slate-200 flex items-center gap-1.5">
-                                  <span>{u.name}</span>
-                                  {isSelf && (
-                                    <span className="text-[10px] px-1.5 py-0.2 bg-sky-950 text-sky-400 border border-sky-800 rounded font-semibold">
-                                      Você
-                                    </span>
-                                  )}
-                                </div>
-                                <div className="text-[11px] text-slate-400 flex items-center gap-1">
-                                  <Calendar className="w-3 h-3 text-slate-500" />
-                                  <span>Cadastrado em {new Date(u.createdAt).toLocaleDateString('pt-BR')}</span>
-                                </div>
-                              </div>
-                            </div>
-                          </td>
-
-                          <td className="px-4 py-3.5">
-                            <div className="text-xs text-slate-300 space-y-0.5">
-                              <div className="flex items-center gap-1.5">
-                                <Mail className="w-3.5 h-3.5 text-slate-500" />
-                                <span>{u.email}</span>
-                              </div>
-                              {u.company && (
-                                <div className="flex items-center gap-1.5 text-slate-400 text-[11px]">
-                                  <Building2 className="w-3 h-3 text-slate-500" />
-                                  <span>{u.company}</span>
-                                </div>
-                              )}
-                              {u.phone && (
-                                <div className="flex items-center gap-1.5 text-slate-400 text-[11px]">
-                                  <Phone className="w-3 h-3 text-slate-500" />
-                                  <span>{u.phone}</span>
-                                </div>
-                              )}
-                            </div>
-                          </td>
-
-                          <td className="px-4 py-3.5">
-                            <span
-                              className={`inline-flex items-center gap-1 text-[11px] font-bold px-2.5 py-1 rounded-full border ${
-                                isPending
-                                  ? 'bg-amber-950 text-amber-300 border-amber-800'
-                                  : isBlocked
-                                  ? 'bg-rose-950 text-rose-300 border-rose-800'
-                                  : 'bg-emerald-950 text-emerald-300 border-emerald-800'
-                              }`}
-                            >
-                              {isPending && <Clock className="w-3.5 h-3.5" />}
-                              {isBlocked && <ShieldAlert className="w-3.5 h-3.5" />}
-                              {!isPending && !isBlocked && <CheckCircle2 className="w-3.5 h-3.5" />}
-                              <span>{isPending ? 'Aguardando Liberação' : isBlocked ? 'Bloqueado' : 'Ativo'}</span>
-                            </span>
-                          </td>
-
-                          <td className="px-4 py-3.5">
-                            <select
-                              value={u.role}
-                              onChange={(e) => handleRoleChange(u.uid, e.target.value as UserRole)}
-                              disabled={isSelf}
-                              className={`bg-slate-950 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-slate-200 focus:outline-none focus:border-sky-500 transition-colors ${
-                                isSelf ? 'opacity-50 cursor-not-allowed' : ''
-                              }`}
-                            >
-                              <option value="super_admin">Super Admin (Total)</option>
-                              <option value="field_lead">Líder de Campo</option>
-                              <option value="surveyor">Coletor de Campo</option>
-                              <option value="auditor">Auditor (Leitura)</option>
-                            </select>
-                          </td>
-
-                          <td className="px-4 py-3.5 text-right">
-                            <div className="flex items-center justify-end gap-1.5">
-                              {isPending ? (
-                                <button
-                                  onClick={() => handleApproveUser(u)}
-                                  className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold flex items-center gap-1.5 shadow-md active:scale-95 transition-all"
-                                >
-                                  <UserCheck className="w-3.5 h-3.5" />
-                                  <span>Liberar Acesso</span>
-                                </button>
-                              ) : (
-                                !isSelf && (
-                                  <button
-                                    onClick={() => (isBlocked ? handleApproveUser(u) : handleBlockUser(u))}
-                                    className={`px-2.5 py-1.5 rounded-lg border text-xs font-semibold transition-all flex items-center gap-1 ${
-                                      isBlocked
-                                        ? 'bg-emerald-950/60 border-emerald-800 text-emerald-300 hover:bg-emerald-900/80'
-                                        : 'bg-slate-800 hover:bg-amber-950/60 border-slate-700 text-slate-300 hover:text-amber-300'
-                                    }`}
-                                    title={isBlocked ? 'Desbloquear usuário' : 'Suspender acesso'}
-                                  >
-                                    {isBlocked ? <CheckCircle2 className="w-3.5 h-3.5" /> : <UserX className="w-3.5 h-3.5" />}
-                                    <span>{isBlocked ? 'Reativar' : 'Bloquear'}</span>
-                                  </button>
-                                )
-                              )}
-
-                              {!isSelf && (
-                                <button
-                                  onClick={() => handleDeleteUser(u)}
-                                  className="p-1.5 rounded-lg bg-slate-800 hover:bg-rose-950 text-slate-400 hover:text-rose-400 border border-slate-700 transition-colors"
-                                  title="Excluir cadastro"
-                                >
-                                  <Trash2 className="w-4 h-4" />
-                                </button>
-                              )}
-                            </div>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          </>
-        )}
-      </div>
-
-      {/* Modal: Cadastrar / Liberar Usuário Manualmente */}
-      {isAddUserModalOpen && (
-        <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4">
-          <div className="bg-slate-900 border border-slate-700/80 rounded-3xl w-full max-w-lg overflow-hidden shadow-2xl animate-in fade-in zoom-in-95 duration-200">
-            <div className="p-5 border-b border-slate-800 flex items-center justify-between bg-slate-950/60">
-              <div className="flex items-center gap-2.5">
-                <div className="w-9 h-9 rounded-xl bg-sky-500/20 border border-sky-500/40 flex items-center justify-center text-sky-400">
-                  <UserPlus className="w-5 h-5" />
+                    {!isOwner && (
+                      <button
+                        onClick={() => handleDeleteUser(u)}
+                        className="p-2 rounded-xl bg-slate-950 hover:bg-rose-950/60 border border-slate-800 hover:border-rose-800 text-slate-500 hover:text-rose-400 transition-colors"
+                        title="Excluir cadastro"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    )}
+                  </div>
                 </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* TAB 3: PLANOS & CUPONS PROMOCIONAIS                                       */}
+      {/* ========================================================================= */}
+      {adminTab === 'plans' && (
+        <div className="space-y-6 animate-in fade-in duration-200">
+          {/* Official Plans Table */}
+          <div className="space-y-3">
+            <h3 className="text-sm font-extrabold text-white uppercase tracking-wider flex items-center gap-2">
+              <Tag className="w-4 h-4 text-indigo-400" />
+              Tabela de Planos e Preços Oficiais do GoField Pro
+            </h3>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {/* Plan 1 */}
+              <div className="bg-slate-900 border border-slate-800 rounded-3xl p-5 shadow-xl flex flex-col justify-between space-y-4">
                 <div>
-                  <h3 className="font-bold text-base text-white">Cadastrar / Liberar Usuário</h3>
-                  <p className="text-xs text-slate-400">Adicione ou pré-aprove o acesso de um colaborador.</p>
+                  <span className="text-[10px] uppercase font-black px-2.5 py-0.5 rounded-full bg-sky-500/20 text-sky-300 border border-sky-500/30">
+                    Individual
+                  </span>
+                  <h4 className="text-lg font-black text-white mt-2">Plano Profissional</h4>
+                  <div className="mt-2">
+                    <span className="text-2xl font-black text-sky-400 font-mono">R$ 97,00</span>
+                    <span className="text-xs text-slate-400"> / mês</span>
+                  </div>
+                  <ul className="mt-4 space-y-2 text-xs text-slate-300">
+                    <li className="flex items-center gap-2">✓ 1 Operador de Campo</li>
+                    <li className="flex items-center gap-2">✓ Mapas PDF e GPS Ilimitados</li>
+                    <li className="flex items-center gap-2">✓ Medição de Pilha de Madeira (m³)</li>
+                    <li className="flex items-center gap-2">✓ Relatórios Técnicos em PDF</li>
+                  </ul>
                 </div>
               </div>
+
+              {/* Plan 2 */}
+              <div className="bg-slate-900 border border-emerald-500/50 rounded-3xl p-5 shadow-2xl flex flex-col justify-between space-y-4 ring-1 ring-emerald-500/30">
+                <div>
+                  <span className="text-[10px] uppercase font-black px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                    Mais Popular
+                  </span>
+                  <h4 className="text-lg font-black text-white mt-2">Plano Equipe</h4>
+                  <div className="mt-2">
+                    <span className="text-2xl font-black text-emerald-400 font-mono">R$ 289,00</span>
+                    <span className="text-xs text-slate-400"> / mês</span>
+                  </div>
+                  <ul className="mt-4 space-y-2 text-xs text-slate-300">
+                    <li className="flex items-center gap-2">✓ Até 5 Técnicos de Campo</li>
+                    <li className="flex items-center gap-2">✓ Painel de Gestão da Frota (Odômetro)</li>
+                    <li className="flex items-center gap-2">✓ Cubagem e Laudos em Lote</li>
+                    <li className="flex items-center gap-2">✓ Backup Seguro na Nuvem</li>
+                  </ul>
+                </div>
+              </div>
+
+              {/* Plan 3 */}
+              <div className="bg-slate-900 border border-indigo-500/40 rounded-3xl p-5 shadow-xl flex flex-col justify-between space-y-4">
+                <div>
+                  <span className="text-[10px] uppercase font-black px-2.5 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
+                    Corporativo
+                  </span>
+                  <h4 className="text-lg font-black text-white mt-2">Florestal & Usinas</h4>
+                  <div className="mt-2">
+                    <span className="text-2xl font-black text-indigo-400 font-mono">R$ 690,00</span>
+                    <span className="text-xs text-slate-400"> / mês</span>
+                  </div>
+                  <ul className="mt-4 space-y-2 text-xs text-slate-300">
+                    <li className="flex items-center gap-2">✓ 15 a 30 Operadores simultâneos</li>
+                    <li className="flex items-center gap-2">✓ Logotipo da empresa cliente no PDF</li>
+                    <li className="flex items-center gap-2">✓ Treinamento e Suporte VIP</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Promo Coupons Management */}
+          <div className="bg-slate-900 border border-slate-800 rounded-3xl p-5 shadow-xl space-y-4">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+              <div>
+                <h4 className="font-bold text-white text-sm flex items-center gap-2">
+                  <Gift className="w-4 h-4 text-amber-400" />
+                  Cupons Promocionais & Descontos Regionais
+                </h4>
+                <p className="text-[11px] text-slate-400 mt-0.5">
+                  Crie cupons de lançamento para oferecer descontos às primeiras empresas contratantes.
+                </p>
+              </div>
+
               <button
                 type="button"
-                onClick={() => setIsAddUserModalOpen(false)}
-                className="p-1.5 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
+                onClick={() => setIsCouponModalOpen(true)}
+                className="bg-amber-600 hover:bg-amber-500 text-slate-950 font-black px-3.5 py-1.5 rounded-xl text-xs flex items-center gap-1.5 shadow-md active:scale-95 transition-all"
+              >
+                <Plus className="w-4 h-4" />
+                <span>Criar Novo Cupom</span>
+              </button>
+            </div>
+
+            {coupons.length === 0 ? (
+              <div className="p-6 text-center text-slate-500 text-xs border border-dashed border-slate-800 rounded-2xl">
+                Nenhum cupom promocional ativo no momento. Clique no botão acima para criar o primeiro!
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+                {coupons.map((coupon) => (
+                  <div
+                    key={coupon.id}
+                    className="bg-slate-950 border border-slate-800 rounded-2xl p-3.5 flex items-center justify-between"
+                  >
+                    <div>
+                      <span className="font-mono font-black text-amber-400 text-sm tracking-wider">{coupon.code}</span>
+                      <div className="text-[11px] text-slate-300 font-semibold mt-0.5">
+                        {coupon.discountPercent}% de Desconto
+                      </div>
+                      <div className="text-[10px] text-slate-500">Válido até {coupon.validUntil}</div>
+                    </div>
+                    <button
+                      onClick={() => handleDeleteCoupon(coupon.id)}
+                      className="p-2 rounded-xl text-slate-500 hover:text-red-400 hover:bg-slate-900 transition-colors"
+                      title="Excluir cupom"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* TAB 4: CONFIGURAÇÕES DE COBRANÇA (PIX & WHATSAPP)                         */}
+      {/* ========================================================================= */}
+      {adminTab === 'billing_settings' && (
+        <div className="bg-slate-900 border border-slate-800 rounded-3xl p-5 sm:p-7 shadow-2xl space-y-5 animate-in fade-in duration-200">
+          <div className="border-b border-slate-800 pb-3">
+            <h3 className="text-base font-extrabold text-white flex items-center gap-2">
+              <QrCode className="w-5 h-5 text-amber-400" />
+              Configuração de Recebimento Pix & Cobrança Automática
+            </h3>
+            <p className="text-xs text-slate-400 mt-1">
+              Cadastre sua Chave Pix e o modelo de mensagem para que o botão "Cobrar no WhatsApp" funcione com 1 clique.
+            </p>
+          </div>
+
+          <form onSubmit={handleSaveBillingConfig} className="space-y-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-[11px] font-bold text-slate-300 uppercase mb-1">
+                  Tipo da Chave Pix
+                </label>
+                <select
+                  value={billingConfig.pixKeyType}
+                  onChange={(e) => setBillingConfig((p) => ({ ...p, pixKeyType: e.target.value as any }))}
+                  className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2.5 text-xs text-white focus:outline-none focus:border-amber-500"
+                >
+                  <option value="cnpj">CNPJ</option>
+                  <option value="email">E-mail</option>
+                  <option value="phone">Celular</option>
+                  <option value="random">Chave Aleatória (EVP)</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-bold text-slate-300 uppercase mb-1">
+                  Sua Chave Pix *
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={billingConfig.pixKey}
+                  onChange={(e) => setBillingConfig((p) => ({ ...p, pixKey: e.target.value }))}
+                  placeholder="Ex: 48.123.456/0001-90"
+                  className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2.5 text-xs text-white font-mono focus:outline-none focus:border-amber-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-bold text-slate-300 uppercase mb-1">
+                  Nome do Titular / Razão Social *
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={billingConfig.beneficiaryName}
+                  onChange={(e) => setBillingConfig((p) => ({ ...p, beneficiaryName: e.target.value }))}
+                  placeholder="Ex: AM TST SAÚDE E SEGURANÇA"
+                  className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2.5 text-xs text-white focus:outline-none focus:border-amber-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-bold text-slate-300 uppercase mb-1">
+                  Banco de Recebimento
+                </label>
+                <input
+                  type="text"
+                  value={billingConfig.bankName}
+                  onChange={(e) => setBillingConfig((p) => ({ ...p, bankName: e.target.value }))}
+                  placeholder="Ex: Banco Inter PJ / Nubank PJ"
+                  className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2.5 text-xs text-white focus:outline-none focus:border-amber-500"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-[11px] font-bold text-slate-300 uppercase mb-1">
+                Modelo da Mensagem de Cobrança WhatsApp
+              </label>
+              <textarea
+                rows={4}
+                value={billingConfig.customMessageTemplate}
+                onChange={(e) => setBillingConfig((p) => ({ ...p, customMessageTemplate: e.target.value }))}
+                className="w-full bg-slate-950 border border-slate-700 rounded-xl p-3 text-xs text-white focus:outline-none focus:border-amber-500 font-sans leading-relaxed"
+              />
+              <p className="text-[10px] text-slate-500 mt-1">
+                Tags automáticas disponíveis: <b className="text-slate-400">{'{nome}'}</b>,{' '}
+                <b className="text-slate-400">{'{empresa}'}</b>, <b className="text-slate-400">{'{valor}'}</b>,{' '}
+                <b className="text-slate-400">{'{vencimento}'}</b>, <b className="text-slate-400">{'{chave_pix}'}</b>.
+              </p>
+            </div>
+
+            <div className="pt-2 flex justify-end">
+              <button
+                type="submit"
+                disabled={savingBilling}
+                className="bg-amber-600 hover:bg-amber-500 text-slate-950 font-black px-6 py-2.5 rounded-xl text-xs shadow-lg active:scale-95 transition-all flex items-center gap-2"
+              >
+                {savingBilling ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
+                <span>Salvar Configurações de Cobrança</span>
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* MODAL 1: EDIT SUBSCRIPTION / PLAN DETAILS                                 */}
+      {/* ========================================================================= */}
+      {editingUserSubscription && (
+        <div className="fixed inset-0 z-[99999] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in">
+          <div className="bg-slate-900 border border-slate-800 rounded-3xl w-full max-w-md p-6 shadow-2xl space-y-4">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+              <div>
+                <h3 className="font-bold text-white text-base">Gerenciar Assinatura</h3>
+                <p className="text-xs text-slate-400">{editingUserSubscription.name} ({editingUserSubscription.company})</p>
+              </div>
+              <button
+                onClick={() => setEditingUserSubscription(null)}
+                className="p-1.5 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            <form onSubmit={handleCreateOrAuthorizeUser} className="p-5 space-y-4">
+            <form onSubmit={handleSaveSubscriptionChanges} className="space-y-3.5 text-xs">
               <div>
-                <label className="block text-[11px] font-bold text-slate-300 mb-1 uppercase tracking-wider">
-                  E-mail do Colaborador *
-                </label>
-                <div className="relative">
-                  <Mail className="w-4 h-4 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2" />
+                <label className="block text-slate-300 font-bold uppercase text-[10px] mb-1">Plano</label>
+                <select
+                  value={subModalPlan}
+                  onChange={(e) => setSubModalPlan(e.target.value as any)}
+                  className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-white"
+                >
+                  <option value="free_trial">Teste Grátis (Trial)</option>
+                  <option value="pro_mensal">Profissional Mensal (R$ 97/mês)</option>
+                  <option value="equipe_mensal">Plano Equipe (R$ 289/mês)</option>
+                  <option value="florestal_corporativo">Florestal & Usinas (R$ 690/mês)</option>
+                  <option value="personalizado">Personalizado</option>
+                </select>
+              </div>
+
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="block text-slate-300 font-bold uppercase text-[10px] mb-1">Status</label>
+                  <select
+                    value={subModalStatus}
+                    onChange={(e) => setSubModalStatus(e.target.value as any)}
+                    className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-white"
+                  >
+                    <option value="active">🟢 Ativo (Em Dia)</option>
+                    <option value="trial">🟡 Em Teste (Trial)</option>
+                    <option value="overdue">🔴 Inadimplente</option>
+                    <option value="suspended">⚪ Suspenso</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-slate-300 font-bold uppercase text-[10px] mb-1">Valor Mensal (R$)</label>
                   <input
-                    type="email"
-                    required
-                    value={newUserEmail}
-                    onChange={(e) => setNewUserEmail(e.target.value)}
-                    placeholder="colaborador@empresa.com"
-                    className="w-full bg-slate-950 border border-slate-700 rounded-xl pl-9 pr-4 py-2.5 text-sm text-white focus:outline-none focus:border-sky-500 transition-colors"
+                    type="number"
+                    step="0.01"
+                    value={subModalValue}
+                    onChange={(e) => setSubModalValue(Number(e.target.value))}
+                    className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-white font-mono"
                   />
                 </div>
-                <span className="text-[10px] text-slate-500 mt-1 block">
-                  Se o usuário já tentou se cadastrar com este e-mail, seu status será liberado instantaneamente.
-                </span>
               </div>
 
               <div>
-                <label className="block text-[11px] font-bold text-slate-300 mb-1 uppercase tracking-wider">
-                  Nome Completo
-                </label>
+                <label className="block text-slate-300 font-bold uppercase text-[10px] mb-1">Data de Vencimento</label>
                 <input
-                  type="text"
-                  value={newUserName}
-                  onChange={(e) => setNewUserName(e.target.value)}
-                  placeholder="Ex: João da Silva"
-                  className="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-sky-500 transition-colors"
+                  type="date"
+                  value={subModalExpiresAt}
+                  onChange={(e) => setSubModalExpiresAt(e.target.value)}
+                  className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-white"
                 />
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-[11px] font-bold text-slate-300 mb-1 uppercase tracking-wider">
-                    Empresa / Órgão
-                  </label>
-                  <div className="relative">
-                    <Building2 className="w-4 h-4 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2" />
-                    <input
-                      type="text"
-                      value={newUserCompany}
-                      onChange={(e) => setNewUserCompany(e.target.value)}
-                      placeholder="AM TST Engenharia"
-                      className="w-full bg-slate-950 border border-slate-700 rounded-xl pl-9 pr-3 py-2 text-xs text-white focus:outline-none focus:border-sky-500 transition-colors"
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-[11px] font-bold text-slate-300 mb-1 uppercase tracking-wider">
-                    Telefone / WhatsApp
-                  </label>
-                  <div className="relative">
-                    <Phone className="w-4 h-4 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2" />
-                    <input
-                      type="tel"
-                      value={newUserPhone}
-                      onChange={(e) => setNewUserPhone(e.target.value)}
-                      placeholder="(00) 00000-0000"
-                      className="w-full bg-slate-950 border border-slate-700 rounded-xl pl-9 pr-3 py-2 text-xs text-white focus:outline-none focus:border-sky-500 transition-colors"
-                    />
-                  </div>
-                </div>
+              <div>
+                <label className="block text-slate-300 font-bold uppercase text-[10px] mb-1">Notas Internas</label>
+                <textarea
+                  rows={2}
+                  value={subModalNotes}
+                  onChange={(e) => setSubModalNotes(e.target.value)}
+                  placeholder="Ex: Contrato anual fechado com pagamento via Pix todo dia 10."
+                  className="w-full bg-slate-950 border border-slate-700 rounded-xl p-2.5 text-white"
+                />
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-[11px] font-bold text-slate-300 mb-1 uppercase tracking-wider">
-                    Cargo / Nível de Acesso
-                  </label>
-                  <select
-                    value={newUserRole}
-                    onChange={(e) => setNewUserRole(e.target.value as UserRole)}
-                    className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-sky-500 transition-colors"
-                  >
-                    <option value="surveyor">Coletor de Campo (GPS, Trilhas)</option>
-                    <option value="field_lead">Líder de Equipe (Edição)</option>
-                    <option value="auditor">Auditor (Leitura)</option>
-                    <option value="super_admin">Super Admin (Total)</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-[11px] font-bold text-slate-300 mb-1 uppercase tracking-wider">
-                    Status Inicial
-                  </label>
-                  <select
-                    value={newUserStatus}
-                    onChange={(e) => setNewUserStatus(e.target.value as UserStatus)}
-                    className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-sky-500 transition-colors"
-                  >
-                    <option value="active">Liberado Imediatamente (Ativo)</option>
-                    <option value="pending">Aguardando Aprovação (Pendente)</option>
-                    <option value="blocked">Bloqueado</option>
-                  </select>
-                </div>
-              </div>
-
-              <div className="pt-3 border-t border-slate-800 flex items-center justify-end gap-2.5">
+              <div className="pt-2 flex items-center justify-end gap-2">
                 <button
                   type="button"
-                  onClick={() => setIsAddUserModalOpen(false)}
-                  className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
+                  onClick={() => setEditingUserSubscription(null)}
+                  className="px-4 py-2 rounded-xl bg-slate-800 text-slate-300 font-bold"
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
-                  disabled={savingUser}
-                  className="px-5 py-2 rounded-xl text-xs font-bold bg-sky-600 hover:bg-sky-500 disabled:bg-sky-800 text-white transition-all shadow-lg flex items-center gap-1.5"
+                  disabled={savingSubChanges}
+                  className="px-5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold"
                 >
-                  {savingUser ? (
-                    <>
-                      <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                      <span>Salvando...</span>
-                    </>
-                  ) : (
-                    <>
-                      <Check className="w-3.5 h-3.5" />
-                      <span>{newUserStatus === 'active' ? 'Liberar Acesso Agora' : 'Salvar Cadastro'}</span>
-                    </>
-                  )}
+                  {savingSubChanges ? 'Salvando...' : 'Salvar Alterações'}
                 </button>
               </div>
             </form>
@@ -918,22 +1500,209 @@ export const AdminPanel: React.FC = () => {
         </div>
       )}
 
-      {/* Corporate Copyright Footer */}
-      <footer className="pt-4 border-t border-slate-800/80 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-500">
-        <div className="flex items-center gap-2">
-          <span className="font-bold text-slate-400">GoField Pro</span>
-          <span>•</span>
-          <span>AM TST SAÚDE E SEGURANÇA DO TRABALHO</span>
+      {/* ========================================================================= */}
+      {/* MODAL 2: ADD / PRE-AUTHORIZE NEW CLIENT MODAL                             */}
+      {/* ========================================================================= */}
+      {isAddUserModalOpen && (
+        <div className="fixed inset-0 z-[99999] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in">
+          <div className="bg-slate-900 border border-slate-800 rounded-3xl w-full max-w-lg p-6 shadow-2xl space-y-4">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+              <div>
+                <h3 className="font-bold text-white text-base">Cadastrar Novo Cliente / Colaborador</h3>
+                <p className="text-xs text-slate-400">Pré-autorize o acesso ou cadastre uma nova empresa</p>
+              </div>
+              <button
+                onClick={() => setIsAddUserModalOpen(false)}
+                className="p-1.5 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleCreateOrAuthorizeUser} className="space-y-3.5 text-xs">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-slate-300 font-bold uppercase text-[10px] mb-1">Nome Completo *</label>
+                  <input
+                    type="text"
+                    required
+                    value={newUserName}
+                    onChange={(e) => setNewUserName(e.target.value)}
+                    placeholder="Ex: João da Silva"
+                    className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-white"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-slate-300 font-bold uppercase text-[10px] mb-1">E-mail de Acesso *</label>
+                  <input
+                    type="email"
+                    required
+                    value={newUserEmail}
+                    onChange={(e) => setNewUserEmail(e.target.value)}
+                    placeholder="joao@empresa.com"
+                    className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-white"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-slate-300 font-bold uppercase text-[10px] mb-1">Empresa / Razão Social</label>
+                  <input
+                    type="text"
+                    value={newUserCompany}
+                    onChange={(e) => setNewUserCompany(e.target.value)}
+                    placeholder="Ex: Madeireira Vale Verde"
+                    className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-white"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-slate-300 font-bold uppercase text-[10px] mb-1">WhatsApp / Telefone</label>
+                  <input
+                    type="tel"
+                    value={newUserPhone}
+                    onChange={(e) => setNewUserPhone(e.target.value)}
+                    placeholder="(00) 00000-0000"
+                    className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-white"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-slate-300 font-bold uppercase text-[10px] mb-1">Plano Inicial</label>
+                  <select
+                    value={newUserPlan}
+                    onChange={(e) => {
+                      const plan = e.target.value as SubscriptionPlanType;
+                      setNewUserPlan(plan);
+                      setNewUserSubValue(plan === 'equipe_mensal' ? 289 : plan === 'florestal_corporativo' ? 690 : 97);
+                    }}
+                    className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-white"
+                  >
+                    <option value="free_trial">Teste Grátis (14 dias)</option>
+                    <option value="pro_mensal">Profissional Mensal (R$ 97)</option>
+                    <option value="equipe_mensal">Plano Equipe (R$ 289)</option>
+                    <option value="florestal_corporativo">Florestal & Usinas (R$ 690)</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-slate-300 font-bold uppercase text-[10px] mb-1">Nível de Acesso</label>
+                  <select
+                    value={newUserRole}
+                    onChange={(e) => setNewUserRole(e.target.value as UserRole)}
+                    className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-white"
+                  >
+                    <option value="surveyor">Coletor de Campo (GPS / Trilhas / Madeira)</option>
+                    <option value="field_lead">Líder de Equipe (Edição Geral)</option>
+                    <option value="auditor">Auditor (Visualizador de Laudos)</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="pt-3 border-t border-slate-800 flex items-center justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setIsAddUserModalOpen(false)}
+                  className="px-4 py-2 rounded-xl bg-slate-800 text-slate-300 font-bold"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={savingUser}
+                  className="px-5 py-2 rounded-xl bg-sky-600 hover:bg-sky-500 text-white font-bold"
+                >
+                  {savingUser ? 'Salvando...' : 'Cadastrar e Liberar'}
+                </button>
+              </div>
+            </form>
+          </div>
         </div>
-        <a
-          href="https://amtst.vercel.app/"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="text-sky-400 hover:text-sky-300 font-medium hover:underline transition-colors"
-        >
-          https://amtst.vercel.app/
-        </a>
-      </footer>
+      )}
+
+      {/* ========================================================================= */}
+      {/* MODAL 3: CREATE PROMO COUPON MODAL                                        */}
+      {/* ========================================================================= */}
+      {isCouponModalOpen && (
+        <div className="fixed inset-0 z-[99999] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in">
+          <div className="bg-slate-900 border border-slate-800 rounded-3xl w-full max-w-md p-6 shadow-2xl space-y-4">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+              <div>
+                <h3 className="font-bold text-white text-base">Criar Cupom Promocional</h3>
+                <p className="text-xs text-slate-400">Gere códigos de desconto para clientes regionais</p>
+              </div>
+              <button
+                onClick={() => setIsCouponModalOpen(false)}
+                className="p-1.5 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleCreateCoupon} className="space-y-3.5 text-xs">
+              <div>
+                <label className="block text-slate-300 font-bold uppercase text-[10px] mb-1">
+                  Código do Cupom *
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={newCouponCode}
+                  onChange={(e) => setNewCouponCode(e.target.value.toUpperCase())}
+                  placeholder="Ex: REGIAO20 ou LANCAMENTO"
+                  className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-white font-mono uppercase font-bold"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="block text-slate-300 font-bold uppercase text-[10px] mb-1">
+                    % de Desconto
+                  </label>
+                  <input
+                    type="number"
+                    min="1"
+                    max="100"
+                    value={newCouponDiscount}
+                    onChange={(e) => setNewCouponDiscount(Number(e.target.value))}
+                    className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-white font-mono"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-slate-300 font-bold uppercase text-[10px] mb-1">
+                    Validade (Dias)
+                  </label>
+                  <input
+                    type="number"
+                    min="1"
+                    value={newCouponDays}
+                    onChange={(e) => setNewCouponDays(Number(e.target.value))}
+                    className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-white font-mono"
+                  />
+                </div>
+              </div>
+
+              <div className="pt-2 flex items-center justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setIsCouponModalOpen(false)}
+                  className="px-4 py-2 rounded-xl bg-slate-800 text-slate-300 font-bold"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={savingCoupon}
+                  className="px-5 py-2 rounded-xl bg-amber-600 hover:bg-amber-500 text-slate-950 font-black"
+                >
+                  {savingCoupon ? 'Criando...' : 'Ativar Cupom'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

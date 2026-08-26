@@ -1,6 +1,10 @@
 export type UserRole = 'super_admin' | 'field_lead' | 'surveyor' | 'auditor';
 export type UserStatus = 'pending' | 'active' | 'blocked';
 
+export type SubscriptionPlanType = 'free_trial' | 'pro_mensal' | 'equipe_mensal' | 'florestal_corporativo' | 'personalizado';
+export type SubscriptionStatusType = 'active' | 'trial' | 'overdue' | 'suspended' | 'canceled';
+export type PaymentMethodType = 'pix' | 'boleto' | 'cartao' | 'transferencia' | 'cortesia';
+
 export interface UserProfile {
   uid: string;
   email: string;
@@ -9,11 +13,44 @@ export interface UserProfile {
   status: UserStatus;
   avatar: string;
   company?: string;
+  companyCnpj?: string;
   phone?: string;
   requestedRole?: UserRole;
   createdAt: string;
   approvedAt?: string;
   approvedBy?: string;
+
+  // Commercial & Subscription Fields
+  subscriptionPlan?: SubscriptionPlanType;
+  subscriptionStatus?: SubscriptionStatusType;
+  subscriptionExpiresAt?: string; // ISO Date String
+  subscriptionValue?: number; // Valor mensal em BRL ex: 290
+  paymentMethod?: PaymentMethodType;
+  billingNotes?: string;
+  maxUsersAllowed?: number;
+  lastPaymentDate?: string;
+}
+
+export interface PromoCoupon {
+  id: string;
+  code: string;
+  discountPercent?: number;
+  discountFixed?: number;
+  validUntil: string;
+  maxUses: number;
+  usedCount: number;
+  active: boolean;
+  notes?: string;
+}
+
+export interface SystemBillingConfig {
+  pixKey: string;
+  pixKeyType: 'cnpj' | 'email' | 'phone' | 'random';
+  beneficiaryName: string;
+  bankName: string;
+  defaultTrialDays: number;
+  whatsappSupportNumber: string;
+  customMessageTemplate: string;
 }
 
 export type Language = 'pt' | 'en' | 'es';
