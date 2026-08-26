@@ -16,6 +16,7 @@ import { FieldRoundsPanel } from './components/FieldRounds/FieldRoundsPanel';
 import { AdminPanel } from './components/Admin/AdminPanel';
 import { LoginScreen } from './components/Auth/LoginScreen';
 import { PendingApprovalScreen } from './components/Auth/PendingApprovalScreen';
+import { ApprovalCelebrationScreen } from './components/Auth/ApprovalCelebrationScreen';
 import { ToastContainer } from './components/Common/ToastContainer';
 import { ConfirmModal } from './components/Common/ConfirmModal';
 import { SettingsModal } from './components/Settings/SettingsModal';
@@ -25,6 +26,16 @@ import { AppUpdateBanner } from './components/Common/AppUpdateBanner';
 const MainAppContent: React.FC = () => {
   const { activeTab, isSettingsModalOpen, setIsSettingsModalOpen, isWoodpileModalOpen, setIsWoodpileModalOpen } = useApp();
   const { user, profile, loading } = useAuth();
+  const [showCelebration, setShowCelebration] = React.useState<boolean>(false);
+
+  React.useEffect(() => {
+    if (profile && profile.role !== 'super_admin' && profile.status === 'active') {
+      const acknowledged = localStorage.getItem(`gofield_approved_acknowledged_${profile.uid}`);
+      if (acknowledged !== 'true') {
+        setShowCelebration(true);
+      }
+    }
+  }, [profile?.status, profile?.uid, profile?.role]);
 
   if (loading) {
     return (
@@ -41,6 +52,11 @@ const MainAppContent: React.FC = () => {
   // If the user's account is pending approval or blocked (and not the owner super_admin)
   if (profile.role !== 'super_admin' && (profile.status === 'pending' || profile.status === 'blocked')) {
     return <PendingApprovalScreen />;
+  }
+
+  // If newly approved, display the celebration transition screen
+  if (showCelebration && profile.status === 'active' && profile.role !== 'super_admin') {
+    return <ApprovalCelebrationScreen onContinue={() => setShowCelebration(false)} />;
   }
 
   return (

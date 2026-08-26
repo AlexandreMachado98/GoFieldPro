@@ -23,6 +23,7 @@ import {
 import { doc, getDoc, updateDoc, collection, getDocs } from 'firebase/firestore';
 import { db } from '../../lib/firebase';
 import { SystemBillingConfig, PlanItemConfig, PromoCoupon } from '../../types';
+import { ApprovalCelebrationScreen } from './ApprovalCelebrationScreen';
 
 const FALLBACK_PLANS: PlanItemConfig[] = [
   {
@@ -234,6 +235,10 @@ export const PendingApprovalScreen: React.FC = () => {
     setCouponSuccess('');
     setCouponError('');
   };
+
+  if (profile?.status === 'active') {
+    return <ApprovalCelebrationScreen onContinue={refreshProfile} />;
+  }
 
   const selectedPlan = plans.find((p) => p.id === selectedPlanId) || plans[0] || FALLBACK_PLANS[0];
 
