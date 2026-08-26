@@ -1,4 +1,5 @@
 import React, { useState, useRef } from 'react';
+import { formatFieldDistance } from '../../utils/geoUtils';
 import { useApp } from '../../context/AppContext';
 import { useAuth } from '../../context/AuthContext';
 import { FieldRound } from '../../types';
@@ -562,7 +563,7 @@ export const HomeDashboard: React.FC = () => {
                           <div className="text-center">
                             <div className="text-xs text-slate-400 font-bold uppercase">Total</div>
                             <div className="text-base sm:text-lg font-black text-sky-400 font-mono">
-                              {round.totalKm > 0 ? `${round.totalKm.toLocaleString('pt-BR')} km` : '---'}
+                              {round.totalKm > 0 ? formatFieldDistance(round.totalKm).full : '---'}
                             </div>
                           </div>
                         </div>
@@ -867,7 +868,7 @@ export const HomeDashboard: React.FC = () => {
                 <div className="sm:col-span-2 pt-2 border-t border-slate-800 flex items-center justify-between">
                   <span className="text-xs text-slate-400 font-medium">KM Total:</span>
                   <span className="text-base font-extrabold text-sky-400 font-mono">
-                    {calcModalTotalKm() > 0 ? `${calcModalTotalKm()} KM` : '-- KM'}
+                    {calcModalTotalKm() > 0 ? formatFieldDistance(calcModalTotalKm()).full : '--'}
                   </span>
                 </div>
               </div>

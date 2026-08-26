@@ -1,3 +1,4 @@
+import { formatFieldDistance } from './geoUtils';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { FieldRound } from '../types';
@@ -67,7 +68,7 @@ export const generateFieldRoundsPdf = async (
   doc.text('TOTAL PERCORRIDO', 20, startY + 6);
   doc.setFontSize(12);
   doc.setTextColor(14, 165, 233);
-  doc.text(`${totalKmSum.toLocaleString('pt-BR')} KM`, 20, startY + 14);
+  doc.text(formatFieldDistance(totalKmSum).full.toUpperCase(), 20, startY + 14);
 
   // Divider 1
   doc.setDrawColor(203, 213, 225);
@@ -100,7 +101,7 @@ export const generateFieldRoundsPdf = async (
     const timeRange = `${r.startTime || '--:--'} às ${r.endTime || '--:--'}`;
     const initialKmStr = r.initialKm.toLocaleString('pt-BR');
     const finalKmStr = r.finalKm ? r.finalKm.toLocaleString('pt-BR') : 'Em andamento';
-    const totalKmStr = r.totalKm ? `${r.totalKm.toLocaleString('pt-BR')} km` : '--';
+    const totalKmStr = r.totalKm ? formatFieldDistance(r.totalKm).full : '--';
     const vehicleInfo = [r.technicianName, r.vehiclePlate ? `[${r.vehiclePlate}]` : '']
       .filter(Boolean)
       .join(' ');
@@ -131,7 +132,7 @@ export const generateFieldRoundsPdf = async (
           styles: { halign: 'right', fontStyle: 'bold', fontSize: 8.5, textColor: [15, 23, 42] },
         },
         {
-          content: `${totalKmSum.toLocaleString('pt-BR')} km`,
+          content: formatFieldDistance(totalKmSum).full,
           styles: { halign: 'right', fontStyle: 'bold', fontSize: 9, textColor: [2, 132, 199] },
         },
         {

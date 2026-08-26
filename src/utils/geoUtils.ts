@@ -195,3 +195,36 @@ export function calculatePolygonArea(coords: GeoCoordinate[]): { m2: number; hec
   const hectares = Number((area / 10000).toFixed(2));
   return { m2: Math.round(area), hectares: isNaN(hectares) ? 0 : hectares };
 }
+
+/**
+ * Formats distance in km or meters cleanly for technical field reports and UI:
+ * - < 1 km: e.g. "159 m" or "850 m"
+ * - >= 1 km: e.g. "1,5 km" or "12,45 km"
+ */
+export function formatFieldDistance(km: number | undefined | null): { value: string; unit: string; full: string } {
+  if (km === undefined || km === null || isNaN(km) || km <= 0) {
+    return { value: '0', unit: 'km', full: '0 km' };
+  }
+
+  // Under 1 km: display in meters (e.g. 159 m)
+  if (km < 1) {
+    const meters = Math.round(km * 1000);
+    return {
+      value: meters.toLocaleString('pt-BR'),
+      unit: 'm',
+      full: `${meters.toLocaleString('pt-BR')} m`,
+    };
+  }
+
+  // 1 km or more: display in km with up to 2 decimal places (e.g. 12 km, 12,5 km, 12,54 km)
+  const formatted = Number(km.toFixed(2)).toLocaleString('pt-BR', {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 2,
+  });
+
+  return {
+    value: formatted,
+    unit: 'km',
+    full: `${formatted} km`,
+  };
+}
