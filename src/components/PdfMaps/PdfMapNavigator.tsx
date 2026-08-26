@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { useApp } from '../../context/AppContext';
 import { 
-  UploadCloud, 
+  UploadCloud, DownloadCloud, 
   FileText, 
   Trash2, 
   ZoomIn, 
@@ -55,6 +55,8 @@ import {
   calculateNavigationToMarker
 } from '../../utils/geoTransform';
 import { calculateDistanceMeters } from '../../utils/geoUtils';
+import { parseKMLString, parseKMZFile } from '../../utils/kmlParser';
+import { KMLFeature, GeoCoordinate } from '../../types';
 import { MeasurementPoint, MeasurementPointType } from '../../types';
 import { MeasurementControlBar } from '../Map/MeasurementControlBar';
 import { PointDetailModal } from '../Map/PointDetailModal';
@@ -256,6 +258,86 @@ export const PdfMapNavigator: React.FC = () => {
   const markerPhotoInputRef = useRef<HTMLInputElement>(null);
   const markerCameraInputRef = useRef<HTMLInputElement>(null);
   const editPhotoInputRef = useRef<HTMLInputElement>(null);
+  const importKmlInputRef = useRef<HTMLInputElement>(null);
+
+  // KML/KMZ Import Handler
+  const handleImportKml = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !activeDoc) return;
+    
+    setIsProcessing(true);
+    setProcessingProgress('Importando KML/KMZ e projetando no mapa...');
+    
+    try {
+      let features: KMLFeature[] = [];
+      if (file.name.toLowerCase().endsWith('.kmz')) {
+        const res = await parseKMZFile(file);
+        features = res.features;
+      } else {
+        const text = await file.text();
+        features = parseKMLString(text);
+      }
+      
+      let newTracks: PdfTrack[] = [...(activeDoc.tracks || [])];
+      let newMarkers: PdfMarker[] = [...(activeDoc.markers || [])];
+      
+      features.forEach((feat) => {
+        if (feat.type === 'Point' && !Array.isArray(feat.coordinates)) {
+          const coord = feat.coordinates as GeoCoordinate;
+          if (coord.lat !== undefined && coord.lng !== undefined) {
+            const pdfCoord = gpsToPdf(coord.lat, coord.lng, activeDoc);
+            newMarkers.push({
+              id: `kmz-pt-${Date.now()}-${Math.random().toString(36).substr(2,9)}`,
+              x: pdfCoord.x,
+              y: pdfCoord.y,
+              lat: coord.lat,
+              lng: coord.lng,
+              title: feat.name || 'Ponto Importado',
+              notes: feat.description || '',
+              category: 'checkpoint',
+              color: feat.color || '#10b981',
+              createdAt: new Date().toISOString()
+            });
+          }
+        } else if (feat.type === 'LineString' && Array.isArray(feat.coordinates)) {
+          const pts = (feat.coordinates as GeoCoordinate[])
+            .filter(c => c.lat !== undefined && c.lng !== undefined)
+            .map(c => {
+               const pc = gpsToPdf(c.lat, c.lng, activeDoc);
+               return { x: pc.x, y: pc.y, lat: c.lat, lng: c.lng };
+            });
+          
+          if (pts.length > 1) {
+            newTracks.push({
+              id: `kmz-trk-${Date.now()}-${Math.random().toString(36).substr(2,9)}`,
+              name: feat.name || 'Trilha Importada',
+              points: pts,
+              color: feat.strokeWidth ? (feat.color || '#3b82f6') : '#3b82f6',
+              createdAt: new Date().toISOString(),
+              isRecorded: false
+            });
+          }
+        }
+      });
+      
+      const updatedDoc = {
+         ...activeDoc,
+         markers: newMarkers,
+         tracks: newTracks
+      };
+      
+      updateDocumentInStore(updatedDoc);
+      notifySuccess('Importação Concluída', `${features.length} elementos georreferenciados foram projetados neste mapa PDF.`);
+      
+    } catch(err) {
+      console.error('Error importing KML/KMZ', err);
+      notifyError('Falha na Importação', 'Não foi possível ler as coordenadas do arquivo KML/KMZ fornecido.');
+    } finally {
+      setIsProcessing(false);
+      setProcessingProgress('');
+      if (e.target) e.target.value = '';
+    }
+  };
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<L.Map | null>(null);
   const imageOverlayRef = useRef<L.ImageOverlay | null>(null);
@@ -2039,6 +2121,18 @@ export const PdfMapNavigator: React.FC = () => {
             </button>
           )}
 
+          {/* Import KML/KMZ to Active Document */}
+          {activeDoc && (
+            <button
+              onClick={() => importKmlInputRef.current?.click()}
+              className="px-3 py-1.5 rounded-2xl bg-slate-800 hover:bg-slate-700 text-emerald-400 border border-slate-700 text-xs font-extrabold flex items-center gap-1.5 shadow-2xl transition-all active:scale-95"
+              title="Importar Trilhas e Pontos de outro mapa (KML/KMZ) para este PDF"
+            >
+              <DownloadCloud className="w-4 h-4" />
+              <span className="hidden md:inline">Importar KML</span>
+            </button>
+          )}
+
           {/* Export & Share Modal Opener */}
           {activeDoc && (
             <button
@@ -2625,6 +2719,13 @@ export const PdfMapNavigator: React.FC = () => {
       </div>
 
       {/* Hidden File Inputs */}
+      <input
+        type="file"
+        ref={importKmlInputRef}
+        onChange={handleImportKml}
+        accept=".kml,.kmz"
+        className="hidden"
+      />
       <input
         type="file"
         ref={fileInputRef}
