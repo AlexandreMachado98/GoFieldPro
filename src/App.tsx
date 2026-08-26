@@ -21,10 +21,19 @@ import { ToastContainer } from './components/Common/ToastContainer';
 import { ConfirmModal } from './components/Common/ConfirmModal';
 import { SettingsModal } from './components/Settings/SettingsModal';
 import { WoodpileCubageModal } from './components/Forestry/WoodpileCubageModal';
+import { LegalPoliciesModal } from './components/Legal/LegalPoliciesModal';
 import { AppUpdateBanner } from './components/Common/AppUpdateBanner';
 
 const MainAppContent: React.FC = () => {
-  const { activeTab, isSettingsModalOpen, setIsSettingsModalOpen, isWoodpileModalOpen, setIsWoodpileModalOpen } = useApp();
+  const {
+    activeTab,
+    isSettingsModalOpen,
+    setIsSettingsModalOpen,
+    isWoodpileModalOpen,
+    setIsWoodpileModalOpen,
+    isPoliciesModalOpen,
+    setIsPoliciesModalOpen,
+  } = useApp();
   const { user, profile, loading } = useAuth();
   const [showCelebration, setShowCelebration] = React.useState<boolean>(false);
 
@@ -92,6 +101,7 @@ const MainAppContent: React.FC = () => {
       <LayerManagerModal />
       <SettingsModal isOpen={isSettingsModalOpen} onClose={() => setIsSettingsModalOpen(false)} />
       <WoodpileCubageModal isOpen={isWoodpileModalOpen} onClose={() => setIsWoodpileModalOpen(false)} />
+      <LegalPoliciesModal isOpen={isPoliciesModalOpen} onClose={() => setIsPoliciesModalOpen(false)} />
       <ConfirmModal />
       <ToastContainer />
     </div>

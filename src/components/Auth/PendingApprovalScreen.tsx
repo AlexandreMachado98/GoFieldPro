@@ -24,6 +24,7 @@ import { doc, getDoc, updateDoc, collection, getDocs } from 'firebase/firestore'
 import { db } from '../../lib/firebase';
 import { SystemBillingConfig, PlanItemConfig, PromoCoupon } from '../../types';
 import { ApprovalCelebrationScreen } from './ApprovalCelebrationScreen';
+import { LegalPoliciesModal } from '../Legal/LegalPoliciesModal';
 
 const FALLBACK_PLANS: PlanItemConfig[] = [
   {
@@ -103,6 +104,7 @@ export const PendingApprovalScreen: React.FC = () => {
   const [couponLoading, setCouponLoading] = useState(false);
   const [couponError, setCouponError] = useState('');
   const [couponSuccess, setCouponSuccess] = useState('');
+  const [isPoliciesOpen, setIsPoliciesOpen] = useState(false);
 
   useEffect(() => {
     refreshProfile();
@@ -678,10 +680,19 @@ export const PendingApprovalScreen: React.FC = () => {
         </div>
 
         {/* Footer */}
-        <div className="text-center text-[9px] sm:text-[10px] text-slate-500 font-medium pb-4">
-          GoField Pro • AM TST SAÚDE E SEGURANÇA DO TRABALHO
+        <div className="flex flex-col items-center justify-center gap-1.5 text-center text-[9px] sm:text-[10px] text-slate-500 font-medium pb-4">
+          <button
+            type="button"
+            onClick={() => setIsPoliciesOpen(true)}
+            className="text-slate-400 hover:text-emerald-400 transition-colors underline cursor-pointer text-[10px]"
+          >
+            Termos de Uso e Política de Privacidade (LGPD)
+          </button>
+          <div>GoField Pro • AM TST SAÚDE E SEGURANÇA DO TRABALHO</div>
         </div>
       </div>
+
+      <LegalPoliciesModal isOpen={isPoliciesOpen} onClose={() => setIsPoliciesOpen(false)} />
     </div>
   );
 };

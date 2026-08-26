@@ -21,6 +21,7 @@ import {
   Sparkles,
   RefreshCw,
   Trees,
+  ShieldCheck,
 } from 'lucide-react';
 
 export const Sidebar: React.FC = () => {
@@ -32,6 +33,7 @@ export const Sidebar: React.FC = () => {
     setIsMobileMenuOpen,
     setIsSettingsModalOpen,
     setIsWoodpileModalOpen,
+    setIsPoliciesModalOpen,
     showConfirm
   } = useApp();
   const { profile, logout } = useAuth();
@@ -172,6 +174,17 @@ export const Sidebar: React.FC = () => {
             >
               <Settings className="w-5 h-5 text-sky-400" />
               <span>Configurações</span>
+            </button>
+
+            <button
+              onClick={() => {
+                setIsMobileMenuOpen(false);
+                setIsPoliciesModalOpen(true);
+              }}
+              className="w-full flex items-center gap-3.5 px-4 py-2.5 rounded-xl text-sm font-bold text-slate-300 hover:text-white hover:bg-slate-900/80 transition-all active:scale-98"
+            >
+              <ShieldCheck className="w-5 h-5 text-emerald-400" />
+              <span>Políticas & LGPD</span>
             </button>
 
             <PwaInstallButton variant="sidebar" />

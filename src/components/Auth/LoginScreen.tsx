@@ -28,11 +28,14 @@ import {
   Loader2,
   KeyRound,
   ArrowLeft,
+  FileText,
 } from 'lucide-react';
+import { LegalPoliciesModal } from '../Legal/LegalPoliciesModal';
 
 export const LoginScreen: React.FC = () => {
   // Modes: 'login' | 'register' | 'forgot_password'
   const [viewMode, setViewMode] = useState<'login' | 'register' | 'forgot_password'>('login');
+  const [isPoliciesOpen, setIsPoliciesOpen] = useState(false);
 
   // Form fields
   const [name, setName] = useState('');
@@ -622,13 +625,22 @@ export const LoginScreen: React.FC = () => {
         )}
 
         {/* Footer info */}
-        <div className="flex flex-col items-center justify-center gap-1 text-[10px] sm:text-[11px] text-slate-500 font-medium text-center">
-          <div className="flex items-center gap-1.5">
+        <div className="flex flex-col items-center justify-center gap-1.5 text-[10px] sm:text-[11px] text-slate-500 font-medium text-center">
+          <button
+            type="button"
+            onClick={() => setIsPoliciesOpen(true)}
+            className="text-slate-400 hover:text-emerald-400 transition-colors underline cursor-pointer text-[10px]"
+          >
+            Termos de Uso e Política de Privacidade (LGPD)
+          </button>
+          <div className="flex items-center gap-1.5 text-slate-500">
             <ShieldCheck className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
             <span>GoField Pro • AM TST SAÚDE E SEGURANÇA DO TRABALHO</span>
           </div>
         </div>
       </div>
+
+      <LegalPoliciesModal isOpen={isPoliciesOpen} onClose={() => setIsPoliciesOpen(false)} />
     </div>
   );
 };

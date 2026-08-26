@@ -183,6 +183,8 @@ interface AppContextType {
   setIsMeasuring: (measuring: boolean) => void;
   isWoodpileModalOpen: boolean;
   setIsWoodpileModalOpen: (open: boolean) => void;
+  isPoliciesModalOpen: boolean;
+  setIsPoliciesModalOpen: (open: boolean) => void;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -411,6 +413,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const [isMeasuring, setIsMeasuring] = useState<boolean>(false);
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState<boolean>(false);
   const [isWoodpileModalOpen, setIsWoodpileModalOpen] = useState<boolean>(false);
+  const [isPoliciesModalOpen, setIsPoliciesModalOpen] = useState<boolean>(false);
 
   // App Settings with LocalStorage persistence
   const [settings, setSettings] = useState<AppSettings>(() => {
@@ -1399,6 +1402,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         setIsMeasuring,
         isWoodpileModalOpen,
         setIsWoodpileModalOpen,
+        isPoliciesModalOpen,
+        setIsPoliciesModalOpen,
       }}
     >
       {children}
