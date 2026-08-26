@@ -149,7 +149,7 @@ export interface Waypoint {
   projectId: string;
   name: string;
   code: string;
-  category: 'inspection' | 'hazard' | 'geodesic' | 'fauna_flora' | 'soil_sample' | 'infrastructure' | 'obstacle' | 'checkpoint';
+  category: 'inspection' | 'hazard' | 'geodesic' | 'fauna_flora' | 'soil_sample' | 'infrastructure' | 'obstacle' | 'checkpoint' | 'fire' | 'woodpile';
   lat: number;
   lng: number;
   altitude: number;

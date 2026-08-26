@@ -18,7 +18,7 @@ export interface PdfMarker {
   lng?: number;
   title: string;
   notes?: string;
-  category: 'woodpile' | 'checkpoint' | 'inspection' | 'hazard' | 'boundary' | 'sample' | 'note';
+  category: 'woodpile' | 'fire' | 'checkpoint' | 'inspection' | 'hazard' | 'boundary' | 'sample' | 'note';
   color: string;
   photos?: string[]; // compressed base64 images
   woodpileData?: {

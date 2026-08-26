@@ -391,6 +391,10 @@ export const MapViewer: React.FC = () => {
     for (const wp of waypoints) {
       const getCategoryInfo = (cat: Waypoint['category']) => {
         switch (cat) {
+          case 'fire':
+            return { color: '#ef4444', icon: '🔥', label: 'Fogo / Sinistro' };
+          case 'woodpile':
+            return { color: '#d97706', icon: '🪵', label: 'Pilha Madeira' };
           case 'hazard':
             return { color: '#ef4444', icon: '⚠️', label: 'Perigo' };
           case 'obstacle':
@@ -408,6 +412,7 @@ export const MapViewer: React.FC = () => {
           default:
             return { color: '#0284c7', icon: '📍', label: 'Marco' };
         }
+
       };
 
       const info = getCategoryInfo(wp.category);

@@ -1,18 +1,16 @@
 import React from 'react';
-import { Home, Map, FileText, Flame, Gauge, HardDrive } from 'lucide-react';
+import { Home, Map, FileText, Gauge, HardDrive } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 
 export const MobileBottomNav: React.FC = () => {
-  const { activeTab, setActiveTab, fireIncidents } = useApp();
-
-  const activeFireCount = (fireIncidents || []).filter((i) => i && i.status === 'em_combate').length;
+  const { activeTab, setActiveTab } = useApp();
 
   const navItems = [
     { id: 'home', label: 'Início', icon: Home },
     { id: 'map', label: 'GPS', icon: Map },
     { id: 'pdf_maps', label: 'Plantas PDF', icon: FileText },
-    { id: 'fire_incidents', label: 'Incêndios', icon: Flame, badge: activeFireCount, isFlame: true },
     { id: 'field_rounds', label: 'Atividades', icon: Gauge },
+    { id: 'offline', label: 'Offline', icon: HardDrive },
   ];
 
   return (
@@ -27,26 +25,15 @@ export const MobileBottomNav: React.FC = () => {
             onClick={() => setActiveTab(item.id as any)}
             className={`flex flex-col items-center justify-center py-1 px-2.5 rounded-xl transition-all relative active:scale-95 ${
               isActive
-                ? item.isFlame
-                  ? 'text-rose-400 font-extrabold'
-                  : 'text-sky-400 font-extrabold'
+                ? 'text-sky-400 font-extrabold'
                 : 'text-slate-400 hover:text-slate-200 font-medium'
             }`}
           >
-            <div className="relative">
-              <Icon
-                className={`w-5 h-5 transition-transform ${
-                  isActive ? 'scale-110' : ''
-                } ${
-                  item.isFlame && item.badge && item.badge > 0 ? 'text-rose-500 animate-pulse' : ''
-                }`}
-              />
-              {item.badge !== undefined && item.badge > 0 && (
-                <span className="absolute -top-1.5 -right-2.5 w-4 h-4 bg-rose-600 text-white rounded-full text-[9px] font-black flex items-center justify-center animate-pulse border border-slate-950">
-                  {item.badge}
-                </span>
-              )}
-            </div>
+            <Icon
+              className={`w-5 h-5 transition-transform ${
+                isActive ? 'scale-110' : ''
+              }`}
+            />
             <span className="text-[10px] mt-0.5 tracking-tight">{item.label}</span>
           </button>
         );

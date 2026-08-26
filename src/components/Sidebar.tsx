@@ -88,14 +88,6 @@ export const Sidebar: React.FC = () => {
     { id: 'home', label: t.tabHome || 'Início', icon: Home },
     { id: 'map', label: t.tabMap || 'Mapa de Navegação', icon: Map },
     { id: 'pdf_maps', label: t.tabPdfMaps || 'Mapas & Plantas PDF', icon: FileText },
-    {
-      id: 'fire_incidents',
-      label: 'Focos de Incêndio & Sinistros',
-      icon: Flame,
-      badge: activeFireCount,
-      badgeColor: 'bg-rose-600',
-      iconColor: 'text-rose-400',
-    },
     { id: 'field_rounds', label: t.tabFieldRounds || 'Registrar Atividade', icon: Gauge },
     { id: 'offline', label: t.tabOffline || 'Mapas Offline', icon: HardDrive },
   ];
