@@ -2142,7 +2142,7 @@ export const PdfMapNavigator: React.FC = () => {
   // Page switcher
   const handlePageChange = (newPage: number) => {
     if (!activeDoc) return;
-    if (newPage < 0 || newPage >= activeDoc.pageCount) return;
+    if (newPage < 0 || newPage >= (activeDoc.pageCount || 1)) return;
     const updatedDoc: PdfDocument = { ...activeDoc, currentPage: newPage };
     updateDocumentInStore(updatedDoc);
   };
