@@ -40,7 +40,8 @@ import * as pdfjsLib from 'pdfjs-dist';
 import pdfWorker from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
 import 'leaflet/dist/leaflet.css';
 import { 
-  PdfDocument, 
+  PdfDocument,
+  GeoCalibration, 
   PdfMarker, 
   PdfTrack, 
   PdfTrackPoint,
@@ -290,10 +291,10 @@ export const PdfMapNavigator: React.FC = () => {
         return;
       }
 
-      setProcessingProgress(`Processando ${features.length} elementos geográficos...`);
+      setProcessingProgress(`Projetando ${features.length} elementos na folha do PDF...`);
       await new Promise(resolve => setTimeout(resolve, 80));
       
-      // Calculate Bounding Box of all imported coordinates
+      // 1. Calculate Bounding Box of all imported coordinates
       let minLat = 90, maxLat = -90, minLng = 180, maxLng = -180;
       let hasValidCoords = false;
 
@@ -323,26 +324,31 @@ export const PdfMapNavigator: React.FC = () => {
       const h = activeDoc.height && !isNaN(activeDoc.height) ? activeDoc.height : 1200;
       const w = activeDoc.width && !isNaN(activeDoc.width) ? activeDoc.width : 1600;
 
-      // Determine effective calibration
-      let effectiveCalibration = activeDoc.calibration;
-      let isAutoCalibrated = false;
-
-      if ((!effectiveCalibration || !effectiveCalibration.isCalibrated) && hasValidCoords) {
-        const latSpan = Math.abs(maxLat - minLat);
-        const lngSpan = Math.abs(maxLng - minLng);
-        const latPad = latSpan > 0 ? latSpan * 0.15 : 0.002;
-        const lngPad = lngSpan > 0 ? lngSpan * 0.15 : 0.002;
+      // 2. ALWAYS Auto-Anchor the PDF calibration to the KML bounds so nothing is thrown outside the map
+      let effectiveCalibration: GeoCalibration;
+      
+      if (hasValidCoords) {
+        const latSpan = Math.abs(maxLat - minLat) || 0.005;
+        const lngSpan = Math.abs(maxLng - minLng) || 0.005;
+        // 10% padding around the edges
+        const latPad = latSpan * 0.1;
+        const lngPad = lngSpan * 0.1;
 
         effectiveCalibration = {
           isCalibrated: true,
-          ref1: { x: h * 0.9, y: w * 0.1, lat: maxLat + latPad, lng: minLng - lngPad },
-          ref2: { x: h * 0.1, y: w * 0.9, lat: minLat - latPad, lng: maxLng + lngPad },
+          ref1: { x: h * 0.90, y: w * 0.10, lat: maxLat + latPad, lng: minLng - lngPad },
+          ref2: { x: h * 0.10, y: w * 0.90, lat: minLat - latPad, lng: maxLng + lngPad },
           scaleMetersPerPixel: 1,
         };
-        isAutoCalibrated = true;
+      } else {
+        effectiveCalibration = activeDoc.calibration || {
+          isCalibrated: false,
+          ref1: { x: h * 0.9, y: w * 0.1, lat: -23.5420, lng: -46.6380 },
+          ref2: { x: h * 0.1, y: w * 0.9, lat: -23.5540, lng: -46.6220 },
+        };
       }
 
-      // Temporary document with effective calibration to ensure accurate projection
+      // Temporary document with effective calibration
       const tempDoc: PdfDocument = {
         ...activeDoc,
         calibration: effectiveCalibration,
@@ -354,7 +360,6 @@ export const PdfMapNavigator: React.FC = () => {
       let markersAdded = 0;
       let tracksAdded = 0;
       let wasTruncated = false;
-      const importedBounds: [number, number][] = [];
 
       features.forEach((feat) => {
         if (feat.type === 'Point' && !Array.isArray(feat.coordinates)) {
@@ -365,11 +370,15 @@ export const PdfMapNavigator: React.FC = () => {
           const coord = feat.coordinates as GeoCoordinate;
           if (coord && typeof coord.lat === 'number' && typeof coord.lng === 'number' && !isNaN(coord.lat) && !isNaN(coord.lng)) {
             const pdfCoord = gpsToPdf(coord.lat, coord.lng, tempDoc);
-            if (!isNaN(pdfCoord.x) && !isNaN(pdfCoord.y)) {
+            // Strict Clamping inside PDF page canvas
+            const clampedX = Math.max(15, Math.min(h - 15, pdfCoord.x));
+            const clampedY = Math.max(15, Math.min(w - 15, pdfCoord.y));
+
+            if (!isNaN(clampedX) && !isNaN(clampedY)) {
               newMarkers.push({
                 id: `kmz-pt-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-                x: pdfCoord.x,
-                y: pdfCoord.y,
+                x: clampedX,
+                y: clampedY,
                 lat: coord.lat,
                 lng: coord.lng,
                 title: feat.name || 'Ponto Importado',
@@ -380,7 +389,6 @@ export const PdfMapNavigator: React.FC = () => {
                 photos: feat.photos || [],
               });
               markersAdded++;
-              importedBounds.push([pdfCoord.x, pdfCoord.y]);
             }
           }
         } else if (feat.type === 'LineString' && Array.isArray(feat.coordinates)) {
@@ -392,7 +400,9 @@ export const PdfMapNavigator: React.FC = () => {
             .filter((c) => c && typeof c.lat === 'number' && typeof c.lng === 'number' && !isNaN(c.lat) && !isNaN(c.lng))
             .map((c) => {
               const pc = gpsToPdf(c.lat, c.lng, tempDoc);
-              return { x: pc.x, y: pc.y, lat: c.lat, lng: c.lng };
+              const clampedX = Math.max(10, Math.min(h - 10, pc.x));
+              const clampedY = Math.max(10, Math.min(w - 10, pc.y));
+              return { x: clampedX, y: clampedY, lat: c.lat, lng: c.lng };
             })
             .filter((p) => !isNaN(p.x) && !isNaN(p.y));
 
@@ -412,7 +422,6 @@ export const PdfMapNavigator: React.FC = () => {
               isRecorded: false,
             });
             tracksAdded++;
-            pts.forEach((p) => importedBounds.push([p.x, p.y]));
           }
         }
       });
@@ -426,25 +435,23 @@ export const PdfMapNavigator: React.FC = () => {
 
       updateDocumentInStore(updatedDoc);
 
-      // Pan & Zoom Leaflet view to focus on the newly imported items
-      if (mapInstanceRef.current && importedBounds.length > 0) {
+      // Re-center camera directly on the PDF document canvas
+      if (mapInstanceRef.current) {
         try {
-          const latLngBounds = L.latLngBounds(importedBounds);
-          mapInstanceRef.current.fitBounds(latLngBounds, {
-            padding: [50, 50],
-            maxZoom: 3,
+          mapInstanceRef.current.fitBounds([[0, 0], [h, w]], {
+            padding: [20, 20],
             animate: true,
           });
         } catch (fitErr) {
-          console.warn('Could not fit bounds to imported items:', fitErr);
+          console.warn('Could not fit bounds to PDF image:', fitErr);
         }
       }
 
       notifySuccess(
-        isAutoCalibrated ? 'Planta Calibrada & KML Carregado' : 'KML/KMZ Importado',
+        'KML/KMZ Projetado no Mapa',
         wasTruncated
-          ? `Importação otimizada: ${markersAdded} pontos e ${tracksAdded} trilhas projetados (alguns itens foram limitados para máxima performance).`
-          : `${markersAdded} pontos e ${tracksAdded} trilhas foram projetados perfeitamente no seu mapa.`
+          ? `${markersAdded} pontos e ${tracksAdded} trilhas foram ajustados e desenhados diretamente na sua folha PDF.`
+          : `${markersAdded} pontos e ${tracksAdded} trilhas foram ajustados e desenhados diretamente na sua folha PDF.`
       );
     } catch (err) {
       console.error('Error importing KML/KMZ:', err);
