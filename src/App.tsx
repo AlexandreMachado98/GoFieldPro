@@ -13,6 +13,8 @@ import { HomeDashboard } from './components/Home/HomeDashboard';
 import { PdfMapNavigator } from './components/PdfMaps/PdfMapNavigator';
 import { OfflineSyncDrawer } from './components/Offline/OfflineSyncDrawer';
 import { FieldRoundsPanel } from './components/FieldRounds/FieldRoundsPanel';
+import { FireIncidentsPanel } from './components/FireIncidents/FireIncidentsPanel';
+import { MobileBottomNav } from './components/Navigation/MobileBottomNav';
 import { AdminPanel } from './components/Admin/AdminPanel';
 import { LoginScreen } from './components/Auth/LoginScreen';
 import { PendingApprovalScreen } from './components/Auth/PendingApprovalScreen';
@@ -84,6 +86,7 @@ const MainAppContent: React.FC = () => {
             </div>
           )}
           {activeTab === 'field_rounds' && <FieldRoundsPanel />}
+          {activeTab === 'fire_incidents' && <FireIncidentsPanel />}
           {activeTab === 'home' && <HomeDashboard />}
           {activeTab === 'pdf_maps' && (
             <ErrorBoundary fallbackTitle="Visualizador de Mapas e Plantas PDF">

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { collection, onSnapshot, query, where } from 'firebase/firestore';
+import { collection, onSnapshot } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { useApp } from '../context/AppContext';
 import { useAuth } from '../context/AuthContext';
@@ -8,9 +8,7 @@ import { APP_VERSION } from '../config/version';
 import { PwaInstallButton } from './PWA/PwaInstallButton';
 import {
   Map,
-  Activity,
   Home,
-  Users,
   HardDrive,
   UserCog,
   Gauge,
@@ -19,9 +17,13 @@ import {
   LogOut,
   X,
   Sparkles,
-  RefreshCw,
   Trees,
   ShieldCheck,
+  Flame,
+  PanelLeftClose,
+  PanelLeft,
+  ChevronLeft,
+  ChevronRight,
 } from 'lucide-react';
 
 export const Sidebar: React.FC = () => {
@@ -31,31 +33,39 @@ export const Sidebar: React.FC = () => {
     t,
     isMobileMenuOpen,
     setIsMobileMenuOpen,
+    isSidebarCollapsed,
+    toggleSidebarCollapsed,
     setIsSettingsModalOpen,
     setIsWoodpileModalOpen,
     setIsPoliciesModalOpen,
-    showConfirm
+    fireIncidents,
   } = useApp();
   const { profile, logout } = useAuth();
   const { isUpdateAvailable, latestVersion, applyUpdate } = useUpdate();
   const [pendingCount, setPendingCount] = useState(0);
 
+  const activeFireCount = fireIncidents.filter((i) => i.status === 'em_combate').length;
+
   useEffect(() => {
     if (profile?.role !== 'super_admin') return;
 
     const usersRef = collection(db, 'users');
-    const unsubscribe = onSnapshot(usersRef, (snapshot) => {
-      let count = 0;
-      snapshot.forEach((doc) => {
-        const data = doc.data();
-        if (data.status === 'pending') {
-          count++;
-        }
-      });
-      setPendingCount(count);
-    }, (err) => {
-      console.warn("Sidebar pending count listener:", err.message);
-    });
+    const unsubscribe = onSnapshot(
+      usersRef,
+      (snapshot) => {
+        let count = 0;
+        snapshot.forEach((doc) => {
+          const data = doc.data();
+          if (data.status === 'pending') {
+            count++;
+          }
+        });
+        setPendingCount(count);
+      },
+      (err) => {
+        console.warn('Sidebar pending count listener:', err.message);
+      }
+    );
 
     return () => unsubscribe();
   }, [profile]);
@@ -70,77 +80,122 @@ export const Sidebar: React.FC = () => {
     label: string;
     icon: React.ElementType;
     badge?: number;
+    badgeColor?: string;
+    iconColor?: string;
   }
 
   const tabs: TabItem[] = [
     { id: 'home', label: t.tabHome || 'Início', icon: Home },
     { id: 'map', label: t.tabMap || 'Mapa de Navegação', icon: Map },
     { id: 'pdf_maps', label: t.tabPdfMaps || 'Mapas & Plantas PDF', icon: FileText },
+    {
+      id: 'fire_incidents',
+      label: 'Focos de Incêndio & Sinistros',
+      icon: Flame,
+      badge: activeFireCount,
+      badgeColor: 'bg-rose-600',
+      iconColor: 'text-rose-400',
+    },
     { id: 'field_rounds', label: t.tabFieldRounds || 'Registrar Atividade', icon: Gauge },
     { id: 'offline', label: t.tabOffline || 'Mapas Offline', icon: HardDrive },
   ];
 
   if (profile?.role === 'super_admin') {
-    tabs.push({ id: 'admin', label: 'Admin', icon: UserCog, badge: pendingCount });
+    tabs.push({ id: 'admin', label: 'Admin & Equipe', icon: UserCog, badge: pendingCount, badgeColor: 'bg-amber-500' });
   }
 
   return (
     <>
-      {/* Mobile backdrop overlay - Stacking priority z-[99998] */}
+      {/* Mobile backdrop overlay */}
       {isMobileMenuOpen && (
-        <div 
-          className="fixed inset-0 bg-black/80 backdrop-blur-xs z-[99998] transition-opacity cursor-pointer" 
+        <div
+          className="md:hidden fixed inset-0 bg-black/80 backdrop-blur-xs z-[99998] transition-opacity cursor-pointer"
           onClick={() => setIsMobileMenuOpen(false)}
         />
       )}
 
-      <aside 
-        className={`fixed inset-y-0 left-0 w-72 bg-slate-950 border-r border-slate-800 flex flex-col h-[100dvh] z-[99999] shadow-2xl transform transition-transform duration-300 ease-in-out select-none ${
-          isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'
-        }`}
+      {/* Main Sidebar: Responsive Drawer on Mobile, Collapsible Permanent Bar on Desktop */}
+      <aside
+        className={`
+          fixed md:relative inset-y-0 left-0 bg-slate-950 border-r border-slate-800 flex flex-col h-[100dvh] z-[99999] md:z-30 shadow-2xl transition-all duration-300 ease-in-out select-none
+          ${isMobileMenuOpen ? 'translate-x-0 w-72' : '-translate-x-full md:translate-x-0'}
+          ${isSidebarCollapsed ? 'md:w-20' : 'md:w-64 lg:w-72'}
+        `}
       >
-        <div className="p-4 border-b border-slate-800 flex items-center justify-between bg-slate-950 shrink-0">
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-sky-500 to-emerald-500 flex items-center justify-center text-white shadow-lg">
+        {/* Header */}
+        <div className="p-3 sm:p-4 border-b border-slate-800 flex items-center justify-between bg-slate-950 shrink-0">
+          <div className="flex items-center gap-3 overflow-hidden">
+            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-sky-500 via-emerald-500 to-rose-500 flex items-center justify-center text-white shadow-lg shrink-0">
               <Map className="w-5 h-5" />
             </div>
-            <div>
-              <h1 className="text-lg font-extrabold text-white tracking-tight leading-none">GoField <span className="text-sky-400">Pro</span></h1>
-              <p className="text-[10px] text-slate-400 mt-0.5">Navegação GPS e mapas offline</p>
-            </div>
+            {(!isSidebarCollapsed || isMobileMenuOpen) && (
+              <div className="truncate">
+                <h1 className="text-base font-extrabold text-white tracking-tight leading-none truncate">
+                  GoField <span className="text-sky-400">Pro</span>
+                </h1>
+                <p className="text-[10px] text-slate-400 mt-0.5 truncate">Navegação & Campo</p>
+              </div>
+            )}
           </div>
-          <button 
-            className="p-2 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 transition-colors active:scale-95"
+
+          {/* Close button on Mobile */}
+          <button
+            className="md:hidden p-2 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 transition-colors active:scale-95"
             onClick={() => setIsMobileMenuOpen(false)}
             aria-label="Fechar Menu"
           >
             <X className="w-6 h-6" />
           </button>
+
+          {/* Collapse/Expand Toggle on Desktop */}
+          <button
+            onClick={toggleSidebarCollapsed}
+            className="hidden md:flex p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 transition-colors active:scale-95"
+            title={isSidebarCollapsed ? 'Expandir Barra Lateral' : 'Minimizar Barra Lateral'}
+          >
+            {isSidebarCollapsed ? <PanelLeft className="w-5 h-5 text-sky-400" /> : <PanelLeftClose className="w-5 h-5" />}
+          </button>
         </div>
-        
-        <nav className="flex-1 overflow-y-auto py-4 px-3 space-y-1.5 pb-6">
+
+        {/* Nav Links */}
+        <nav className="flex-1 overflow-y-auto py-3 px-2 sm:px-3 space-y-1.5 pb-6">
           {tabs.map((tab) => {
-            const Icon = tab.icon as React.ElementType;
+            const Icon = tab.icon;
             const isActive = activeTab === (tab.id as any);
-            const badgeCount = (tab as any).badge;
+            const badgeCount = tab.badge || 0;
+            const isCollapsed = isSidebarCollapsed && !isMobileMenuOpen;
 
             return (
               <button
                 key={tab.id}
-                onClick={() => { setActiveTab(tab.id as any); setIsMobileMenuOpen(false); }}
-                className={`w-full flex items-center justify-between px-4 py-3 rounded-xl text-sm font-extrabold transition-all active:scale-98 ${
+                onClick={() => {
+                  setActiveTab(tab.id as any);
+                  setIsMobileMenuOpen(false);
+                }}
+                title={isCollapsed ? tab.label : undefined}
+                className={`w-full flex items-center ${
+                  isCollapsed ? 'justify-center px-2 py-3' : 'justify-between px-3.5 py-3'
+                } rounded-xl text-sm font-extrabold transition-all active:scale-98 relative group ${
                   isActive
                     ? 'bg-sky-600 text-white shadow-lg shadow-sky-950/50'
                     : 'text-slate-300 hover:text-white hover:bg-slate-900/80'
                 }`}
               >
-                <div className="flex items-center gap-3.5">
-                  <Icon className={`w-5 h-5 ${isActive ? 'text-white' : 'text-sky-400'}`} />
-                  <span>{tab.label}</span>
+                <div className="flex items-center gap-3">
+                  <Icon
+                    className={`w-5 h-5 shrink-0 ${
+                      isActive ? 'text-white' : tab.iconColor || 'text-sky-400'
+                    }`}
+                  />
+                  {!isCollapsed && <span className="truncate">{tab.label}</span>}
                 </div>
 
                 {badgeCount > 0 && (
-                  <span className="px-2 py-0.5 rounded-full text-[11px] font-black bg-amber-500 text-slate-950 shadow-md animate-pulse">
+                  <span
+                    className={`px-2 py-0.5 rounded-full text-[10px] font-black text-white shadow-md animate-pulse ${
+                      tab.badgeColor || 'bg-amber-500'
+                    } ${isCollapsed ? 'absolute -top-1 -right-1 w-4 h-4 p-0 flex items-center justify-center text-[9px]' : ''}`}
+                  >
                     {badgeCount}
                   </span>
                 )}
@@ -148,53 +203,68 @@ export const Sidebar: React.FC = () => {
             );
           })}
 
+          {/* Forestry Tools & Settings Section */}
           <div className="pt-3 border-t border-slate-900 space-y-1.5">
+            {/* Woodpile Cubage */}
             <button
               onClick={() => {
                 setIsMobileMenuOpen(false);
                 setIsWoodpileModalOpen(true);
               }}
-              className="w-full flex items-center justify-between px-4 py-2.5 rounded-xl text-sm font-extrabold text-emerald-400 bg-emerald-950/40 border border-emerald-500/30 hover:bg-emerald-900/40 transition-all active:scale-98"
+              title={isSidebarCollapsed && !isMobileMenuOpen ? 'Cubagem Florestal (m³)' : undefined}
+              className={`w-full flex items-center ${
+                isSidebarCollapsed && !isMobileMenuOpen ? 'justify-center p-2.5' : 'justify-between px-3.5 py-2.5'
+              } rounded-xl text-xs font-extrabold text-emerald-400 bg-emerald-950/40 border border-emerald-500/30 hover:bg-emerald-900/40 transition-all active:scale-98`}
             >
-              <div className="flex items-center gap-3.5">
-                <Trees className="w-5 h-5 text-emerald-400" />
-                <span>Cubagem Florestal</span>
+              <div className="flex items-center gap-3">
+                <Trees className="w-5 h-5 text-emerald-400 shrink-0" />
+                {(!isSidebarCollapsed || isMobileMenuOpen) && <span>Cubagem Florestal</span>}
               </div>
-              <span className="text-[9px] uppercase font-black px-1.5 py-0.2 rounded-full bg-emerald-500 text-slate-950">
-                m³
-              </span>
+              {(!isSidebarCollapsed || isMobileMenuOpen) && (
+                <span className="text-[9px] uppercase font-black px-1.5 py-0.2 rounded-full bg-emerald-500 text-slate-950">
+                  m³
+                </span>
+              )}
             </button>
 
+            {/* Settings */}
             <button
               onClick={() => {
                 setIsMobileMenuOpen(false);
                 setIsSettingsModalOpen(true);
               }}
-              className="w-full flex items-center gap-3.5 px-4 py-2.5 rounded-xl text-sm font-bold text-slate-300 hover:text-white hover:bg-slate-900/80 transition-all active:scale-98"
+              title={isSidebarCollapsed && !isMobileMenuOpen ? 'Configurações' : undefined}
+              className={`w-full flex items-center ${
+                isSidebarCollapsed && !isMobileMenuOpen ? 'justify-center p-2.5' : 'gap-3 px-3.5 py-2.5'
+              } rounded-xl text-xs font-bold text-slate-300 hover:text-white hover:bg-slate-900/80 transition-all active:scale-98`}
             >
-              <Settings className="w-5 h-5 text-sky-400" />
-              <span>Configurações</span>
+              <Settings className="w-5 h-5 text-sky-400 shrink-0" />
+              {(!isSidebarCollapsed || isMobileMenuOpen) && <span>Configurações</span>}
             </button>
 
+            {/* Policies */}
             <button
               onClick={() => {
                 setIsMobileMenuOpen(false);
                 setIsPoliciesModalOpen(true);
               }}
-              className="w-full flex items-center gap-3.5 px-4 py-2.5 rounded-xl text-sm font-bold text-slate-300 hover:text-white hover:bg-slate-900/80 transition-all active:scale-98"
+              title={isSidebarCollapsed && !isMobileMenuOpen ? 'Políticas & LGPD' : undefined}
+              className={`w-full flex items-center ${
+                isSidebarCollapsed && !isMobileMenuOpen ? 'justify-center p-2.5' : 'gap-3 px-3.5 py-2.5'
+              } rounded-xl text-xs font-bold text-slate-300 hover:text-white hover:bg-slate-900/80 transition-all active:scale-98`}
             >
-              <ShieldCheck className="w-5 h-5 text-emerald-400" />
-              <span>Políticas & LGPD</span>
+              <ShieldCheck className="w-5 h-5 text-emerald-400 shrink-0" />
+              {(!isSidebarCollapsed || isMobileMenuOpen) && <span>Políticas & LGPD</span>}
             </button>
 
-            <PwaInstallButton variant="sidebar" />
+            {(!isSidebarCollapsed || isMobileMenuOpen) && <PwaInstallButton variant="sidebar" />}
           </div>
         </nav>
 
-        {/* Sidebar Footer with prominent Logout Button and App Version */}
-        <div className="p-3 border-t border-slate-800/80 bg-slate-950 shrink-0 space-y-2">
+        {/* Footer */}
+        <div className="p-2.5 sm:p-3 border-t border-slate-800/80 bg-slate-950 shrink-0 space-y-2">
           {/* Update Available Badge */}
-          {isUpdateAvailable && (
+          {isUpdateAvailable && (!isSidebarCollapsed || isMobileMenuOpen) && (
             <button
               type="button"
               onClick={applyUpdate}
@@ -210,33 +280,38 @@ export const Sidebar: React.FC = () => {
             </button>
           )}
 
+          {/* Logout */}
           <button
             type="button"
             onClick={handleLogout}
-            className="w-full flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl bg-rose-950/40 hover:bg-rose-900/60 border border-rose-900/60 text-rose-300 hover:text-rose-200 text-xs font-bold transition-all active:scale-98"
+            title={isSidebarCollapsed && !isMobileMenuOpen ? 'Sair do Aplicativo' : undefined}
+            className={`w-full flex items-center ${
+              isSidebarCollapsed && !isMobileMenuOpen ? 'justify-center p-2.5' : 'justify-center gap-2 px-3 py-2.5'
+            } rounded-xl bg-rose-950/40 hover:bg-rose-900/60 border border-rose-900/60 text-rose-300 hover:text-rose-200 text-xs font-bold transition-all active:scale-98`}
           >
-            <LogOut className="w-4 h-4" />
-            <span>Sair do Aplicativo</span>
+            <LogOut className="w-4 h-4 shrink-0" />
+            {(!isSidebarCollapsed || isMobileMenuOpen) && <span>Sair</span>}
           </button>
 
           {/* App Version Info */}
-          <button
-            type="button"
-            onClick={() => {
-              setIsMobileMenuOpen(false);
-              setIsSettingsModalOpen(true);
-            }}
-            className="w-full flex items-center justify-between text-[10px] text-slate-400 hover:text-slate-200 px-1 py-0.5 rounded transition-colors group"
-          >
-            <span className="font-semibold text-slate-500 group-hover:text-slate-400">GoField Pro</span>
-            <span className="flex items-center gap-1.5 font-mono text-emerald-400 font-bold">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-              {APP_VERSION}
-            </span>
-          </button>
+          {(!isSidebarCollapsed || isMobileMenuOpen) && (
+            <button
+              type="button"
+              onClick={() => {
+                setIsMobileMenuOpen(false);
+                setIsSettingsModalOpen(true);
+              }}
+              className="w-full flex items-center justify-between text-[10px] text-slate-400 hover:text-slate-200 px-1 py-0.5 rounded transition-colors group"
+            >
+              <span className="font-semibold text-slate-500 group-hover:text-slate-400">GoField Pro</span>
+              <span className="flex items-center gap-1.5 font-mono text-emerald-400 font-bold">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                {APP_VERSION}
+              </span>
+            </button>
+          )}
         </div>
       </aside>
     </>
   );
 };
-

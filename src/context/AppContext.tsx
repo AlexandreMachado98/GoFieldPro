@@ -19,6 +19,7 @@ import {
   ToastMessage,
   ConfirmDialogConfig,
   FieldRound,
+  FireIncident,
   AppSettings,
 } from '../types';
 import {
@@ -29,6 +30,7 @@ import {
   initialTeamMembers,
   initialNotifications,
   initialFieldRounds,
+  initialFireIncidents,
 } from '../data/mockData';
 import { translations } from '../i18n/translations';
 import {
@@ -195,7 +197,47 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const [language, setLanguage] = useState<Language>('pt');
   const [currentRole, setCurrentRole] = useState<UserRole>('super_admin');
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState<'home' | 'map' | 'pdf_maps' | 'layers' | 'tracks' | 'team' | 'reports' | 'analytics' | 'offline'>('home');
+  const [activeTab, setActiveTab] = useState<'home' | 'map' | 'pdf_maps' | 'layers' | 'tracks' | 'field_rounds' | 'fire_incidents' | 'team' | 'reports' | 'analytics' | 'offline' | 'admin'>('home');
+
+  // Collapsible Sidebar State with LocalStorage memory
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem('geofield_sidebar_collapsed') === 'true';
+    } catch {
+      return false;
+    }
+  });
+
+  const toggleSidebarCollapsed = useCallback(() => {
+    setIsSidebarCollapsed((prev) => {
+      const next = !prev;
+      try {
+        localStorage.setItem('geofield_sidebar_collapsed', String(next));
+      } catch {}
+      return next;
+    });
+  }, []);
+
+  // Fire Incidents State
+  const [fireIncidents, setFireIncidents] = useState<FireIncident[]>(() => {
+    try {
+      const saved = localStorage.getItem('geofield_fire_incidents');
+      if (saved) {
+        return JSON.parse(saved);
+      }
+    } catch (e) {
+      console.warn('Error reading saved fire incidents', e);
+    }
+    return initialFireIncidents;
+  });
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('geofield_fire_incidents', JSON.stringify(fireIncidents));
+    } catch (e) {
+      console.warn('Error persisting fire incidents', e);
+    }
+  }, [fireIncidents]);
 
   // Translation helper
   const [pdfFiles, setPdfFiles] = useState<{ id: string, name: string, dataUrl: string, width?: number, height?: number }[]>([]);
@@ -1207,6 +1249,53 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   };
 
   // Field Rounds (Quilometragem Diária de Campo)
+
+  // Fire Incident actions
+  const addFireIncident = (incidentData: Omit<FireIncident, 'id' | 'createdAt' | 'updatedAt'>) => {
+    const newInc: FireIncident = {
+      ...incidentData,
+      id: `fire-${Date.now()}`,
+      photos: incidentData.photos || [],
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+    setFireIncidents((prev) => [newInc, ...prev]);
+    notifySuccess('Foco de Incêndio Registrado', `Ocorrência em "${newInc.locationName}" salva com sucesso.`);
+  };
+
+  const updateFireIncident = (id: string, incidentData: Partial<FireIncident>) => {
+    setFireIncidents((prev) =>
+      prev.map((i) => {
+        if (i.id !== id) return i;
+        return {
+          ...i,
+          ...incidentData,
+          updatedAt: new Date().toISOString(),
+        };
+      })
+    );
+    notifySuccess('Ocorrência Atualizada', 'Informações de combate e foco atualizadas.');
+  };
+
+  const deleteFireIncident = (id: string) => {
+    const item = fireIncidents.find((i) => i.id === id);
+    setFireIncidents((prev) => prev.filter((i) => i.id !== id));
+    notifyInfo('Registro Excluído', `Foco em "${item?.locationName || 'Campo'}" removido.`);
+  };
+
+  const addPhotoToFireIncident = (id: string, photoBase64: string) => {
+    setFireIncidents((prev) =>
+      prev.map((i) => {
+        if (i.id !== id) return i;
+        return {
+          ...i,
+          photos: [...(i.photos || []), photoBase64],
+          updatedAt: new Date().toISOString(),
+        };
+      })
+    );
+  };
+
   const addFieldRound = (roundData: Omit<FieldRound, 'id' | 'createdAt' | 'updatedAt' | 'totalKm'>) => {
     const finalKmNum = Number(roundData.finalKm) || 0;
     const initKmNum = Number(roundData.initialKm) || 0;

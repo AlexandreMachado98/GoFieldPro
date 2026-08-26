@@ -1,4 +1,4 @@
-import { ProjectFolder, LayerItem, Waypoint, Track, TeamMember, FieldNotification, FieldRound } from '../types';
+import { ProjectFolder, LayerItem, Waypoint, Track, TeamMember, FieldNotification, FieldRound, FireIncident } from '../types';
 
 export const initialProjects: ProjectFolder[] = [
   {
@@ -35,3 +35,5 @@ export const initialTeamMembers: TeamMember[] = [];
 export const initialNotifications: FieldNotification[] = [];
 export const initialFieldRounds: FieldRound[] = [];
 
+
+export const initialFireIncidents: FireIncident[] = [];

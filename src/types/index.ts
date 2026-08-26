@@ -363,4 +363,52 @@ export interface MeasurementSession {
   projectName: string;
 }
 
+export type FireIncidentType = 
+  | 'foco_ativo' 
+  | 'area_queimada' 
+  | 'queima_controlada' 
+  | 'sinistro_florestal' 
+  | 'principio_incendio';
+
+export type FireIncidentStatus = 
+  | 'em_combate' 
+  | 'controlado' 
+  | 'extinto' 
+  | 'monitoramento';
+
+export type FireSeverity = 
+  | 'baixa' 
+  | 'media' 
+  | 'alta' 
+  | 'critica';
+
+export interface FireIncident {
+  id: string;
+  title: string;
+  locationName: string; // Ex: Fazenda Santa Maria - Talhão 12
+  date: string; // YYYY-MM-DD
+  time: string; // HH:MM
+  type: FireIncidentType;
+  status: FireIncidentStatus;
+  severity: FireSeverity;
+  lat: number;
+  lng: number;
+  altitude?: number;
+  utm?: { easting: number; northing: number; zone: number };
+  estimatedAreaHectares?: number;
+  windSpeedKmh?: number;
+  windDirection?: string;
+  temperatureC?: number;
+  relativeHumidity?: number;
+  resourcesMobilized?: string[];
+  combatTeamNotes?: string;
+  probableCause?: string;
+  technicianName: string;
+  photos: string[];
+  notes?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+
 
