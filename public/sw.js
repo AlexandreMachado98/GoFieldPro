@@ -1,6 +1,6 @@
 // Service Worker for GoField Pro PWA
 // Version: v2.4.0 - Auto-Update and Offline Resilient Engine
-const CACHE_NAME = 'gofield-pro-v2.4.0';
+const CACHE_NAME = 'gofield-pro-v2.5.0';
 const OFFLINE_URLS = [
   '/',
   '/index.html',

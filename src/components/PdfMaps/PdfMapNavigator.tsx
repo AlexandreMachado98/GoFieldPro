@@ -261,14 +261,13 @@ export const PdfMapNavigator: React.FC = () => {
   const importKmlInputRef = useRef<HTMLInputElement>(null);
 
   // KML/KMZ Import Handler
-  // KML/KMZ Import Handler
   const handleImportKml = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file || !activeDoc) return;
     
     setIsDrawerOpen(false); // Close drawer to show full screen loading
     setIsProcessing(true);
-    setProcessingProgress('Importando e analisando arquivo...');
+    setProcessingProgress('Importando e decodificando KML/KMZ...');
     
     // Give React time to render the loading screen
     await new Promise(resolve => setTimeout(resolve, 150));
@@ -283,130 +282,172 @@ export const PdfMapNavigator: React.FC = () => {
         features = parseKMLString(text);
       }
 
-      setProcessingProgress('Projetando coordenadas KML no mapa PDF...');
-      await new Promise(resolve => setTimeout(resolve, 100));
+      if (!features || features.length === 0) {
+        notifyWarning(
+          'Nenhum Elemento Encontrado',
+          'O arquivo KML/KMZ não contém pontos ou coordenadas geográficas reconhecíveis.'
+        );
+        return;
+      }
+
+      setProcessingProgress(`Processando ${features.length} elementos geográficos...`);
+      await new Promise(resolve => setTimeout(resolve, 80));
       
+      // Calculate Bounding Box of all imported coordinates
+      let minLat = 90, maxLat = -90, minLng = 180, maxLng = -180;
+      let hasValidCoords = false;
+
+      features.forEach((feat) => {
+        if (feat.type === 'Point' && !Array.isArray(feat.coordinates)) {
+          const coord = feat.coordinates as GeoCoordinate;
+          if (coord && typeof coord.lat === 'number' && typeof coord.lng === 'number' && !isNaN(coord.lat) && !isNaN(coord.lng)) {
+            minLat = Math.min(minLat, coord.lat);
+            maxLat = Math.max(maxLat, coord.lat);
+            minLng = Math.min(minLng, coord.lng);
+            maxLng = Math.max(maxLng, coord.lng);
+            hasValidCoords = true;
+          }
+        } else if (feat.type === 'LineString' && Array.isArray(feat.coordinates)) {
+          (feat.coordinates as GeoCoordinate[]).forEach((coord) => {
+            if (coord && typeof coord.lat === 'number' && typeof coord.lng === 'number' && !isNaN(coord.lat) && !isNaN(coord.lng)) {
+              minLat = Math.min(minLat, coord.lat);
+              maxLat = Math.max(maxLat, coord.lat);
+              minLng = Math.min(minLng, coord.lng);
+              maxLng = Math.max(maxLng, coord.lng);
+              hasValidCoords = true;
+            }
+          });
+        }
+      });
+
+      const h = activeDoc.height && !isNaN(activeDoc.height) ? activeDoc.height : 1200;
+      const w = activeDoc.width && !isNaN(activeDoc.width) ? activeDoc.width : 1600;
+
+      // Determine effective calibration
+      let effectiveCalibration = activeDoc.calibration;
+      let isAutoCalibrated = false;
+
+      if ((!effectiveCalibration || !effectiveCalibration.isCalibrated) && hasValidCoords) {
+        const latSpan = Math.abs(maxLat - minLat);
+        const lngSpan = Math.abs(maxLng - minLng);
+        const latPad = latSpan > 0 ? latSpan * 0.15 : 0.002;
+        const lngPad = lngSpan > 0 ? lngSpan * 0.15 : 0.002;
+
+        effectiveCalibration = {
+          isCalibrated: true,
+          ref1: { x: h * 0.9, y: w * 0.1, lat: maxLat + latPad, lng: minLng - lngPad },
+          ref2: { x: h * 0.1, y: w * 0.9, lat: minLat - latPad, lng: maxLng + lngPad },
+          scaleMetersPerPixel: 1,
+        };
+        isAutoCalibrated = true;
+      }
+
+      // Temporary document with effective calibration to ensure accurate projection
+      const tempDoc: PdfDocument = {
+        ...activeDoc,
+        calibration: effectiveCalibration,
+      };
+
       let newTracks: PdfTrack[] = [...(activeDoc.tracks || [])];
       let newMarkers: PdfMarker[] = [...(activeDoc.markers || [])];
 
-      // AUTO-CALIBRATION: If map isn't calibrated, auto-fit to KML bounding box
-      let isAutoCalibrated = false;
-      const cal = activeDoc.calibration;
-      if ((!cal || !cal.isCalibrated) && features.length > 0) {
-        let minLat = 90, maxLat = -90, minLng = 180, maxLng = -180;
-        let hasValidCoords = false;
-        
-        features.forEach((feat) => {
-          if (feat.type === 'Point' && !Array.isArray(feat.coordinates)) {
-            const coord = feat.coordinates as GeoCoordinate;
-            if (coord.lat !== undefined && coord.lng !== undefined) {
-              minLat = Math.min(minLat, coord.lat); maxLat = Math.max(maxLat, coord.lat);
-              minLng = Math.min(minLng, coord.lng); maxLng = Math.max(maxLng, coord.lng);
-              hasValidCoords = true;
-            }
-          } else if (feat.type === 'LineString' && Array.isArray(feat.coordinates)) {
-            (feat.coordinates as GeoCoordinate[]).forEach(coord => {
-              if (coord.lat !== undefined && coord.lng !== undefined) {
-                minLat = Math.min(minLat, coord.lat); maxLat = Math.max(maxLat, coord.lat);
-                minLng = Math.min(minLng, coord.lng); maxLng = Math.max(maxLng, coord.lng);
-                hasValidCoords = true;
-              }
-            });
-          }
-        });
+      let markersAdded = 0;
+      let tracksAdded = 0;
+      let wasTruncated = false;
+      const importedBounds: [number, number][] = [];
 
-        if (hasValidCoords) {
-           const h = activeDoc.height || 1200;
-           const w = activeDoc.width || 1600;
-           // Expand bounds by 10%
-           const latPad = Math.abs(maxLat - minLat) * 0.1 || 0.001;
-           const lngPad = Math.abs(maxLng - minLng) * 0.1 || 0.001;
-           
-           activeDoc.calibration = {
-             isCalibrated: true,
-             ref1: { x: h * 0.9, y: w * 0.1, lat: maxLat + latPad, lng: minLng - lngPad },
-             ref2: { x: h * 0.1, y: w * 0.9, lat: minLat - latPad, lng: maxLng + lngPad },
-             scaleMetersPerPixel: 1
-           };
-           isAutoCalibrated = true;
+      features.forEach((feat) => {
+        if (feat.type === 'Point' && !Array.isArray(feat.coordinates)) {
+          if (markersAdded >= 500) {
+            wasTruncated = true;
+            return;
+          }
+          const coord = feat.coordinates as GeoCoordinate;
+          if (coord && typeof coord.lat === 'number' && typeof coord.lng === 'number' && !isNaN(coord.lat) && !isNaN(coord.lng)) {
+            const pdfCoord = gpsToPdf(coord.lat, coord.lng, tempDoc);
+            if (!isNaN(pdfCoord.x) && !isNaN(pdfCoord.y)) {
+              newMarkers.push({
+                id: `kmz-pt-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+                x: pdfCoord.x,
+                y: pdfCoord.y,
+                lat: coord.lat,
+                lng: coord.lng,
+                title: feat.name || 'Ponto Importado',
+                notes: feat.description || '',
+                category: 'checkpoint',
+                color: feat.color || '#10b981',
+                createdAt: new Date().toISOString(),
+                photos: feat.photos || [],
+              });
+              markersAdded++;
+              importedBounds.push([pdfCoord.x, pdfCoord.y]);
+            }
+          }
+        } else if (feat.type === 'LineString' && Array.isArray(feat.coordinates)) {
+          if (tracksAdded >= 150) {
+            wasTruncated = true;
+            return;
+          }
+          let pts = (feat.coordinates as GeoCoordinate[])
+            .filter((c) => c && typeof c.lat === 'number' && typeof c.lng === 'number' && !isNaN(c.lat) && !isNaN(c.lng))
+            .map((c) => {
+              const pc = gpsToPdf(c.lat, c.lng, tempDoc);
+              return { x: pc.x, y: pc.y, lat: c.lat, lng: c.lng };
+            })
+            .filter((p) => !isNaN(p.x) && !isNaN(p.y));
+
+          // Downsample high-density tracks to keep Leaflet fast & responsive
+          if (pts.length > 500) {
+            const step = Math.ceil(pts.length / 500);
+            pts = pts.filter((_, idx) => idx % step === 0 || idx === pts.length - 1);
+          }
+
+          if (pts.length > 1) {
+            newTracks.push({
+              id: `kmz-trk-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+              name: feat.name || 'Trilha Importada',
+              points: pts,
+              color: feat.color || '#0284c7',
+              createdAt: new Date().toISOString(),
+              isRecorded: false,
+            });
+            tracksAdded++;
+            pts.forEach((p) => importedBounds.push([p.x, p.y]));
+          }
+        }
+      });
+
+      const updatedDoc: PdfDocument = {
+        ...activeDoc,
+        calibration: effectiveCalibration,
+        markers: newMarkers,
+        tracks: newTracks,
+      };
+
+      updateDocumentInStore(updatedDoc);
+
+      // Pan & Zoom Leaflet view to focus on the newly imported items
+      if (mapInstanceRef.current && importedBounds.length > 0) {
+        try {
+          const latLngBounds = L.latLngBounds(importedBounds);
+          mapInstanceRef.current.fitBounds(latLngBounds, {
+            padding: [50, 50],
+            maxZoom: 3,
+            animate: true,
+          });
+        } catch (fitErr) {
+          console.warn('Could not fit bounds to imported items:', fitErr);
         }
       }
-      
-        let markersAdded = 0;
-        let tracksAdded = 0;
-        let wasTruncated = false;
 
-        features.forEach((feat) => {
-          if (feat.type === 'Point' && !Array.isArray(feat.coordinates)) {
-            if (markersAdded >= 300) {
-              wasTruncated = true;
-              return;
-            }
-            const coord = feat.coordinates as GeoCoordinate;
-            if (coord.lat !== undefined && coord.lng !== undefined) {
-              const pdfCoord = gpsToPdf(coord.lat, coord.lng, activeDoc);
-              if (!isNaN(pdfCoord.x) && !isNaN(pdfCoord.y)) {
-                newMarkers.push({
-                  id: `kmz-pt-${Date.now()}-${Math.random().toString(36).substr(2,9)}`,
-                  x: pdfCoord.x,
-                  y: pdfCoord.y,
-                  lat: coord.lat,
-                  lng: coord.lng,
-                  title: feat.name || 'Ponto Importado',
-                  notes: feat.description || '',
-                  category: 'checkpoint',
-                  color: feat.color || '#10b981',
-                  createdAt: new Date().toISOString(),
-                  photos: feat.photos || []
-                });
-                markersAdded++;
-              }
-            }
-          } else if (feat.type === 'LineString' && Array.isArray(feat.coordinates)) {
-            if (tracksAdded >= 100) {
-              wasTruncated = true;
-              return;
-            }
-            let pts = (feat.coordinates as GeoCoordinate[])
-              .filter(c => c.lat !== undefined && c.lng !== undefined)
-              .map(c => {
-                 const pc = gpsToPdf(c.lat, c.lng, activeDoc);
-                 return { x: pc.x, y: pc.y, lat: c.lat, lng: c.lng };
-              }).filter(p => !isNaN(p.x) && !isNaN(p.y));
-            
-            if (pts.length > 500) {
-              const step = Math.ceil(pts.length / 500);
-              pts = pts.filter((_, idx) => idx % step === 0);
-            }
-            
-            if (pts.length > 1) {
-              newTracks.push({
-                id: `kmz-trk-${Date.now()}-${Math.random().toString(36).substr(2,9)}`,
-                name: feat.name || 'Trilha Importada',
-                points: pts,
-                color: feat.strokeWidth ? (feat.color || '#3b82f6') : '#3b82f6',
-                createdAt: new Date().toISOString(),
-                isRecorded: false
-              });
-              tracksAdded++;
-            }
-          }
-        });
-
-      const updatedDoc = {
-         ...activeDoc,
-         markers: newMarkers,
-         tracks: newTracks
-      };
-      
-      updateDocumentInStore(updatedDoc);
       notifySuccess(
-        isAutoCalibrated ? 'Mapa Auto-Calibrado e Importado' : 'Importação Concluída', 
-        wasTruncated ? `Importação otimizada: ${markersAdded} pontos e ${tracksAdded} trilhas (o arquivo é muito grande, itens extras foram ignorados para evitar travamentos).` : `${markersAdded} pontos e ${tracksAdded} trilhas foram projetados.`
+        isAutoCalibrated ? 'Planta Calibrada & KML Carregado' : 'KML/KMZ Importado',
+        wasTruncated
+          ? `Importação otimizada: ${markersAdded} pontos e ${tracksAdded} trilhas projetados (alguns itens foram limitados para máxima performance).`
+          : `${markersAdded} pontos e ${tracksAdded} trilhas foram projetados perfeitamente no seu mapa.`
       );
-      
-    } catch(err) {
-      console.error('Error importing KML/KMZ', err);
+    } catch (err) {
+      console.error('Error importing KML/KMZ:', err);
       notifyError('Falha na Importação', 'Não foi possível ler as coordenadas do arquivo KML/KMZ fornecido.');
     } finally {
       setIsProcessing(false);
@@ -414,6 +455,7 @@ export const PdfMapNavigator: React.FC = () => {
       if (e.target) e.target.value = '';
     }
   };
+
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<L.Map | null>(null);
   const imageOverlayRef = useRef<L.ImageOverlay | null>(null);

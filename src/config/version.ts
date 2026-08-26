@@ -1,8 +1,8 @@
 // Centralized App Version and Build Metadata
-export const APP_VERSION = 'v2.4.0';
-export const APP_BUILD_NUMBER = 240;
-export const APP_BUILD_DATE = '25/08/2026';
-export const APP_RELEASE_NAME = 'GoField Pro Tactical 2.4';
+export const APP_VERSION = 'v2.5.0';
+export const APP_BUILD_NUMBER = 250;
+export const APP_BUILD_DATE = '26/08/2026';
+export const APP_RELEASE_NAME = 'GoField Pro Tactical 2.5';
 
 export interface ChangelogItem {
   version: string;
@@ -13,6 +13,17 @@ export interface ChangelogItem {
 
 export const APP_CHANGELOG: ChangelogItem[] = [
   {
+    version: 'v2.5.0',
+    date: '26/08/2026',
+    title: 'Motor KML/KMZ Ultra-Resiliente & Atualização Forçada',
+    highlights: [
+      'Leitura ultra-resiliente de arquivos KML/KMZ em múltiplos padrões de GIS, Google Earth e CAD.',
+      'Auto-calibração e enquadramento automático de visão (auto-zoom) nos pontos e trilhas do KML.',
+      'Suporte para pacotes KMZ com múltiplos sub-arquivos KML e fotos georreferenciadas.',
+      'Mecanismo de auto-limpeza de cache e sincronização forçada para celulares e navegadores.',
+    ],
+  },
+  {
     version: 'v2.4.0',
     date: '25/08/2026',
     title: 'Pilha de Madeira, Tema Claro/Escuro & Atualização Automática PWA',
@@ -21,17 +32,6 @@ export const APP_CHANGELOG: ChangelogItem[] = [
       'Modo Claro (Luz Solar) e Modo Escuro com contraste aprimorado para trabalho sob sol intenso.',
       'Barra do mapa limpa e botão de Camadas unificado.',
       'Sistema de atualização automática contínua para celulares instalados via PWA.',
-      'Otimizações anti-superaquecimento e economia extrema de bateria.',
-    ],
-  },
-  {
-    version: 'v2.3.0',
-    date: '20/08/2026',
-    title: 'Gravação de Trilhas em Tempo Real & Régua Geodésica',
-    highlights: [
-      'Gravação de trilhas GPS em tempo real na folha PDF com odômetro integrado.',
-      'Régua geodésica multiponto para cálculo de perímetro e área.',
-      'Exportação de relatórios técnicos em PDF com dossiê fotográfico.',
     ],
   },
 ];

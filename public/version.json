@@ -1,8 +1,8 @@
 {
-  "version": "v2.4.0",
-  "buildNumber": 240,
-  "buildDate": "2026-08-25",
-  "releaseTimestamp": 1756168800000,
+  "version": "v2.5.0",
+  "buildNumber": 250,
+  "buildDate": "2026-08-26",
+  "releaseTimestamp": 1787749138686,
   "minSupportedVersion": "v2.0.0",
-  "description": "GoField Pro - Versão 2.4.0 Atualizada"
+  "description": "GoField Pro - Versão 2.5.0 com Leitor KML/KMZ Aprimorado e Auto-Atualização Forçada"
 }
