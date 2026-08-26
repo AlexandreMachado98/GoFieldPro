@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useApp } from '../../context/AppContext';
 import { useAuth } from '../../context/AuthContext';
 import { useUpdate } from '../../context/UpdateContext';
@@ -28,7 +28,10 @@ import {
   CheckCircle2,
   ArrowUpCircle,
   HelpCircle,
-  Clock
+  Clock,
+  Building2,
+  Image as ImageIcon,
+  Upload,
 } from 'lucide-react';
 
 interface SettingsModalProps {
@@ -57,10 +60,22 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
     lastCheckedTime
   } = useUpdate();
 
-  const [activeTab, setActiveTab] = useState<'gps' | 'coords' | 'maps' | 'field' | 'appearance' | 'system'>('gps');
+  const [activeTab, setActiveTab] = useState<'gps' | 'coords' | 'maps' | 'field' | 'appearance' | 'system' | 'company'>('gps');
   const [cachedMapSize, setCachedMapSize] = useState<string>('Calculando...');
   const [isCleaning, setIsCleaning] = useState(false);
   const [showChangelog, setShowChangelog] = useState(false);
+
+  // Custom Company Logo & Information for PDF Reports
+  const [companyLogo, setCompanyLogo] = useState<string>(() => {
+    return localStorage.getItem('gofield_custom_company_logo') || '';
+  });
+  const [companyName, setCompanyName] = useState<string>(() => {
+    return localStorage.getItem('gofield_custom_company_name') || profile?.company || 'AM TST SAÚDE E SEGURANÇA DO TRABALHO';
+  });
+  const [companyCnpj, setCompanyCnpj] = useState<string>(() => {
+    return localStorage.getItem('gofield_custom_company_cnpj') || '';
+  });
+  const logoInputRef = useRef<HTMLInputElement>(null);
 
   const handleManualCheckUpdates = async () => {
     const hasNew = await checkForUpdates(true);
@@ -206,6 +221,18 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
           >
             <Sun className="w-3.5 h-3.5 text-amber-400" />
             Tema & Aparência
+          </button>
+
+          <button
+            onClick={() => setActiveTab('company')}
+            className={`flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all ${
+              activeTab === 'company'
+                ? 'bg-sky-600 text-white shadow-md shadow-sky-600/20'
+                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
+            }`}
+          >
+            <Building2 className="w-3.5 h-3.5 text-emerald-400" />
+            Empresa & Laudos
           </button>
 
           <button
@@ -606,6 +633,125 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
                       </div>
                     </div>
                   </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* TAB: EMPRESA, LOGOTIPO & LAUDOS */}
+          {activeTab === 'company' && (
+            <div className="space-y-4 animate-in fade-in text-xs">
+              <div className="bg-slate-950/60 border border-slate-800 rounded-2xl p-4 space-y-3">
+                <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+                  <div>
+                    <h4 className="text-xs font-bold text-white flex items-center gap-2">
+                      <Building2 className="w-4 h-4 text-emerald-400" />
+                      Logotipo & Identidade Visual dos Laudos PDF
+                    </h4>
+                    <p className="text-[11px] text-slate-400 mt-0.5">
+                      Este logotipo e os dados da sua empresa serão impressos no cabeçalho oficial de todos os laudos técnicos em PDF.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="space-y-3">
+                  <div>
+                    <label className="block text-[10px] uppercase font-bold text-slate-300 mb-1">
+                      Logotipo da Empresa (PNG / JPG)
+                    </label>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      ref={logoInputRef}
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) {
+                          const reader = new FileReader();
+                          reader.onload = (event) => {
+                            const result = event.target?.result as string;
+                            setCompanyLogo(result);
+                            localStorage.setItem('gofield_custom_company_logo', result);
+                            notifySuccess('Logotipo Carregado!', 'A imagem será usada no cabeçalho dos laudos PDF.');
+                          };
+                          reader.readAsDataURL(file);
+                        }
+                      }}
+                      className="hidden"
+                    />
+
+                    <div className="flex items-center gap-3">
+                      {companyLogo ? (
+                        <div className="relative w-20 h-20 rounded-2xl bg-slate-900 border border-emerald-500/50 p-1 flex items-center justify-center overflow-hidden">
+                          <img src={companyLogo} alt="Logo" className="max-w-full max-h-full object-contain" />
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setCompanyLogo('');
+                              localStorage.removeItem('gofield_custom_company_logo');
+                              notifyWarning('Logotipo Removido', 'Os laudos usarão o brasão padrão do sistema.');
+                            }}
+                            className="absolute top-1 right-1 bg-red-600/80 hover:bg-red-600 text-white p-1 rounded-lg"
+                            title="Remover logotipo"
+                          >
+                            <X className="w-3 h-3" />
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="w-20 h-20 rounded-2xl bg-slate-950 border border-dashed border-slate-700 flex flex-col items-center justify-center text-slate-500 text-[10px]">
+                          <ImageIcon className="w-6 h-6 mb-1 text-slate-600" />
+                          <span>Sem Logo</span>
+                        </div>
+                      )}
+
+                      <div className="space-y-1.5">
+                        <button
+                          type="button"
+                          onClick={() => logoInputRef.current?.click()}
+                          className="bg-slate-900 hover:bg-slate-800 text-sky-400 border border-slate-700 font-bold px-3.5 py-2 rounded-xl text-xs flex items-center gap-1.5 active:scale-95"
+                        >
+                          <Upload className="w-3.5 h-3.5" />
+                          <span>{companyLogo ? 'Trocar Logotipo' : 'Enviar Logotipo da Empresa'}</span>
+                        </button>
+                        <p className="text-[10px] text-slate-500">
+                          Recomendado: Imagem PNG com fundo transparente ou JPG nítido.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
+                    <div>
+                      <label className="block text-[10px] uppercase font-bold text-slate-300 mb-1">
+                        Nome da Empresa / Razão Social
+                      </label>
+                      <input
+                        type="text"
+                        value={companyName}
+                        onChange={(e) => {
+                          setCompanyName(e.target.value);
+                          localStorage.setItem('gofield_custom_company_name', e.target.value);
+                        }}
+                        placeholder="Ex: Madeireira & Silvicultura Vale Verde"
+                        className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-white font-bold"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-[10px] uppercase font-bold text-slate-300 mb-1">
+                        CNPJ da Empresa
+                      </label>
+                      <input
+                        type="text"
+                        value={companyCnpj}
+                        onChange={(e) => {
+                          setCompanyCnpj(e.target.value);
+                          localStorage.setItem('gofield_custom_company_cnpj', e.target.value);
+                        }}
+                        placeholder="00.000.000/0000-00"
+                        className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-white font-mono"
+                      />
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>

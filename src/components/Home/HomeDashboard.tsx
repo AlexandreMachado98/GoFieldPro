@@ -25,7 +25,8 @@ import {
   Check,
   Edit2,
   Trash2,
-  X
+  X,
+  Trees,
 } from 'lucide-react';
 
 export const HomeDashboard: React.FC = () => {
@@ -36,6 +37,7 @@ export const HomeDashboard: React.FC = () => {
     updateFieldRound, 
     deleteFieldRound, 
     addPhotoToFieldRound, 
+    setIsWoodpileModalOpen,
     hasGpsLock,
     showConfirm,
     notifySuccess,
@@ -325,6 +327,14 @@ export const HomeDashboard: React.FC = () => {
           </div>
 
           <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
+            <button
+              onClick={() => setIsWoodpileModalOpen(true)}
+              className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-emerald-950/60 hover:bg-emerald-900/60 border border-emerald-500/40 text-emerald-300 font-bold text-xs shadow transition-all active:scale-95 cursor-pointer"
+            >
+              <Trees className="w-4 h-4 text-emerald-400" />
+              <span>Cubagem Florestal (m³)</span>
+            </button>
+
             <button
               onClick={() => setActiveTab('pdf_maps')}
               className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-700 hover:border-slate-600 text-white font-bold text-xs shadow transition-all active:scale-95 cursor-pointer"

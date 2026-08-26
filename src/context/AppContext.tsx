@@ -181,6 +181,8 @@ interface AppContextType {
   setIsReportModalOpen: (open: boolean) => void;
   isMeasuring: boolean;
   setIsMeasuring: (measuring: boolean) => void;
+  isWoodpileModalOpen: boolean;
+  setIsWoodpileModalOpen: (open: boolean) => void;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -408,6 +410,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const [isReportModalOpen, setIsReportModalOpen] = useState<boolean>(false);
   const [isMeasuring, setIsMeasuring] = useState<boolean>(false);
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState<boolean>(false);
+  const [isWoodpileModalOpen, setIsWoodpileModalOpen] = useState<boolean>(false);
 
   // App Settings with LocalStorage persistence
   const [settings, setSettings] = useState<AppSettings>(() => {
@@ -1394,6 +1397,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         setIsReportModalOpen,
         isMeasuring,
         setIsMeasuring,
+        isWoodpileModalOpen,
+        setIsWoodpileModalOpen,
       }}
     >
       {children}

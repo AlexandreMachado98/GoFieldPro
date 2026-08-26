@@ -19,7 +19,8 @@ import {
   LogOut,
   X,
   Sparkles,
-  RefreshCw
+  RefreshCw,
+  Trees,
 } from 'lucide-react';
 
 export const Sidebar: React.FC = () => {
@@ -30,6 +31,7 @@ export const Sidebar: React.FC = () => {
     isMobileMenuOpen,
     setIsMobileMenuOpen,
     setIsSettingsModalOpen,
+    setIsWoodpileModalOpen,
     showConfirm
   } = useApp();
   const { profile, logout } = useAuth();
@@ -148,9 +150,25 @@ export const Sidebar: React.FC = () => {
             <button
               onClick={() => {
                 setIsMobileMenuOpen(false);
+                setIsWoodpileModalOpen(true);
+              }}
+              className="w-full flex items-center justify-between px-4 py-2.5 rounded-xl text-sm font-extrabold text-emerald-400 bg-emerald-950/40 border border-emerald-500/30 hover:bg-emerald-900/40 transition-all active:scale-98"
+            >
+              <div className="flex items-center gap-3.5">
+                <Trees className="w-5 h-5 text-emerald-400" />
+                <span>Cubagem Florestal</span>
+              </div>
+              <span className="text-[9px] uppercase font-black px-1.5 py-0.2 rounded-full bg-emerald-500 text-slate-950">
+                m³
+              </span>
+            </button>
+
+            <button
+              onClick={() => {
+                setIsMobileMenuOpen(false);
                 setIsSettingsModalOpen(true);
               }}
-              className="w-full flex items-center gap-3.5 px-4 py-3 rounded-xl text-sm font-bold text-slate-300 hover:text-white hover:bg-slate-900/80 transition-all active:scale-98"
+              className="w-full flex items-center gap-3.5 px-4 py-2.5 rounded-xl text-sm font-bold text-slate-300 hover:text-white hover:bg-slate-900/80 transition-all active:scale-98"
             >
               <Settings className="w-5 h-5 text-sky-400" />
               <span>Configurações</span>

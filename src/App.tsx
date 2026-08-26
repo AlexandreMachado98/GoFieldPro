@@ -19,10 +19,11 @@ import { PendingApprovalScreen } from './components/Auth/PendingApprovalScreen';
 import { ToastContainer } from './components/Common/ToastContainer';
 import { ConfirmModal } from './components/Common/ConfirmModal';
 import { SettingsModal } from './components/Settings/SettingsModal';
+import { WoodpileCubageModal } from './components/Forestry/WoodpileCubageModal';
 import { AppUpdateBanner } from './components/Common/AppUpdateBanner';
 
 const MainAppContent: React.FC = () => {
-  const { activeTab, isSettingsModalOpen, setIsSettingsModalOpen } = useApp();
+  const { activeTab, isSettingsModalOpen, setIsSettingsModalOpen, isWoodpileModalOpen, setIsWoodpileModalOpen } = useApp();
   const { user, profile, loading } = useAuth();
 
   if (loading) {
@@ -74,6 +75,7 @@ const MainAppContent: React.FC = () => {
       <AddWaypointModal />
       <LayerManagerModal />
       <SettingsModal isOpen={isSettingsModalOpen} onClose={() => setIsSettingsModalOpen(false)} />
+      <WoodpileCubageModal isOpen={isWoodpileModalOpen} onClose={() => setIsWoodpileModalOpen(false)} />
       <ConfirmModal />
       <ToastContainer />
     </div>
