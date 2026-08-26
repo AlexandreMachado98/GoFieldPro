@@ -3486,6 +3486,19 @@ export const PdfMapNavigator: React.FC = () => {
                 </button>
               )}
 
+              {activeDoc && (
+                <button
+                  onClick={() => {
+                    setIsDrawerOpen(false);
+                    importKmlInputRef.current?.click();
+                  }}
+                  className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-sky-900/40 hover:bg-sky-800/60 border border-sky-500/40 text-sky-400 font-extrabold rounded-xl shadow transition-all active:scale-98"
+                >
+                  <DownloadCloud className="w-4 h-4" />
+                  <span>Importar Trilhas e Pontos (KML/KMZ)</span>
+                </button>
+              )}
+
               {isProcessing && (
                 <div className="p-3 rounded-xl bg-emerald-950/60 border border-emerald-800 text-emerald-200">
                   {processingProgress}
