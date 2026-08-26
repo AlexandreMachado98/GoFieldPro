@@ -1,4 +1,5 @@
 import jsPDF from 'jspdf';
+import JSZip from 'jszip';
 import { PdfDocument, PdfMarker, PdfTrack } from './pdfStorage';
 import { pdfToGps } from './geoTransform';
 
@@ -645,4 +646,43 @@ export async function shareExportedFile(
   // Fallback download
   downloadFile(fileBlob, fileName, fileBlob.type);
   return false;
+}
+
+/**
+ * Exports document waypoints and tracks to KMZ (Zipped KML with images)
+ */
+export async function generateKMZ(doc: PdfDocument, projectName = 'GoField Pro'): Promise<Blob> {
+  const zip = new JSZip();
+  
+  // We need to modify the KML slightly to reference local images in KMZ
+  let kmlString = generateKML(doc, projectName);
+  
+  const imgFolder = zip.folder('images');
+  if (imgFolder) {
+    (doc.markers || []).forEach(marker => {
+      if (marker.photos && marker.photos.length > 0) {
+        marker.photos.forEach((photoBase64, idx) => {
+          const parts = photoBase64.split(',');
+          if (parts.length === 2) {
+            const base64Data = parts[1];
+            let ext = 'jpg';
+            if (parts[0].includes('png')) ext = 'png';
+            if (parts[0].includes('webp')) ext = 'webp';
+            const filename = `${marker.id}_${idx}.${ext}`;
+            
+            imgFolder.file(filename, base64Data, {base64: true});
+            
+            // Replace base64 strings in KML with relative image paths
+            // KML exported from generateKML currently embeds the base64 as an <img> tag src.
+            // We need to replace src="data:image/jpeg;base64,..." with src="images/filename.jpg"
+            // Wait, we can just blind replace the exact base64 dataUrl string!
+            kmlString = kmlString.replace(photoBase64, `images/${filename}`);
+          }
+        });
+      }
+    });
+  }
+  
+  zip.file('doc.kml', kmlString);
+  return await zip.generateAsync({ type: 'blob', compression: 'DEFLATE' });
 }

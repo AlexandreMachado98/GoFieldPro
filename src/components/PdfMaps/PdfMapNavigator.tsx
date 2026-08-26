@@ -26,7 +26,7 @@ import {
   Layers,
   Sparkles,
   Eye,
-  Footprints,
+  Footprints, List,
   FolderOpen,
   Undo2,
   Share2,
@@ -2062,9 +2062,9 @@ export const PdfMapNavigator: React.FC = () => {
           <button
             onClick={() => setIsDrawerOpen(true)}
             className="flex items-center gap-1.5 text-xs font-extrabold text-white hover:text-emerald-400 transition-colors"
-            title="Abrir Lista de Mapas, Pontos e Rotas"
+            title="Abrir Camadas, Mapas, Pontos e Rotas"
           >
-            <FolderOpen className="w-4 h-4 text-emerald-400 shrink-0" />
+            <List className="w-4 h-4 text-emerald-400 shrink-0" />
             <span className="truncate max-w-[110px] sm:max-w-[180px]">
               {activeDoc ? activeDoc.name : 'Nenhum Mapa'}
             </span>
@@ -2121,17 +2121,7 @@ export const PdfMapNavigator: React.FC = () => {
             </button>
           )}
 
-          {/* Import KML/KMZ to Active Document */}
-          {activeDoc && (
-            <button
-              onClick={() => importKmlInputRef.current?.click()}
-              className="px-3 py-1.5 rounded-2xl bg-slate-800 hover:bg-slate-700 text-emerald-400 border border-slate-700 text-xs font-extrabold flex items-center gap-1.5 shadow-2xl transition-all active:scale-95"
-              title="Importar Trilhas e Pontos de outro mapa (KML/KMZ) para este PDF"
-            >
-              <DownloadCloud className="w-4 h-4" />
-              <span className="hidden md:inline">Importar KML</span>
-            </button>
-          )}
+          
 
           {/* Export & Share Modal Opener */}
           {activeDoc && (
@@ -2698,11 +2688,11 @@ export const PdfMapNavigator: React.FC = () => {
               {/* Mapas / Gaveta */}
               <button
                 onClick={() => setIsDrawerOpen(true)}
-                title="Abrir Lista de Mapas"
+                title="Abrir Camadas"
                 className="flex flex-col items-center justify-center p-2.5 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition-all active:scale-95"
               >
                 <Layers className="w-5 h-5 text-teal-400 mb-0.5" />
-                <span className="text-[10px] font-extrabold tracking-tight">Mapas</span>
+                <span className="text-[10px] font-extrabold tracking-tight">Camadas</span>
               </button>
             </div>
           </div>

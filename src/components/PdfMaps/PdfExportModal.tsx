@@ -16,7 +16,7 @@ import {
 } from 'lucide-react';
 import { PdfDocument } from '../../utils/pdfStorage';
 import { 
-  generateKML, 
+  generateKML, generateKMZ, 
   generateGeoJSON, 
   generateGPX, 
   generateAnnotatedPdf, 
@@ -58,10 +58,17 @@ export const PdfExportModal: React.FC<PdfExportModalProps> = ({
         downloadFile(pdfBlob, `GoField_${cleanDocName}_Anotado.pdf`, 'application/pdf');
         notifySuccess('Download Concluído', 'Planta técnica PDF exportada com todas as marcações.');
       } else if (format === 'kml') {
-        setGeneratingLabel('Gerando arquivo KML (Google Earth & QGIS)...');
-        const kmlString = generateKML(doc);
-        downloadFile(kmlString, `GoField_${cleanDocName}_SIG.kml`, 'application/vnd.google-earth.kml+xml');
-        notifySuccess('Download KML Concluído', 'Compatível com Google Earth, Avenza Maps e QGIS.');
+        setGeneratingLabel('Gerando arquivo KMZ (KML com Fotos)...');
+        const kmzBlob = await generateKMZ(doc);
+        const url = URL.createObjectURL(kmzBlob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `GoField_${cleanDocName}_SIG.kmz`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
+        notifySuccess('Download KMZ Concluído', 'Arquivo pronto para Google Earth e SIG.');
       } else if (format === 'geojson') {
         setGeneratingLabel('Gerando GeoJSON Universal...');
         const geojsonString = generateGeoJSON(doc);
@@ -95,14 +102,13 @@ export const PdfExportModal: React.FC<PdfExportModalProps> = ({
           `Levantamento de Campo realizado no GoField Pro com ${totalMarkers} pontos e ${totalTracks} trilhas.`
         );
       } else if (format === 'kml') {
-        setGeneratingLabel('Preparando arquivo KML...');
-        const kmlString = generateKML(doc);
-        const blob = new Blob([kmlString], { type: 'application/vnd.google-earth.kml+xml' });
+        setGeneratingLabel('Preparando arquivo KMZ com fotos...');
+        const kmzBlob = await generateKMZ(doc);
         await shareExportedFile(
-          blob,
-          `GoField_${cleanDocName}_SIG.kml`,
-          `Camadas KML: ${doc.name}`,
-          `Arquivo KML contendo vértices e trilhas de campo do GoField Pro.`
+          kmzBlob,
+          `GoField_${cleanDocName}_SIG.kmz`,
+          `Camadas KMZ: ${doc.name}`,
+          `Arquivo KMZ contendo vértices, trilhas e fotos de campo do GoField Pro.`
         );
       } else if (format === 'geojson') {
         setGeneratingLabel('Preparando GeoJSON...');
