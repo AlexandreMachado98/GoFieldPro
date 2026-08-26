@@ -70,7 +70,6 @@ export const WoodpileCubageModal: React.FC<WoodpileCubageModalProps> = ({ isOpen
   const [pilePhotos, setPilePhotos] = useState<string[]>([]);
 
   // Form State: Smalian & Huber Log Cubage
-  const [smalianLogName, setSmalianLogName] = useState('Tora 01');
   const [smalianD1, setSmalianD1] = useState<number>(28); // Diâmetro fino cm
   const [smalianD2, setSmalianD2] = useState<number>(36); // Diâmetro grosso cm
   const [smalianLength, setSmalianLength] = useState<number>(6.0); // Comprimento m
@@ -193,13 +192,13 @@ export const WoodpileCubageModal: React.FC<WoodpileCubageModalProps> = ({ isOpen
             </div>
             <div className="min-w-0">
               <h2 className="font-extrabold text-sm sm:text-base text-white truncate flex items-center gap-2">
-                <span>Cubagem Florestal & Pilha de Madeira</span>
+                <span>Cubagem Florestal & Madeira</span>
                 <span className="text-[9px] uppercase font-black px-2 py-0.2 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">
-                  m³ & Estéreo
+                  m³ & st
                 </span>
               </h2>
-              <p className="text-[11px] text-slate-400 truncate">
-                Cálculo de volume estéreo, fator de empilhamento e cubagem rigorosa de toros
+              <p className="text-[10px] sm:text-[11px] text-slate-400 truncate">
+                Cálculo de volume estéreo, fator de empilhamento e cubagem rigorosa
               </p>
             </div>
           </div>
@@ -213,52 +212,52 @@ export const WoodpileCubageModal: React.FC<WoodpileCubageModalProps> = ({ isOpen
         </div>
 
         {/* Subtabs */}
-        <div className="grid grid-cols-3 p-2 bg-slate-950/60 border-b border-slate-800 text-xs font-bold gap-1.5 shrink-0">
+        <div className="grid grid-cols-3 p-1.5 sm:p-2 bg-slate-950/60 border-b border-slate-800 text-[11px] sm:text-xs font-bold gap-1 sm:gap-1.5 shrink-0">
           <button
             onClick={() => setActiveTab('pile')}
-            className={`py-2 px-2 rounded-xl transition-all flex items-center justify-center gap-1.5 ${
+            className={`py-2 px-1.5 sm:px-2 rounded-xl transition-all flex items-center justify-center gap-1 sm:gap-1.5 ${
               activeTab === 'pile'
                 ? 'bg-emerald-600 text-white shadow'
                 : 'text-slate-400 hover:text-white hover:bg-slate-900'
             }`}
           >
-            <Layers className="w-3.5 h-3.5" />
-            <span className="truncate">Pilha de Madeira</span>
+            <Layers className="w-3.5 h-3.5 shrink-0" />
+            <span className="truncate">Pilha</span>
           </button>
 
           <button
             onClick={() => setActiveTab('smalian')}
-            className={`py-2 px-2 rounded-xl transition-all flex items-center justify-center gap-1.5 ${
+            className={`py-2 px-1.5 sm:px-2 rounded-xl transition-all flex items-center justify-center gap-1 sm:gap-1.5 ${
               activeTab === 'smalian'
                 ? 'bg-emerald-600 text-white shadow'
                 : 'text-slate-400 hover:text-white hover:bg-slate-900'
             }`}
           >
-            <Calculator className="w-3.5 h-3.5" />
-            <span className="truncate">Toros (Smalian/Huber)</span>
+            <Calculator className="w-3.5 h-3.5 shrink-0" />
+            <span className="truncate">Toros (Smalian)</span>
           </button>
 
           <button
             onClick={() => setActiveTab('history')}
-            className={`py-2 px-2 rounded-xl transition-all flex items-center justify-center gap-1.5 ${
+            className={`py-2 px-1.5 sm:px-2 rounded-xl transition-all flex items-center justify-center gap-1 sm:gap-1.5 ${
               activeTab === 'history'
                 ? 'bg-emerald-600 text-white shadow'
                 : 'text-slate-400 hover:text-white hover:bg-slate-900'
             }`}
           >
-            <Tag className="w-3.5 h-3.5" />
-            <span className="truncate">Histórico & Laudos ({woodpiles.length})</span>
+            <Tag className="w-3.5 h-3.5 shrink-0" />
+            <span className="truncate">Histórico ({woodpiles.length})</span>
           </button>
         </div>
 
         {/* Modal Body */}
-        <div className="flex-1 overflow-y-auto p-3.5 sm:p-5 space-y-4">
+        <div className="flex-1 overflow-y-auto p-3.5 sm:p-5 space-y-3.5">
           {/* ========================================================================= */}
           {/* TAB 1: CALCULADORA DE PILHA DE MADEIRA                                    */}
           {/* ========================================================================= */}
           {activeTab === 'pile' && (
-            <form onSubmit={handleSaveWoodpile} className="space-y-3.5 animate-in fade-in text-xs">
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+            <form onSubmit={handleSaveWoodpile} className="space-y-3 animate-in fade-in text-xs">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                 <div>
                   <label className="block text-[10px] uppercase font-bold text-slate-300 mb-1">
                     Código da Pilha *
@@ -282,7 +281,7 @@ export const WoodpileCubageModal: React.FC<WoodpileCubageModalProps> = ({ isOpen
                     required
                     value={locationName}
                     onChange={(e) => setLocationName(e.target.value)}
-                    placeholder="Ex: Talhão 14 - Fazenda Santa Maria"
+                    placeholder="Ex: Talhão 14"
                     className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-white"
                   />
                 </div>
@@ -302,12 +301,12 @@ export const WoodpileCubageModal: React.FC<WoodpileCubageModalProps> = ({ isOpen
               </div>
 
               {/* Dimensions Section */}
-              <div className="bg-slate-950 p-3.5 rounded-2xl border border-slate-800 space-y-3">
+              <div className="bg-slate-950 p-3 rounded-2xl border border-slate-800 space-y-2.5">
                 <span className="text-[10px] uppercase font-bold text-slate-400 block">
                   Dimensões Geométricas da Pilha:
                 </span>
 
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                   <div>
                     <label className="block text-[10px] font-bold text-slate-300 mb-1">
                       Comprimento (m)
@@ -380,16 +379,16 @@ export const WoodpileCubageModal: React.FC<WoodpileCubageModalProps> = ({ isOpen
               </div>
 
               {/* Instant Calculated Result Card */}
-              <div className="bg-gradient-to-r from-emerald-950/80 via-slate-900 to-slate-900 border border-emerald-500/50 p-3.5 rounded-2xl flex items-center justify-between shadow-xl">
+              <div className="bg-gradient-to-r from-emerald-950/80 via-slate-900 to-slate-900 border border-emerald-500/50 p-3 sm:p-3.5 rounded-2xl flex items-center justify-between shadow-xl">
                 <div>
-                  <span className="text-[10px] uppercase font-bold text-slate-400 block">
+                  <span className="text-[9px] sm:text-[10px] uppercase font-bold text-slate-400 block">
                     Volume Total Calculado:
                   </span>
                   <div className="flex items-baseline gap-2 mt-0.5">
                     <span className="text-xl sm:text-2xl font-black text-emerald-400 font-mono">
                       {calculatedSolid.toFixed(2)} m³
                     </span>
-                    <span className="text-xs text-slate-400 font-semibold">
+                    <span className="text-[11px] text-slate-400 font-semibold">
                       (sólido real)
                     </span>
                   </div>
@@ -399,7 +398,7 @@ export const WoodpileCubageModal: React.FC<WoodpileCubageModalProps> = ({ isOpen
                 </div>
 
                 <div className="w-10 h-10 rounded-2xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center shrink-0">
-                  <Trees className="w-6 h-6" />
+                  <Trees className="w-5 h-5 sm:w-6 sm:h-6" />
                 </div>
               </div>
 
@@ -426,7 +425,7 @@ export const WoodpileCubageModal: React.FC<WoodpileCubageModalProps> = ({ isOpen
                   </button>
 
                   {pilePhotos.map((p, idx) => (
-                    <div key={idx} className="relative w-12 h-12 rounded-xl overflow-hidden border border-slate-700">
+                    <div key={idx} className="relative w-11 h-11 sm:w-12 sm:h-12 rounded-xl overflow-hidden border border-slate-700 shrink-0">
                       <img src={p} alt="Pilha" className="w-full h-full object-cover" />
                       <button
                         type="button"
@@ -448,12 +447,12 @@ export const WoodpileCubageModal: React.FC<WoodpileCubageModalProps> = ({ isOpen
                   rows={2}
                   value={pileNotes}
                   onChange={(e) => setPileNotes(e.target.value)}
-                  placeholder="Ex: Pilha regular pronta para transporte. Sem presença de oco."
+                  placeholder="Ex: Pilha regular pronta para transporte."
                   className="w-full bg-slate-950 border border-slate-700 rounded-xl p-2.5 text-xs text-white"
                 />
               </div>
 
-              <div className="pt-2 flex items-center justify-end gap-2 shrink-0">
+              <div className="pt-1 flex items-center justify-end gap-2 shrink-0">
                 <button
                   type="submit"
                   className="w-full sm:w-auto bg-emerald-600 hover:bg-emerald-500 text-white font-black px-5 py-2.5 rounded-xl text-xs flex items-center justify-center gap-2 shadow-lg active:scale-95 transition-all"
@@ -469,19 +468,19 @@ export const WoodpileCubageModal: React.FC<WoodpileCubageModalProps> = ({ isOpen
           {/* TAB 2: CUBAGEM RIGOROSA DE TOROS (SMALIAN & HUBER)                         */}
           {/* ========================================================================= */}
           {activeTab === 'smalian' && (
-            <div className="space-y-4 animate-in fade-in text-xs">
-              <div className="bg-slate-950 p-3.5 rounded-2xl border border-slate-800 space-y-3">
+            <div className="space-y-3.5 animate-in fade-in text-xs">
+              <div className="bg-slate-950 p-3 sm:p-3.5 rounded-2xl border border-slate-800 space-y-2.5">
                 <div className="flex items-center gap-2">
                   <Calculator className="w-4 h-4 text-emerald-400" />
                   <h4 className="font-extrabold text-white text-xs sm:text-sm">
-                    Fórmula de Smalian (Diâmetro da Ponta Fina & Grossa)
+                    Fórmula de Smalian (Ponta Fina & Grossa)
                   </h4>
                 </div>
-                <p className="text-[11px] text-slate-400">
+                <p className="text-[10px] sm:text-[11px] text-slate-400">
                   Ideal para toros com conicidade natural. V = [(g1 + g2) / 2] × L
                 </p>
 
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                   <div>
                     <label className="block text-[10px] font-bold text-slate-300 mb-1">
                       Diâmetro Fino (cm)
@@ -510,7 +509,7 @@ export const WoodpileCubageModal: React.FC<WoodpileCubageModalProps> = ({ isOpen
 
                   <div>
                     <label className="block text-[10px] font-bold text-slate-300 mb-1">
-                      Comprimento da Tora (m)
+                      Comprimento (m)
                     </label>
                     <input
                       type="number"
@@ -522,30 +521,30 @@ export const WoodpileCubageModal: React.FC<WoodpileCubageModalProps> = ({ isOpen
                   </div>
                 </div>
 
-                <div className="bg-slate-900 p-3 rounded-xl border border-slate-800 flex items-center justify-between">
-                  <span className="text-slate-300 font-semibold">Volume pela Fórmula de Smalian:</span>
-                  <span className="text-lg font-black text-emerald-400 font-mono">
+                <div className="bg-slate-900 p-2.5 sm:p-3 rounded-xl border border-slate-800 flex items-center justify-between">
+                  <span className="text-slate-300 font-semibold text-[11px]">Volume Smalian:</span>
+                  <span className="text-base sm:text-lg font-black text-emerald-400 font-mono">
                     {smalianVolume.toFixed(4)} m³
                   </span>
                 </div>
               </div>
 
               {/* Huber Formula */}
-              <div className="bg-slate-950 p-3.5 rounded-2xl border border-slate-800 space-y-3">
+              <div className="bg-slate-950 p-3 sm:p-3.5 rounded-2xl border border-slate-800 space-y-2.5">
                 <div className="flex items-center gap-2">
                   <Calculator className="w-4 h-4 text-sky-400" />
                   <h4 className="font-extrabold text-white text-xs sm:text-sm">
-                    Fórmula de Huber (Diâmetro Mediano Central)
+                    Fórmula de Huber (Diâmetro Mediano)
                   </h4>
                 </div>
-                <p className="text-[11px] text-slate-400">
+                <p className="text-[10px] sm:text-[11px] text-slate-400">
                   Baseada na seção transversal média do toro. V = gm × L
                 </p>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                   <div>
                     <label className="block text-[10px] font-bold text-slate-300 mb-1">
-                      Diâmetro Médio Central (cm)
+                      Diâmetro Médio (cm)
                     </label>
                     <input
                       type="number"
@@ -570,9 +569,9 @@ export const WoodpileCubageModal: React.FC<WoodpileCubageModalProps> = ({ isOpen
                   </div>
                 </div>
 
-                <div className="bg-slate-900 p-3 rounded-xl border border-slate-800 flex items-center justify-between">
-                  <span className="text-slate-300 font-semibold">Volume pela Fórmula de Huber:</span>
-                  <span className="text-lg font-black text-sky-400 font-mono">
+                <div className="bg-slate-900 p-2.5 sm:p-3 rounded-xl border border-slate-800 flex items-center justify-between">
+                  <span className="text-slate-300 font-semibold text-[11px]">Volume Huber:</span>
+                  <span className="text-base sm:text-lg font-black text-sky-400 font-mono">
                     {huberVolume.toFixed(4)} m³
                   </span>
                 </div>
@@ -584,13 +583,13 @@ export const WoodpileCubageModal: React.FC<WoodpileCubageModalProps> = ({ isOpen
           {/* TAB 3: HISTÓRICO DE PILHAS & EMISSÃO DE LAUDOS EM LOTE                    */}
           {/* ========================================================================= */}
           {activeTab === 'history' && (
-            <div className="space-y-3.5 animate-in fade-in text-xs">
+            <div className="space-y-3 animate-in fade-in text-xs">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 bg-slate-950 p-3 rounded-2xl border border-slate-800">
                 <div>
                   <span className="font-extrabold text-white text-xs sm:text-sm">
                     {woodpiles.length} Pilha(s) Registrada(s)
                   </span>
-                  <span className="text-[11px] text-slate-400 block">
+                  <span className="text-[10px] sm:text-[11px] text-slate-400 block">
                     Total: {woodpiles.reduce((s, p) => s + p.solidVolumeM3, 0).toFixed(2)} m³ sólido / {woodpiles.reduce((s, p) => s + p.stereVolume, 0).toFixed(2)} st
                   </span>
                 </div>
@@ -599,7 +598,7 @@ export const WoodpileCubageModal: React.FC<WoodpileCubageModalProps> = ({ isOpen
                   type="button"
                   onClick={() => handleExportPDF()}
                   disabled={woodpiles.length === 0}
-                  className="bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white font-black px-4 py-2 rounded-xl text-xs flex items-center justify-center gap-1.5 shadow-md active:scale-95 transition-all"
+                  className="w-full sm:w-auto bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white font-black px-4 py-2 rounded-xl text-xs flex items-center justify-center gap-1.5 shadow-md active:scale-95 transition-all"
                 >
                   <FileDown className="w-4 h-4" />
                   <span>Emitir Laudo em Lote (PDF)</span>
@@ -607,7 +606,7 @@ export const WoodpileCubageModal: React.FC<WoodpileCubageModalProps> = ({ isOpen
               </div>
 
               {woodpiles.length === 0 ? (
-                <div className="p-8 text-center text-slate-500 border border-dashed border-slate-800 rounded-2xl">
+                <div className="p-8 text-center text-slate-500 border border-dashed border-slate-800 rounded-2xl text-xs">
                   Nenhuma pilha registrada ainda. Use a primeira aba para calcular e registrar sua primeira pilha de madeira.
                 </div>
               ) : (
@@ -615,22 +614,22 @@ export const WoodpileCubageModal: React.FC<WoodpileCubageModalProps> = ({ isOpen
                   {woodpiles.map((pile) => (
                     <div
                       key={pile.id}
-                      className="bg-slate-950 border border-slate-800 rounded-2xl p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:border-emerald-500/40 transition-all"
+                      className="bg-slate-950 border border-slate-800 rounded-2xl p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 hover:border-emerald-500/40 transition-all"
                     >
                       <div className="min-w-0">
-                        <div className="flex items-center gap-2">
-                          <span className="font-black text-emerald-400 font-mono text-sm">{pile.pileCode}</span>
-                          <span className="text-[10px] bg-slate-800 text-slate-300 px-2 py-0.5 rounded-full">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span className="font-black text-emerald-400 font-mono text-xs sm:text-sm">{pile.pileCode}</span>
+                          <span className="text-[9px] bg-slate-800 text-slate-300 px-2 py-0.2 rounded-full">
                             {pile.woodSpecies}
                           </span>
                         </div>
-                        <div className="text-[11px] text-slate-400 mt-1 truncate">
+                        <div className="text-[10px] sm:text-[11px] text-slate-400 mt-0.5 truncate">
                           {pile.locationName} • {pile.lengthMeters}m (C) × {pile.heightMeters}m (A) × {pile.logLengthMeters}m (L)
                         </div>
-                        <div className="text-xs font-bold text-white mt-1">
-                          <span className="text-emerald-400">{pile.solidVolumeM3} m³ sólido</span>
+                        <div className="text-xs font-bold text-white mt-0.5">
+                          <span className="text-emerald-400 font-mono">{pile.solidVolumeM3} m³ sólido</span>
                           <span className="text-slate-500 mx-1">•</span>
-                          <span className="text-slate-300">{pile.stereVolume} st</span>
+                          <span className="text-slate-300 font-mono">{pile.stereVolume} st</span>
                         </div>
                       </div>
 
@@ -638,7 +637,7 @@ export const WoodpileCubageModal: React.FC<WoodpileCubageModalProps> = ({ isOpen
                         <button
                           type="button"
                           onClick={() => handleExportPDF(pile)}
-                          className="bg-slate-900 hover:bg-slate-800 text-sky-400 border border-slate-700 px-3 py-1.5 rounded-xl font-bold text-xs flex items-center gap-1 active:scale-95"
+                          className="flex-1 sm:flex-initial bg-slate-900 hover:bg-slate-800 text-sky-400 border border-slate-700 px-3 py-1.5 rounded-xl font-bold text-xs flex items-center justify-center gap-1 active:scale-95"
                           title="Baixar Laudo PDF individual"
                         >
                           <FileDown className="w-3.5 h-3.5" />

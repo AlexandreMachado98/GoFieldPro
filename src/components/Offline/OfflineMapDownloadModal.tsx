@@ -156,7 +156,7 @@ export const OfflineMapDownloadModal: React.FC<OfflineMapDownloadModalProps> = (
             <label className="block text-[11px] text-slate-300 font-bold uppercase tracking-wider mb-2">
               Nível de Detalhe e Zoom
             </label>
-            <div className="grid grid-cols-3 gap-2">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
               <button
                 type="button"
                 onClick={() => setZoomRange('standard')}

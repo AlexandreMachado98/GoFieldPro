@@ -200,18 +200,18 @@ export const LayerManagerModal: React.FC = () => {
         </div>
 
         {/* Tab Navigation */}
-        <div className="flex border-b border-slate-800 bg-slate-950/30 px-4">
+        <div className="flex border-b border-slate-800 bg-slate-950/30 px-3 sm:px-4 overflow-x-auto no-scrollbar shrink-0">
           <button
             id="tab-active-layers"
             onClick={() => { setActiveSubTab('layers'); setSelectedLayerForFeatures(null); }}
-            className={`py-3 px-4 text-xs font-bold border-b-2 transition-colors flex items-center gap-1.5 ${
+            className={`py-3 px-3 sm:px-4 text-xs font-bold border-b-2 transition-colors flex items-center gap-1.5 whitespace-nowrap shrink-0 ${
               activeSubTab === 'layers'
                 ? 'border-sky-500 text-sky-400'
                 : 'border-transparent text-slate-400 hover:text-slate-200'
             }`}
           >
             <Layers className="w-4 h-4" />
-            Camadas Ativas ({layers.length})
+            <span>Camadas ({layers.length})</span>
           </button>
 
           {currentRole !== 'auditor' && (
@@ -232,14 +232,14 @@ export const LayerManagerModal: React.FC = () => {
               <button
                 id="tab-import-kml"
                 onClick={() => setActiveSubTab('import_kml')}
-                className={`py-3 px-4 text-xs font-bold border-b-2 transition-colors flex items-center gap-1.5 ${
+                className={`py-3 px-3 sm:px-4 text-xs font-bold border-b-2 transition-colors flex items-center gap-1.5 whitespace-nowrap shrink-0 ${
                   activeSubTab === 'import_kml'
                     ? 'border-sky-500 text-sky-400'
                     : 'border-transparent text-slate-400 hover:text-slate-200'
                 }`}
               >
                 <Globe className="w-4 h-4" />
-                {t.uploadKmlKmz}
+                <span>{t.uploadKmlKmz}</span>
               </button>
             </>
           )}
@@ -247,14 +247,14 @@ export const LayerManagerModal: React.FC = () => {
           <button
             id="tab-select-basemap"
             onClick={() => setActiveSubTab('basemap')}
-            className={`py-3 px-4 text-xs font-bold border-b-2 transition-colors flex items-center gap-1.5 ${
+            className={`py-3 px-3 sm:px-4 text-xs font-bold border-b-2 transition-colors flex items-center gap-1.5 whitespace-nowrap shrink-0 ${
               activeSubTab === 'basemap'
                 ? 'border-sky-500 text-sky-400'
                 : 'border-transparent text-slate-400 hover:text-slate-200'
             }`}
           >
             <Globe className="w-4 h-4" />
-            {t.basemap}
+            <span>{t.basemap}</span>
           </button>
         </div>
 

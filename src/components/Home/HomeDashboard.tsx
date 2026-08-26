@@ -326,37 +326,37 @@ export const HomeDashboard: React.FC = () => {
             </p>
           </div>
 
-          <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
+          <div className="grid grid-cols-2 sm:flex sm:items-center gap-2 sm:gap-3 w-full sm:w-auto pt-1 sm:pt-0">
             <button
               onClick={() => setIsWoodpileModalOpen(true)}
-              className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-emerald-950/60 hover:bg-emerald-900/60 border border-emerald-500/40 text-emerald-300 font-bold text-xs shadow transition-all active:scale-95 cursor-pointer"
+              className="flex items-center justify-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2.5 rounded-xl bg-emerald-950/60 hover:bg-emerald-900/60 border border-emerald-500/40 text-emerald-300 font-bold text-[11px] sm:text-xs shadow transition-all active:scale-95 cursor-pointer truncate"
             >
-              <Trees className="w-4 h-4 text-emerald-400" />
-              <span>Cubagem Florestal (m³)</span>
+              <Trees className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-emerald-400 shrink-0" />
+              <span className="truncate">Cubagem (m³)</span>
             </button>
 
             <button
               onClick={() => setActiveTab('pdf_maps')}
-              className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-700 hover:border-slate-600 text-white font-bold text-xs shadow transition-all active:scale-95 cursor-pointer"
+              className="flex items-center justify-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-700 hover:border-slate-600 text-white font-bold text-[11px] sm:text-xs shadow transition-all active:scale-95 cursor-pointer truncate"
             >
-              <FileText className="w-4 h-4 text-emerald-400" />
-              <span>Mapas & Plantas PDF</span>
+              <FileText className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-emerald-400 shrink-0" />
+              <span className="truncate">Plantas PDF</span>
             </button>
 
             <button
               onClick={handleExportPdf}
-              className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-700 hover:border-slate-600 text-white font-bold text-xs shadow transition-all active:scale-95 cursor-pointer"
+              className="flex items-center justify-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-700 hover:border-slate-600 text-white font-bold text-[11px] sm:text-xs shadow transition-all active:scale-95 cursor-pointer truncate"
             >
-              <FileDown className="w-4 h-4 text-sky-400" />
-              <span>Gerar Relatório PDF</span>
+              <FileDown className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-sky-400 shrink-0" />
+              <span className="truncate">Relatório PDF</span>
             </button>
 
             <button
               onClick={handleOpenCreate}
-              className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-sky-600 to-emerald-600 hover:from-sky-500 hover:to-emerald-500 text-white font-bold text-xs shadow-lg shadow-sky-950/50 transition-all active:scale-95 cursor-pointer"
+              className="flex items-center justify-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2.5 rounded-xl bg-gradient-to-r from-sky-600 to-emerald-600 hover:from-sky-500 hover:to-emerald-500 text-white font-bold text-[11px] sm:text-xs shadow-lg shadow-sky-950/50 transition-all active:scale-95 cursor-pointer truncate"
             >
-              <Plus className="w-4 h-4" />
-              <span>Registrar Atividade</span>
+              <Plus className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" />
+              <span className="truncate">Nova Atividade</span>
             </button>
           </div>
         </div>

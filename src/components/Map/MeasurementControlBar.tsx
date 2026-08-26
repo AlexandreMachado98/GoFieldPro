@@ -107,48 +107,48 @@ export const MeasurementControlBar: React.FC<MeasurementControlBarProps> = ({
         </div>
 
         {/* Mode Selector & Quick Actions */}
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          {/* Point Type Switches */}
-          <div className="flex items-center bg-slate-950/80 p-1 rounded-xl border border-slate-800 text-xs">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+          {/* Point Type Switches (Scrollable on mobile) */}
+          <div className="flex items-center gap-1 bg-slate-950/80 p-1 rounded-xl border border-slate-800 text-xs overflow-x-auto w-full sm:w-auto no-scrollbar">
             <button
               onClick={() => setCurrentType('standard')}
-              className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg font-bold transition-all ${
+              className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg font-bold transition-all whitespace-nowrap shrink-0 ${
                 currentType === 'standard'
                   ? 'bg-sky-600 text-white shadow-md'
                   : 'text-slate-400 hover:text-slate-200'
               }`}
             >
               <MapPin className="w-3.5 h-3.5" />
-              <span>Vértice Padrão</span>
+              <span>Vértice</span>
             </button>
 
             <button
               onClick={() => setCurrentType('stop')}
-              className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg font-bold transition-all ${
+              className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg font-bold transition-all whitespace-nowrap shrink-0 ${
                 currentType === 'stop'
                   ? 'bg-emerald-600 text-white shadow-md'
                   : 'text-slate-400 hover:text-slate-200'
               }`}
             >
               <Flag className="w-3.5 h-3.5 text-emerald-300" />
-              <span>Ponto de Parada</span>
+              <span>Parada</span>
             </button>
 
             <button
               onClick={() => setCurrentType('hazard')}
-              className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg font-bold transition-all ${
+              className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg font-bold transition-all whitespace-nowrap shrink-0 ${
                 currentType === 'hazard'
                   ? 'bg-amber-600 text-white shadow-md'
                   : 'text-slate-400 hover:text-slate-200'
               }`}
             >
               <AlertTriangle className="w-3.5 h-3.5 text-amber-300" />
-              <span>Atenção / Risco</span>
+              <span>Alerta</span>
             </button>
 
             <button
               onClick={() => setCurrentType('woodpile')}
-              className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg font-bold transition-all ${
+              className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg font-bold transition-all whitespace-nowrap shrink-0 ${
                 currentType === 'woodpile'
                   ? 'bg-amber-600 text-white shadow-md'
                   : 'text-slate-400 hover:text-slate-200'

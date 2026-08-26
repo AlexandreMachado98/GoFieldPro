@@ -354,21 +354,21 @@ export const FieldRoundsPanel: React.FC = () => {
           </div>
 
           {/* Action buttons */}
-          <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
+          <div className="grid grid-cols-2 sm:flex sm:items-center gap-2 sm:gap-3 w-full sm:w-auto">
             <button
               onClick={handleGeneratePdf}
-              className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-700 hover:border-slate-600 text-white font-bold text-xs shadow transition-all active:scale-95 cursor-pointer"
+              className="flex items-center justify-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-700 hover:border-slate-600 text-white font-bold text-[11px] sm:text-xs shadow transition-all active:scale-95 cursor-pointer truncate"
             >
-              <FileDown className="w-4 h-4 text-sky-400" />
-              <span>Gerar Relatório PDF</span>
+              <FileDown className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-sky-400 shrink-0" />
+              <span className="truncate">Relatório PDF</span>
             </button>
 
             <button
               onClick={handleOpenCreateModal}
-              className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-sky-600 to-emerald-600 hover:from-sky-500 hover:to-emerald-500 text-white font-bold text-xs shadow-lg shadow-sky-950/50 transition-all active:scale-95 cursor-pointer"
+              className="flex items-center justify-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2.5 rounded-xl bg-gradient-to-r from-sky-600 to-emerald-600 hover:from-sky-500 hover:to-emerald-500 text-white font-bold text-[11px] sm:text-xs shadow-lg shadow-sky-950/50 transition-all active:scale-95 cursor-pointer truncate"
             >
-              <Plus className="w-4 h-4" />
-              <span>Registrar Atividade</span>
+              <Plus className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" />
+              <span className="truncate">Nova Atividade</span>
             </button>
           </div>
         </div>

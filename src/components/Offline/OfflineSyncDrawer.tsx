@@ -49,10 +49,10 @@ export const OfflineSyncDrawer: React.FC = () => {
           </div>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2 shrink-0">
+        <div className="grid grid-cols-1 sm:flex sm:flex-wrap items-center gap-2 w-full sm:w-auto shrink-0">
           <button
             onClick={() => setIsDownloadModalOpen(true)}
-            className="px-4 py-2 rounded-xl text-xs font-bold bg-emerald-600 hover:bg-emerald-500 text-white flex items-center gap-1.5 shadow-lg transition-all active:scale-95 border border-emerald-400/40"
+            className="w-full sm:w-auto px-4 py-2.5 rounded-xl text-xs font-bold bg-emerald-600 hover:bg-emerald-500 text-white flex items-center justify-center gap-1.5 shadow-lg transition-all active:scale-95 border border-emerald-400/40"
           >
             <Download className="w-4 h-4" />
             <span>Baixar Mapa Offline</span>
@@ -61,13 +61,13 @@ export const OfflineSyncDrawer: React.FC = () => {
           <button
             id="btn-toggle-field-offline-mode"
             onClick={() => setIsOffline(!isOffline)}
-            className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${
+            className={`w-full sm:w-auto px-4 py-2.5 rounded-xl text-xs font-bold flex items-center justify-center transition-all ${
               isOffline
                 ? 'bg-amber-600 hover:bg-amber-500 text-white shadow-lg'
                 : 'bg-slate-800 hover:bg-slate-700 text-slate-300'
             }`}
           >
-            {isOffline ? 'Simular Reconexão (Ficar Online)' : 'Simular Modo Sem Internet'}
+            {isOffline ? 'Simular Reconexão (Online)' : 'Simular Modo Offline'}
           </button>
         </div>
       </div>
