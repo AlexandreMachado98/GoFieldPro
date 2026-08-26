@@ -83,9 +83,9 @@ export const HomeDashboard: React.FC = () => {
   const photoInputRef = useRef<HTMLInputElement>(null);
 
   // KPI Calculations
-  const totalKmSum = fieldRounds.reduce((sum, r) => sum + (r.totalKm || 0), 0);
-  const activeRounds = fieldRounds.filter((r) => r.status === 'em_andamento');
-  const completedRounds = fieldRounds.filter((r) => r.status === 'finalizada');
+  const totalKmSum = (fieldRounds || []).reduce((sum, r) => sum + (r?.totalKm || 0), 0);
+  const activeRounds = (fieldRounds || []).filter((r) => r && r.status === 'em_andamento');
+  const completedRounds = (fieldRounds || []).filter((r) => r && r.status === 'finalizada');
   const avgKm = fieldRounds.length > 0 ? (totalKmSum / fieldRounds.length).toFixed(1) : '0';
 
   // Compress image

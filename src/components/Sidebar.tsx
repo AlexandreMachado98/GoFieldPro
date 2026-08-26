@@ -44,7 +44,7 @@ export const Sidebar: React.FC = () => {
   const { isUpdateAvailable, latestVersion, applyUpdate } = useUpdate();
   const [pendingCount, setPendingCount] = useState(0);
 
-  const activeFireCount = fireIncidents.filter((i) => i.status === 'em_combate').length;
+  const activeFireCount = (fireIncidents || []).filter((i) => i && i.status === 'em_combate').length;
 
   useEffect(() => {
     if (profile?.role !== 'super_admin') return;

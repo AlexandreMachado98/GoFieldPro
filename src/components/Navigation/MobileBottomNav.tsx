@@ -5,7 +5,7 @@ import { useApp } from '../../context/AppContext';
 export const MobileBottomNav: React.FC = () => {
   const { activeTab, setActiveTab, fireIncidents } = useApp();
 
-  const activeFireCount = fireIncidents.filter((i) => i.status === 'em_combate').length;
+  const activeFireCount = (fireIncidents || []).filter((i) => i && i.status === 'em_combate').length;
 
   const navItems = [
     { id: 'home', label: 'Início', icon: Home },

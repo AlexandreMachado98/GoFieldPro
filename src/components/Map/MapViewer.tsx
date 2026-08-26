@@ -102,7 +102,7 @@ export const MapViewer: React.FC = () => {
   const userAccuracyCircleRef = useRef<L.Circle | null>(null);
   const hasAutoCenteredRef = useRef<boolean>(false);
   const userInteractedRef = useRef<boolean>(false);
-  const lastProjectIdRef = useRef<string>(activeProject.id);
+  const lastProjectIdRef = useRef<string>(activeProject?.id || 'default');
 
   const [isLocating, setIsLocating] = useState<boolean>(false);
   const [isCalibratingGps, setIsCalibratingGps] = useState<boolean>(false);
@@ -145,7 +145,7 @@ export const MapViewer: React.FC = () => {
 
     const map = L.map(mapContainerRef.current, {
       center: [initialLat, initialLng],
-      zoom: hasGpsLock ? 16 : activeProject.zoomLevel,
+      zoom: hasGpsLock ? 16 : (activeProject?.zoomLevel || 13),
       minZoom: 2,
       maxZoom: 21,
       zoomControl: false,
