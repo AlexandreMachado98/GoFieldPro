@@ -20,6 +20,7 @@ import {
   SubscriptionStatusType,
   PromoCoupon,
   SystemBillingConfig,
+  PlanItemConfig,
 } from '../../types';
 import {
   Users,
@@ -53,7 +54,59 @@ import {
   QrCode,
   AlertCircle,
   Edit3,
+  Percent,
 } from 'lucide-react';
+
+export const DEFAULT_PLANS: PlanItemConfig[] = [
+  {
+    id: 'pro',
+    name: 'Plano Profissional',
+    tag: 'Individual',
+    originalPrice: 149,
+    price: 97,
+    discountBadge: '35% OFF',
+    billingPeriod: '/mês',
+    features: [
+      '1 Operador de Campo',
+      'Mapas PDF e GPS Ilimitados',
+      'Medição de Pilha de Madeira (m³)',
+      'Relatórios Técnicos em PDF com Fotos',
+    ],
+    highlight: false,
+  },
+  {
+    id: 'equipe',
+    name: 'Plano Equipe',
+    tag: 'Mais Popular',
+    originalPrice: 390,
+    price: 289,
+    discountBadge: 'Economize R$ 101/mês',
+    billingPeriod: '/mês',
+    features: [
+      'Até 5 Técnicos de Campo',
+      'Painel de Gestão da Frota & Odômetro',
+      'Cubagem Florestal e Laudos em Lote',
+      'Backup e Sincronização em Nuvem',
+    ],
+    highlight: true,
+  },
+  {
+    id: 'florestal',
+    name: 'Florestal & Usinas',
+    tag: 'Corporativo',
+    originalPrice: 950,
+    price: 690,
+    discountBadge: '27% OFF',
+    billingPeriod: '/mês',
+    features: [
+      '15 a 30 Operadores simultâneos',
+      'Logotipo da Empresa nos Laudos PDF',
+      'Contratos e Faturamento PJ',
+      'Treinamento e Suporte VIP Prioritário',
+    ],
+    highlight: false,
+  },
+];
 
 const DEFAULT_BILLING_CONFIG: SystemBillingConfig = {
   pixKey: '48.123.456/0001-90',
@@ -64,6 +117,7 @@ const DEFAULT_BILLING_CONFIG: SystemBillingConfig = {
   whatsappSupportNumber: '5511999999999',
   customMessageTemplate:
     'Olá {nome} ({empresa}), tudo bem? Sua assinatura do GoField Pro no valor de R$ {valor} vence em {vencimento}. Segue nossa Chave Pix ({chave_tipo}) para renovação: {chave_pix} ({titular}). Qualquer dúvida estamos à disposição!',
+  plans: DEFAULT_PLANS,
 };
 
 export const AdminPanel: React.FC = () => {
@@ -81,9 +135,20 @@ export const AdminPanel: React.FC = () => {
   const [subscriptionFilter, setSubscriptionFilter] = useState<'all' | 'active' | 'trial' | 'overdue' | 'suspended'>('all');
   const [searchQuery, setSearchQuery] = useState('');
 
-  // Billing Config State
+  // Billing & Plans Config State
   const [billingConfig, setBillingConfig] = useState<SystemBillingConfig>(DEFAULT_BILLING_CONFIG);
+  const [plans, setPlans] = useState<PlanItemConfig[]>(DEFAULT_PLANS);
   const [savingBilling, setSavingBilling] = useState(false);
+
+  // Edit Plan Modal State
+  const [editingPlan, setEditingPlan] = useState<PlanItemConfig | null>(null);
+  const [planModalName, setPlanModalName] = useState('');
+  const [planModalTag, setPlanModalTag] = useState('');
+  const [planModalOriginalPrice, setPlanModalOriginalPrice] = useState<number>(0);
+  const [planModalPrice, setPlanModalPrice] = useState<number>(0);
+  const [planModalBadge, setPlanModalBadge] = useState('');
+  const [planModalFeaturesText, setPlanModalFeaturesText] = useState('');
+  const [savingPlanChanges, setSavingPlanChanges] = useState(false);
 
   // Promo Coupons State
   const [coupons, setCoupons] = useState<PromoCoupon[]>([]);
@@ -121,7 +186,6 @@ export const AdminPanel: React.FC = () => {
       const data = typeof docSnap.data === 'function' ? docSnap.data() : docSnap;
       const isOwner = (data.email || '').toLowerCase() === 'alexandre1604981@gmail.com';
 
-      // Default calculation for expiry date if not set (default 14 days trial from creation)
       let defaultExpires = data.subscriptionExpiresAt;
       if (!defaultExpires) {
         const createdDate = data.createdAt ? new Date(data.createdAt) : new Date();
@@ -169,15 +233,19 @@ export const AdminPanel: React.FC = () => {
     return usersData;
   };
 
-  // Load Billing Config and Coupons from Firestore
+  // Load Billing Config, Plans, and Coupons from Firestore
   useEffect(() => {
     if (profile?.role !== 'super_admin') return;
 
-    const loadBillingConfig = async () => {
+    const loadBillingAndPlansConfig = async () => {
       try {
         const configDoc = await getDoc(doc(db, 'system_config', 'billing'));
         if (configDoc.exists()) {
-          setBillingConfig({ ...DEFAULT_BILLING_CONFIG, ...configDoc.data() });
+          const data = configDoc.data() as SystemBillingConfig;
+          setBillingConfig({ ...DEFAULT_BILLING_CONFIG, ...data });
+          if (data.plans && Array.isArray(data.plans) && data.plans.length > 0) {
+            setPlans(data.plans);
+          }
         }
       } catch (e) {
         console.warn('Could not load billing config from Firestore, using local defaults', e);
@@ -194,7 +262,7 @@ export const AdminPanel: React.FC = () => {
       }
     };
 
-    loadBillingConfig();
+    loadBillingAndPlansConfig();
     loadCoupons();
   }, [profile]);
 
@@ -245,13 +313,59 @@ export const AdminPanel: React.FC = () => {
     e.preventDefault();
     setSavingBilling(true);
     try {
-      await setDoc(doc(db, 'system_config', 'billing'), billingConfig, { merge: true });
+      await setDoc(doc(db, 'system_config', 'billing'), { ...billingConfig, plans }, { merge: true });
       notifySuccess('Configurações Salvas!', 'Os dados de cobrança Pix e mensagens foram atualizados na nuvem.');
     } catch (err: any) {
       console.error('Error saving billing config:', err);
       notifyError('Erro ao Salvar', 'Não foi possível atualizar as configurações de cobrança.');
     } finally {
       setSavingBilling(false);
+    }
+  };
+
+  // Save Plan Changes Modal
+  const handleSavePlanChanges = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingPlan) return;
+
+    setSavingPlanChanges(true);
+    try {
+      const updatedFeatures = planModalFeaturesText
+        .split('\n')
+        .map((f) => f.replace(/^[-*•]\s*/, '').trim())
+        .filter((f) => f.length > 0);
+
+      const updatedPlans = plans.map((p) => {
+        if (p.id === editingPlan.id) {
+          return {
+            ...p,
+            name: planModalName.trim() || p.name,
+            tag: planModalTag.trim() || p.tag,
+            originalPrice: Number(planModalOriginalPrice) || 0,
+            price: Number(planModalPrice) || 0,
+            discountBadge: planModalBadge.trim(),
+            features: updatedFeatures.length > 0 ? updatedFeatures : p.features,
+          };
+        }
+        return p;
+      });
+
+      setPlans(updatedPlans);
+
+      // Persist directly to Firestore
+      await setDoc(
+        doc(db, 'system_config', 'billing'),
+        { ...billingConfig, plans: updatedPlans },
+        { merge: true }
+      );
+
+      notifySuccess('Plano Atualizado!', `O ${planModalName} agora está com novos valores e serviços salvos na nuvem.`);
+      setEditingPlan(null);
+    } catch (err) {
+      console.error('Error saving plan changes:', err);
+      notifyError('Erro ao Salvar Plano', 'Não foi possível salvar as alterações do plano.');
+    } finally {
+      setSavingPlanChanges(false);
     }
   };
 
@@ -604,11 +718,11 @@ export const AdminPanel: React.FC = () => {
               <span className="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
                 Central SuperAdmin
               </span>
-              <span className="text-[11px] text-slate-400 truncate">• AM TST Gestão</span>
+              <span className="text-[11px] text-slate-400 truncate">• AM TST Gestão & Planos</span>
             </div>
             <h2 className="font-extrabold text-lg sm:text-2xl text-white tracking-tight mt-1 flex items-center gap-2 truncate">
               <UserCog className="w-5 h-5 sm:w-6 sm:h-6 text-sky-400 shrink-0" />
-              <span>Painel Comercial & Equipe</span>
+              <span>Painel Comercial, Planos & Equipe</span>
             </h2>
           </div>
 
@@ -632,7 +746,7 @@ export const AdminPanel: React.FC = () => {
           </div>
         </div>
 
-        {/* Subtabs Buttons (Mobile Friendly Horizontal Scroll / Grid) */}
+        {/* Subtabs Buttons */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 sm:gap-2 pt-2 border-t border-slate-800/80">
           <button
             onClick={() => setAdminTab('users')}
@@ -699,7 +813,7 @@ export const AdminPanel: React.FC = () => {
       {/* ========================================================================= */}
       {adminTab === 'subscriptions' && (
         <div className="space-y-4 animate-in fade-in duration-200">
-          {/* Financial KPI Summary Cards (2x2 on mobile, 4 in row on lg) */}
+          {/* Financial KPI Summary Cards */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3">
             {/* MRR Card */}
             <div className="bg-slate-900 border border-emerald-500/40 rounded-2xl p-3 sm:p-4 shadow-xl flex flex-col justify-between relative overflow-hidden">
@@ -930,7 +1044,7 @@ export const AdminPanel: React.FC = () => {
                     </div>
                   </div>
 
-                  {/* Quick Action Buttons (Fully Responsive on Mobile) */}
+                  {/* Quick Action Buttons */}
                   <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-1.5 pt-1 w-full">
                     {/* WhatsApp Billing Button */}
                     <button
@@ -942,9 +1056,8 @@ export const AdminPanel: React.FC = () => {
                       <span>Cobrar no WhatsApp</span>
                     </button>
 
-                    {/* Secondary Actions Row on Mobile */}
+                    {/* Secondary Actions Row */}
                     <div className="grid grid-cols-3 sm:flex sm:w-auto gap-1.5 w-full sm:w-auto">
-                      {/* +7 Days Extension */}
                       <button
                         type="button"
                         onClick={() => handleExtend7Days(subUser)}
@@ -955,7 +1068,6 @@ export const AdminPanel: React.FC = () => {
                         <span>+7d</span>
                       </button>
 
-                      {/* Suspend / Resume Button */}
                       {!isOwner ? (
                         <button
                           type="button"
@@ -987,7 +1099,6 @@ export const AdminPanel: React.FC = () => {
                         <div />
                       )}
 
-                      {/* Edit Full Subscription Modal */}
                       <button
                         type="button"
                         onClick={() => {
@@ -1170,76 +1281,117 @@ export const AdminPanel: React.FC = () => {
       )}
 
       {/* ========================================================================= */}
-      {/* TAB 3: PLANOS & CUPONS PROMOCIONAIS                                       */}
+      {/* TAB 3: PLANOS EDITÁVEIS, PREÇOS COM DESCONTO & CUPONS                     */}
       {/* ========================================================================= */}
       {adminTab === 'plans' && (
-        <div className="space-y-4 animate-in fade-in duration-200">
-          {/* Official Plans Table */}
-          <div className="space-y-2.5">
-            <h3 className="text-xs sm:text-sm font-extrabold text-white uppercase tracking-wider flex items-center gap-2">
-              <Tag className="w-4 h-4 text-indigo-400" />
-              Tabela de Planos do GoField Pro
-            </h3>
+        <div className="space-y-5 animate-in fade-in duration-200">
+          {/* Dynamic Plans Grid with Discount Options */}
+          <div className="space-y-3">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <div>
+                <h3 className="text-xs sm:text-sm font-extrabold text-white uppercase tracking-wider flex items-center gap-2">
+                  <Tag className="w-4 h-4 text-indigo-400" />
+                  Gerenciador de Planos, Preços & Descontos Personalizados
+                </h3>
+                <p className="text-[11px] text-slate-400 mt-0.5">
+                  Configure o valor inteiro de tabela, o valor com desconto e os serviços incluídos em cada plano.
+                </p>
+              </div>
+            </div>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-              {/* Plan 1 */}
-              <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 shadow-xl flex flex-col justify-between space-y-3">
-                <div>
-                  <span className="text-[9px] uppercase font-black px-2 py-0.5 rounded-full bg-sky-500/20 text-sky-300 border border-sky-500/30">
-                    Individual
-                  </span>
-                  <h4 className="text-base font-black text-white mt-1.5">Profissional</h4>
-                  <div className="mt-1">
-                    <span className="text-xl font-black text-sky-400 font-mono">R$ 97,00</span>
-                    <span className="text-[11px] text-slate-400"> / mês</span>
-                  </div>
-                  <ul className="mt-3 space-y-1.5 text-xs text-slate-300">
-                    <li className="flex items-center gap-1.5">✓ 1 Operador de Campo</li>
-                    <li className="flex items-center gap-1.5">✓ Mapas PDF e GPS Ilimitados</li>
-                    <li className="flex items-center gap-1.5">✓ Medição de Pilha de Madeira</li>
-                    <li className="flex items-center gap-1.5">✓ Laudos Técnicos em PDF</li>
-                  </ul>
-                </div>
-              </div>
+              {plans.map((plan) => {
+                const discountAmount = plan.originalPrice > plan.price ? plan.originalPrice - plan.price : 0;
+                const discountPercentCalc =
+                  plan.originalPrice > 0
+                    ? Math.round(((plan.originalPrice - plan.price) / plan.originalPrice) * 100)
+                    : 0;
 
-              {/* Plan 2 */}
-              <div className="bg-slate-900 border border-emerald-500/50 rounded-2xl p-4 shadow-2xl flex flex-col justify-between space-y-3 ring-1 ring-emerald-500/30">
-                <div>
-                  <span className="text-[9px] uppercase font-black px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
-                    Mais Popular
-                  </span>
-                  <h4 className="text-base font-black text-white mt-1.5">Plano Equipe</h4>
-                  <div className="mt-1">
-                    <span className="text-xl font-black text-emerald-400 font-mono">R$ 289,00</span>
-                    <span className="text-[11px] text-slate-400"> / mês</span>
-                  </div>
-                  <ul className="mt-3 space-y-1.5 text-xs text-slate-300">
-                    <li className="flex items-center gap-1.5">✓ Até 5 Técnicos de Campo</li>
-                    <li className="flex items-center gap-1.5">✓ Painel de Gestão da Frota</li>
-                    <li className="flex items-center gap-1.5">✓ Cubagem e Laudos em Lote</li>
-                    <li className="flex items-center gap-1.5">✓ Backup Seguro na Nuvem</li>
-                  </ul>
-                </div>
-              </div>
+                return (
+                  <div
+                    key={plan.id}
+                    className={`bg-slate-900 border rounded-3xl p-4 sm:p-5 shadow-xl flex flex-col justify-between space-y-4 relative ${
+                      plan.highlight
+                        ? 'border-emerald-500/60 ring-1 ring-emerald-500/40 bg-gradient-to-b from-emerald-950/20 to-slate-900'
+                        : 'border-slate-800'
+                    }`}
+                  >
+                    <div>
+                      {/* Top Badges */}
+                      <div className="flex items-center justify-between gap-1.5 flex-wrap mb-2">
+                        <span className="text-[9px] uppercase font-black px-2 py-0.5 rounded-full bg-slate-800 text-slate-300 border border-slate-700">
+                          {plan.tag}
+                        </span>
+                        {plan.discountBadge && (
+                          <span className="text-[9px] uppercase font-black px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 flex items-center gap-1">
+                            <Percent className="w-2.5 h-2.5" />
+                            {plan.discountBadge}
+                          </span>
+                        )}
+                      </div>
 
-              {/* Plan 3 */}
-              <div className="bg-slate-900 border border-indigo-500/40 rounded-2xl p-4 shadow-xl flex flex-col justify-between space-y-3">
-                <div>
-                  <span className="text-[9px] uppercase font-black px-2 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
-                    Corporativo
-                  </span>
-                  <h4 className="text-base font-black text-white mt-1.5">Florestal & Usinas</h4>
-                  <div className="mt-1">
-                    <span className="text-xl font-black text-indigo-400 font-mono">R$ 690,00</span>
-                    <span className="text-[11px] text-slate-400"> / mês</span>
+                      <h4 className="text-base sm:text-lg font-black text-white">{plan.name}</h4>
+
+                      {/* Pricing Display with Original Crossed-Out Price and Discounted Price */}
+                      <div className="mt-2.5 bg-slate-950 p-3 rounded-2xl border border-slate-800">
+                        {plan.originalPrice > plan.price && (
+                          <div className="flex items-center gap-2 text-[11px] text-slate-400">
+                            <span>De:</span>
+                            <span className="line-through font-mono font-bold text-slate-500">
+                              R$ {plan.originalPrice.toFixed(2)}
+                            </span>
+                            <span className="text-emerald-400 text-[10px] font-bold">
+                              (-R$ {discountAmount.toFixed(0)})
+                            </span>
+                          </div>
+                        )}
+                        <div className="flex items-baseline gap-1 mt-0.5">
+                          <span className="text-[11px] font-bold text-slate-300">Por:</span>
+                          <span className="text-xl sm:text-2xl font-black text-emerald-400 font-mono">
+                            R$ {plan.price.toFixed(2)}
+                          </span>
+                          <span className="text-xs text-slate-400">{plan.billingPeriod}</span>
+                        </div>
+                      </div>
+
+                      {/* Features / Services Included */}
+                      <div className="mt-3.5 space-y-1.5">
+                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+                          Serviços & Recursos Incluídos:
+                        </span>
+                        <ul className="space-y-1.5 text-xs text-slate-300">
+                          {plan.features.map((feat, idx) => (
+                            <li key={idx} className="flex items-start gap-1.5 text-[11px] leading-tight">
+                              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0 mt-0.5" />
+                              <span>{feat}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    </div>
+
+                    {/* Edit Plan Button */}
+                    <div className="pt-2 border-t border-slate-800">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setEditingPlan(plan);
+                          setPlanModalName(plan.name);
+                          setPlanModalTag(plan.tag);
+                          setPlanModalOriginalPrice(plan.originalPrice);
+                          setPlanModalPrice(plan.price);
+                          setPlanModalBadge(plan.discountBadge || '');
+                          setPlanModalFeaturesText(plan.features.join('\n'));
+                        }}
+                        className="w-full bg-slate-800 hover:bg-slate-700 text-white font-bold py-2 px-3 rounded-xl text-xs flex items-center justify-center gap-1.5 transition-all active:scale-95 border border-slate-700 shadow"
+                      >
+                        <Edit3 className="w-3.5 h-3.5 text-sky-400" />
+                        <span>Editar Valores & Serviços</span>
+                      </button>
+                    </div>
                   </div>
-                  <ul className="mt-3 space-y-1.5 text-xs text-slate-300">
-                    <li className="flex items-center gap-1.5">✓ 15 a 30 Operadores</li>
-                    <li className="flex items-center gap-1.5">✓ Logotipo da empresa no PDF</li>
-                    <li className="flex items-center gap-1.5">✓ Treinamento e Suporte VIP</li>
-                  </ul>
-                </div>
-              </div>
+                );
+              })}
             </div>
           </div>
 
@@ -1252,7 +1404,7 @@ export const AdminPanel: React.FC = () => {
                   Cupons Promocionais & Descontos Regionais
                 </h4>
                 <p className="text-[10px] sm:text-[11px] text-slate-400 mt-0.5">
-                  Crie cupons para atrair as primeiras empresas clientes.
+                  Crie cupons para que os clientes apliquem descontos adicionais na tela de adesão.
                 </p>
               </div>
 
@@ -1406,6 +1558,129 @@ export const AdminPanel: React.FC = () => {
       )}
 
       {/* ========================================================================= */}
+      {/* MODAL 0: EDIT PLAN VALUES, DISCOUNTS & SERVICES MODAL                     */}
+      {/* ========================================================================= */}
+      {editingPlan && (
+        <div className="fixed inset-0 z-[99999] flex items-center justify-center p-3 bg-black/80 backdrop-blur-md animate-in fade-in">
+          <div className="bg-slate-900 border border-slate-800 rounded-3xl w-full max-w-lg max-h-[90dvh] flex flex-col p-4 sm:p-6 shadow-2xl overflow-hidden">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-3 shrink-0">
+              <div className="min-w-0">
+                <h3 className="font-bold text-white text-sm sm:text-base truncate">Editar Valores & Serviços do Plano</h3>
+                <p className="text-[11px] text-slate-400 truncate">Configure descontos, preços cheios e benefícios</p>
+              </div>
+              <button
+                onClick={() => setEditingPlan(null)}
+                className="p-1.5 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 shrink-0"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSavePlanChanges} className="space-y-3.5 text-xs overflow-y-auto py-3 flex-1">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                <div>
+                  <label className="block text-slate-300 font-bold uppercase text-[10px] mb-1">Nome do Plano *</label>
+                  <input
+                    type="text"
+                    required
+                    value={planModalName}
+                    onChange={(e) => setPlanModalName(e.target.value)}
+                    className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-white font-bold"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-slate-300 font-bold uppercase text-[10px] mb-1">Rótulo / Tag</label>
+                  <input
+                    type="text"
+                    value={planModalTag}
+                    onChange={(e) => setPlanModalTag(e.target.value)}
+                    placeholder="Ex: Mais Popular ou Individual"
+                    className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-white"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-slate-300 font-bold uppercase text-[10px] mb-1">
+                    Preço Inteiro Cheio (Tabela) R$
+                  </label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={planModalOriginalPrice}
+                    onChange={(e) => setPlanModalOriginalPrice(Number(e.target.value))}
+                    className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-white font-mono"
+                  />
+                  <p className="text-[9px] text-slate-500 mt-0.5">Aparece riscado para destacar o desconto.</p>
+                </div>
+
+                <div>
+                  <label className="block text-slate-300 font-bold uppercase text-[10px] mb-1">
+                    Preço Promocional / Cobrado R$ *
+                  </label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    required
+                    value={planModalPrice}
+                    onChange={(e) => setPlanModalPrice(Number(e.target.value))}
+                    className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-emerald-400 font-mono font-bold"
+                  />
+                  <p className="text-[9px] text-slate-500 mt-0.5">Valor final mensal a ser cobrado.</p>
+                </div>
+
+                <div className="sm:col-span-2">
+                  <label className="block text-slate-300 font-bold uppercase text-[10px] mb-1">
+                    Selo de Desconto em Destaque
+                  </label>
+                  <input
+                    type="text"
+                    value={planModalBadge}
+                    onChange={(e) => setPlanModalBadge(e.target.value)}
+                    placeholder="Ex: 35% OFF ou Economize R$ 101/mês"
+                    className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-white font-semibold"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-slate-300 font-bold uppercase text-[10px] mb-1">
+                  Serviços e Benefícios (1 por linha)
+                </label>
+                <textarea
+                  rows={4}
+                  value={planModalFeaturesText}
+                  onChange={(e) => setPlanModalFeaturesText(e.target.value)}
+                  placeholder="Ex:&#10;1 Operador de Campo&#10;Mapas PDF Ilimitados&#10;Medição de Pilha de Madeira"
+                  className="w-full bg-slate-950 border border-slate-700 rounded-xl p-2.5 text-xs text-white leading-relaxed font-sans"
+                />
+                <p className="text-[9px] text-slate-500 mt-0.5">
+                  Cada linha escrita aqui será exibida como um item com check verde na vitrine do cliente.
+                </p>
+              </div>
+
+              <div className="pt-2 border-t border-slate-800 flex items-center justify-end gap-2 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => setEditingPlan(null)}
+                  className="px-3.5 py-2 rounded-xl bg-slate-800 text-slate-300 font-bold text-xs"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={savingPlanChanges}
+                  className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-lg"
+                >
+                  {savingPlanChanges ? 'Salvando...' : 'Salvar Alterações do Plano'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
       {/* MODAL 1: EDIT SUBSCRIPTION / PLAN DETAILS                                 */}
       {/* ========================================================================= */}
       {editingUserSubscription && (
@@ -1435,9 +1710,9 @@ export const AdminPanel: React.FC = () => {
                   className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-white"
                 >
                   <option value="free_trial">Teste Grátis (Trial)</option>
-                  <option value="pro_mensal">Profissional Mensal (R$ 97/mês)</option>
-                  <option value="equipe_mensal">Plano Equipe (R$ 289/mês)</option>
-                  <option value="florestal_corporativo">Florestal & Usinas (R$ 690/mês)</option>
+                  <option value="pro_mensal">Profissional Mensal</option>
+                  <option value="equipe_mensal">Plano Equipe</option>
+                  <option value="florestal_corporativo">Florestal & Usinas</option>
                   <option value="personalizado">Personalizado</option>
                 </select>
               </div>

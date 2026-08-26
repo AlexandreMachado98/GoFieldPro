@@ -6,30 +6,90 @@ import {
   RefreshCw,
   LogOut,
   CheckCircle2,
-  PhoneCall,
   Mail,
-  Building2,
   Sparkles,
   Send,
   Tag,
   Check,
-  Zap,
+  Percent,
+  Gift,
+  ArrowRight,
+  AlertCircle,
 } from 'lucide-react';
-import { doc, getDoc } from 'firebase/firestore';
+import { doc, getDoc, collection, getDocs } from 'firebase/firestore';
 import { db } from '../../lib/firebase';
-import { SystemBillingConfig } from '../../types';
+import { SystemBillingConfig, PlanItemConfig, PromoCoupon } from '../../types';
+
+const FALLBACK_PLANS: PlanItemConfig[] = [
+  {
+    id: 'pro',
+    name: 'Plano Profissional',
+    tag: 'Individual',
+    originalPrice: 149,
+    price: 97,
+    discountBadge: '35% OFF',
+    billingPeriod: '/mês',
+    features: [
+      '1 Operador de Campo',
+      'Mapas PDF e GPS Ilimitados',
+      'Medição de Pilha de Madeira (m³)',
+      'Relatórios Técnicos em PDF',
+    ],
+    highlight: false,
+  },
+  {
+    id: 'equipe',
+    name: 'Plano Equipe',
+    tag: 'Mais Popular',
+    originalPrice: 390,
+    price: 289,
+    discountBadge: 'Economize R$ 101/mês',
+    billingPeriod: '/mês',
+    features: [
+      'Até 5 Técnicos de Campo',
+      'Painel de Gestão da Frota & Odômetro',
+      'Cubagem Florestal e Laudos em Lote',
+      'Backup e Sincronização em Nuvem',
+    ],
+    highlight: true,
+  },
+  {
+    id: 'florestal',
+    name: 'Florestal & Usinas',
+    tag: 'Corporativo',
+    originalPrice: 950,
+    price: 690,
+    discountBadge: '27% OFF',
+    billingPeriod: '/mês',
+    features: [
+      '15 a 30 Operadores simultâneos',
+      'Logotipo da Empresa nos Laudos PDF',
+      'Contratos e Faturamento PJ',
+      'Treinamento e Suporte VIP Prioritário',
+    ],
+    highlight: false,
+  },
+];
 
 export const PendingApprovalScreen: React.FC = () => {
   const { profile, logout, refreshProfile } = useAuth();
   const [checking, setChecking] = useState(false);
-  const [selectedPlan, setSelectedPlan] = useState<'pro' | 'equipe' | 'florestal'>('equipe');
+  const [plans, setPlans] = useState<PlanItemConfig[]>(FALLBACK_PLANS);
+  const [selectedPlanId, setSelectedPlanId] = useState<string>('equipe');
   const [supportPhone, setSupportPhone] = useState('5511999999999');
+
+  // Coupon State
+  const [couponInput, setCouponInput] = useState('');
+  const [appliedCoupon, setAppliedCoupon] = useState<PromoCoupon | null>(null);
+  const [couponLoading, setCouponLoading] = useState(false);
+  const [couponError, setCouponError] = useState('');
+  const [couponSuccess, setCouponSuccess] = useState('');
 
   useEffect(() => {
     refreshProfile();
 
-    // Fetch support phone number from Firestore if configured
-    const loadBillingConfig = async () => {
+    // Fetch dynamic plans & support phone from Firestore
+    const loadBillingAndPlans = async () => {
       try {
         const configDoc = await getDoc(doc(db, 'system_config', 'billing'));
         if (configDoc.exists()) {
@@ -37,13 +97,16 @@ export const PendingApprovalScreen: React.FC = () => {
           if (data.whatsappSupportNumber) {
             setSupportPhone(data.whatsappSupportNumber.replace(/\D/g, ''));
           }
+          if (data.plans && Array.isArray(data.plans) && data.plans.length > 0) {
+            setPlans(data.plans);
+          }
         }
       } catch (e) {
-        console.warn('Could not fetch billing config', e);
+        console.warn('Could not fetch billing config, using fallback plans', e);
       }
     };
 
-    loadBillingConfig();
+    loadBillingAndPlans();
   }, []);
 
   const handleCheckStatus = async () => {
@@ -54,19 +117,76 @@ export const PendingApprovalScreen: React.FC = () => {
     }, 800);
   };
 
-  const handleOpenWhatsApp = () => {
-    const planName =
-      selectedPlan === 'pro'
-        ? 'Plano Profissional (R$ 97/mês)'
-        : selectedPlan === 'florestal'
-        ? 'Plano Florestal & Usinas (R$ 690/mês)'
-        : 'Plano Equipe (R$ 289/mês)';
+  // Validate and Apply Promo Coupon
+  const handleApplyCoupon = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setCouponError('');
+    setCouponSuccess('');
 
+    const cleanCode = couponInput.trim().toUpperCase();
+    if (!cleanCode) return;
+
+    setCouponLoading(true);
+    try {
+      const couponDoc = await getDoc(doc(db, 'coupons', `coupon_${cleanCode}`));
+      if (couponDoc.exists()) {
+        const couponData = couponDoc.data() as PromoCoupon;
+        if (couponData.active) {
+          setAppliedCoupon(couponData);
+          setCouponSuccess(`Cupom ${couponData.code} aplicado com sucesso! (${couponData.discountPercent}% de desconto extra)`);
+        } else {
+          setCouponError('Este cupom expirou ou não está mais ativo.');
+        }
+      } else {
+        // Search by code case-insensitive
+        const allCouponsSnap = await getDocs(collection(db, 'coupons'));
+        const matched = allCouponsSnap.docs
+          .map((d) => d.data() as PromoCoupon)
+          .find((c) => c.code.toUpperCase() === cleanCode && c.active);
+
+        if (matched) {
+          setAppliedCoupon(matched);
+          setCouponSuccess(`Cupom ${matched.code} aplicado! (${matched.discountPercent}% de desconto extra)`);
+        } else {
+          setCouponError('Cupom inválido ou não encontrado.');
+        }
+      }
+    } catch (err) {
+      console.error('Error applying coupon:', err);
+      setCouponError('Não foi possível validar o cupom.');
+    } finally {
+      setCouponLoading(false);
+    }
+  };
+
+  const handleRemoveCoupon = () => {
+    setAppliedCoupon(null);
+    setCouponInput('');
+    setCouponSuccess('');
+    setCouponError('');
+  };
+
+  const selectedPlan = plans.find((p) => p.id === selectedPlanId) || plans[0] || FALLBACK_PLANS[0];
+
+  // Calculate final discounted price if coupon applied
+  const basePrice = selectedPlan.price;
+  let finalPrice = basePrice;
+  if (appliedCoupon && appliedCoupon.discountPercent) {
+    finalPrice = basePrice * (1 - appliedCoupon.discountPercent / 100);
+  }
+
+  const handleOpenWhatsApp = () => {
     const userName = profile?.name || 'Cliente';
     const userEmail = profile?.email || '';
     const userCompany = profile?.company || 'Não informada';
 
-    const message = `Olá! Realizei meu cadastro no GoField Pro com o e-mail: ${userEmail} (Nome: ${userName}, Empresa: ${userCompany}). Gostaria de liberar o meu acesso e ativar o ${planName} / iniciar meu teste grátis.`;
+    let message = `Olá! Realizei meu cadastro no GoField Pro com o e-mail: ${userEmail} (Nome: ${userName}, Empresa: ${userCompany}).\n\nGostaria de liberar o meu acesso e ativar o ${selectedPlan.name} (Valor: R$ ${finalPrice.toFixed(2)}/mês).`;
+
+    if (appliedCoupon) {
+      message += `\n🏷️ Cupom de desconto aplicado: ${appliedCoupon.code} (${appliedCoupon.discountPercent}% OFF extra).`;
+    }
+
+    message += '\n\nAguardo as orientações para início imediato!';
 
     const cleanPhone = supportPhone.startsWith('55') ? supportPhone : `55${supportPhone}`;
     const whatsappUrl = `https://wa.me/${cleanPhone}?text=${encodeURIComponent(message)}`;
@@ -83,7 +203,7 @@ export const PendingApprovalScreen: React.FC = () => {
         <div className="absolute bottom-[10%] right-[10%] w-[40%] h-[40%] rounded-full bg-emerald-500/10 blur-[130px]" />
       </div>
 
-      <div className="w-full max-w-xl z-10 space-y-4">
+      <div className="w-full max-w-2xl z-10 space-y-4">
         {/* Main Card */}
         <div className="bg-slate-900/95 backdrop-blur-xl border border-slate-800 rounded-3xl p-4 sm:p-7 shadow-2xl space-y-4 sm:space-y-5">
           {/* Header */}
@@ -102,10 +222,10 @@ export const PendingApprovalScreen: React.FC = () => {
               {isBlocked ? 'Acesso Suspenso' : 'Solicitação em Análise'}
             </h1>
 
-            <p className="text-xs sm:text-sm text-slate-300 max-w-md mx-auto leading-relaxed">
+            <p className="text-xs sm:text-sm text-slate-300 max-w-lg mx-auto leading-relaxed">
               {isBlocked
-                ? 'Seu acesso ao sistema está suspenso. Fale com a nossa equipe comercial para renovação.'
-                : 'Seu cadastro foi recebido com sucesso! Escolha o seu plano abaixo e solicite a liberação imediata via WhatsApp.'}
+                ? 'Seu acesso ao sistema está suspenso. Fale com a nossa equipe comercial para reativar seu plano.'
+                : 'Seu cadastro foi registrado com sucesso! Escolha o seu plano abaixo com valores promocionais e solicite a liberação imediata via WhatsApp.'}
             </p>
           </div>
 
@@ -141,10 +261,10 @@ export const PendingApprovalScreen: React.FC = () => {
           </div>
 
           {/* ========================================================================= */}
-          {/* VITRINE DE PLANOS & PREÇOS                                                */}
+          {/* VITRINE DE PLANOS COM PREÇO CHEIO, DESCONTO & SERVIÇOS                    */}
           {/* ========================================================================= */}
           {!isBlocked && (
-            <div className="space-y-3 pt-1">
+            <div className="space-y-4 pt-1">
               <div className="flex items-center justify-between">
                 <h3 className="text-xs font-black uppercase tracking-wider text-slate-300 flex items-center gap-1.5">
                   <Tag className="w-3.5 h-3.5 text-sky-400" />
@@ -152,121 +272,192 @@ export const PendingApprovalScreen: React.FC = () => {
                 </h3>
                 <span className="text-[10px] text-emerald-400 font-bold flex items-center gap-1">
                   <Sparkles className="w-3 h-3" />
-                  Teste Grátis Disponível
+                  Valores com Desconto
                 </span>
               </div>
 
               {/* Plans Grid */}
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
-                {/* Plan 1: Profissional */}
-                <button
-                  type="button"
-                  onClick={() => setSelectedPlan('pro')}
-                  className={`p-3 rounded-2xl border text-left transition-all relative flex flex-col justify-between ${
-                    selectedPlan === 'pro'
-                      ? 'bg-sky-950/50 border-sky-500 ring-1 ring-sky-500/50 shadow-lg'
-                      : 'bg-slate-950 border-slate-800 hover:border-slate-700 opacity-80'
-                  }`}
-                >
-                  <div>
-                    <div className="text-[9px] font-black uppercase px-2 py-0.2 rounded bg-sky-500/20 text-sky-300 border border-sky-500/30 inline-block mb-1">
-                      Individual
-                    </div>
-                    <div className="font-extrabold text-white text-xs">Profissional</div>
-                    <div className="text-base font-black text-sky-400 font-mono mt-1">
-                      R$ 97<span className="text-[10px] font-normal text-slate-400">/mês</span>
-                    </div>
-                    <ul className="mt-2 space-y-1 text-[10px] text-slate-300">
-                      <li>• 1 Usuário / Aparelho</li>
-                      <li>• Mapas PDF Ilimitados</li>
-                      <li>• Medição de Madeira</li>
-                    </ul>
-                  </div>
-                  {selectedPlan === 'pro' && (
-                    <div className="mt-2 text-[10px] font-bold text-sky-400 flex items-center gap-1">
-                      <Check className="w-3 h-3" /> Selecionado
-                    </div>
-                  )}
-                </button>
+                {plans.map((plan) => {
+                  const isSelected = plan.id === selectedPlanId;
+                  const discountAmount = plan.originalPrice > plan.price ? plan.originalPrice - plan.price : 0;
 
-                {/* Plan 2: Equipe (Highlight) */}
-                <button
-                  type="button"
-                  onClick={() => setSelectedPlan('equipe')}
-                  className={`p-3 rounded-2xl border text-left transition-all relative flex flex-col justify-between ${
-                    selectedPlan === 'equipe'
-                      ? 'bg-emerald-950/60 border-emerald-500 ring-2 ring-emerald-500/60 shadow-xl'
-                      : 'bg-slate-950 border-slate-800 hover:border-slate-700 opacity-80'
-                  }`}
-                >
-                  <div className="absolute -top-2 right-2 bg-emerald-500 text-slate-950 text-[8px] font-black px-2 py-0.5 rounded-full uppercase tracking-wider">
-                    Mais Escolhido
-                  </div>
-                  <div>
-                    <div className="text-[9px] font-black uppercase px-2 py-0.2 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 inline-block mb-1">
-                      Equipe
-                    </div>
-                    <div className="font-extrabold text-white text-xs">Plano Equipe</div>
-                    <div className="text-base font-black text-emerald-400 font-mono mt-1">
-                      R$ 289<span className="text-[10px] font-normal text-slate-400">/mês</span>
-                    </div>
-                    <ul className="mt-2 space-y-1 text-[10px] text-slate-300">
-                      <li>• Até 5 Técnicos de Campo</li>
-                      <li>• Diário de Quilometragem</li>
-                      <li>• Laudos em Lote + Nuvem</li>
-                    </ul>
-                  </div>
-                  {selectedPlan === 'equipe' && (
-                    <div className="mt-2 text-[10px] font-bold text-emerald-400 flex items-center gap-1">
-                      <Check className="w-3 h-3" /> Selecionado
-                    </div>
-                  )}
-                </button>
+                  return (
+                    <button
+                      key={plan.id}
+                      type="button"
+                      onClick={() => setSelectedPlanId(plan.id)}
+                      className={`p-3.5 rounded-2xl border text-left transition-all relative flex flex-col justify-between ${
+                        isSelected
+                          ? plan.highlight
+                            ? 'bg-emerald-950/60 border-emerald-500 ring-2 ring-emerald-500/60 shadow-xl'
+                            : 'bg-sky-950/60 border-sky-500 ring-2 ring-sky-500/60 shadow-xl'
+                          : 'bg-slate-950 border-slate-800 hover:border-slate-700 opacity-80'
+                      }`}
+                    >
+                      {plan.highlight && (
+                        <div className="absolute -top-2.5 right-3 bg-emerald-500 text-slate-950 text-[8px] font-black px-2 py-0.5 rounded-full uppercase tracking-wider shadow">
+                          Mais Escolhido
+                        </div>
+                      )}
 
-                {/* Plan 3: Florestal & Usinas */}
-                <button
-                  type="button"
-                  onClick={() => setSelectedPlan('florestal')}
-                  className={`p-3 rounded-2xl border text-left transition-all relative flex flex-col justify-between ${
-                    selectedPlan === 'florestal'
-                      ? 'bg-indigo-950/50 border-indigo-500 ring-1 ring-indigo-500/50 shadow-lg'
-                      : 'bg-slate-950 border-slate-800 hover:border-slate-700 opacity-80'
-                  }`}
-                >
-                  <div>
-                    <div className="text-[9px] font-black uppercase px-2 py-0.2 rounded bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 inline-block mb-1">
-                      Corporativo
-                    </div>
-                    <div className="font-extrabold text-white text-xs">Florestal & Usinas</div>
-                    <div className="text-base font-black text-indigo-400 font-mono mt-1">
-                      R$ 690<span className="text-[10px] font-normal text-slate-400">/mês</span>
-                    </div>
-                    <ul className="mt-2 space-y-1 text-[10px] text-slate-300">
-                      <li>• 15 a 30 Operadores</li>
-                      <li>• Logo da sua Empresa</li>
-                      <li>• Suporte VIP Prioritário</li>
-                    </ul>
-                  </div>
-                  {selectedPlan === 'florestal' && (
-                    <div className="mt-2 text-[10px] font-bold text-indigo-400 flex items-center gap-1">
-                      <Check className="w-3 h-3" /> Selecionado
-                    </div>
-                  )}
-                </button>
+                      <div>
+                        {/* Tag & Discount Badge */}
+                        <div className="flex items-center justify-between gap-1 flex-wrap mb-1.5">
+                          <span className="text-[9px] font-black uppercase px-2 py-0.2 rounded bg-slate-800 text-slate-300 border border-slate-700">
+                            {plan.tag}
+                          </span>
+                          {plan.discountBadge && (
+                            <span className="text-[8px] font-black uppercase px-1.5 py-0.2 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">
+                              {plan.discountBadge}
+                            </span>
+                          )}
+                        </div>
+
+                        <div className="font-extrabold text-white text-xs sm:text-sm">{plan.name}</div>
+
+                        {/* Pricing with Original Crossed-Out Price and Discounted Price */}
+                        <div className="mt-2 bg-slate-900/80 p-2 rounded-xl border border-slate-800">
+                          {plan.originalPrice > plan.price && (
+                            <div className="flex items-center gap-1.5 text-[10px] text-slate-400">
+                              <span className="text-slate-500">De:</span>
+                              <span className="line-through font-mono font-bold text-slate-500">
+                                R$ {plan.originalPrice.toFixed(2)}
+                              </span>
+                            </div>
+                          )}
+                          <div className="flex items-baseline gap-1">
+                            <span className="text-[10px] font-bold text-slate-300">Por:</span>
+                            <span className="text-base sm:text-lg font-black text-emerald-400 font-mono">
+                              R$ {plan.price.toFixed(2)}
+                            </span>
+                            <span className="text-[10px] text-slate-400">{plan.billingPeriod}</span>
+                          </div>
+                        </div>
+
+                        {/* Features List */}
+                        <ul className="mt-2.5 space-y-1 text-[10px] text-slate-300">
+                          {plan.features.map((feat, idx) => (
+                            <li key={idx} className="flex items-start gap-1 leading-tight">
+                              <CheckCircle2 className="w-3 h-3 text-emerald-400 shrink-0 mt-0.5" />
+                              <span>{feat}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+
+                      {/* Selection Indicator */}
+                      <div className="mt-3 pt-2 border-t border-slate-800/80">
+                        {isSelected ? (
+                          <div className="text-[10px] font-bold text-emerald-400 flex items-center gap-1">
+                            <Check className="w-3 h-3" /> Plano Selecionado
+                          </div>
+                        ) : (
+                          <div className="text-[10px] text-slate-500">Toque para selecionar</div>
+                        )}
+                      </div>
+                    </button>
+                  );
+                })}
               </div>
 
-              {/* WhatsApp Activation Button */}
-              <div className="pt-2">
+              {/* ========================================================================= */}
+              {/* CUPOM DE DESCONTO PERSONALIZADO                                           */}
+              {/* ========================================================================= */}
+              <div className="bg-slate-950 border border-slate-800 rounded-2xl p-3 sm:p-4 space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-slate-300 flex items-center gap-1.5">
+                    <Gift className="w-4 h-4 text-amber-400" />
+                    Possui um Cupom de Desconto Personalizado?
+                  </span>
+                  {appliedCoupon && (
+                    <button
+                      type="button"
+                      onClick={handleRemoveCoupon}
+                      className="text-[10px] text-rose-400 hover:underline font-bold"
+                    >
+                      Remover Cupom
+                    </button>
+                  )}
+                </div>
+
+                {appliedCoupon ? (
+                  <div className="bg-emerald-950/40 border border-emerald-500/50 p-2.5 rounded-xl flex items-center justify-between text-xs text-emerald-300">
+                    <div className="flex items-center gap-2">
+                      <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                      <div>
+                        <span className="font-bold">Cupom {appliedCoupon.code} Ativo!</span>
+                        <span className="text-[11px] text-slate-300 block">
+                          Desconto extra de {appliedCoupon.discountPercent}% aplicado sobre o valor promocional.
+                        </span>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <span className="text-[10px] text-slate-400 block line-through">
+                        R$ {basePrice.toFixed(2)}
+                      </span>
+                      <span className="font-black text-emerald-400 font-mono text-sm">
+                        R$ {finalPrice.toFixed(2)}/mês
+                      </span>
+                    </div>
+                  </div>
+                ) : (
+                  <form onSubmit={handleApplyCoupon} className="flex gap-2">
+                    <input
+                      type="text"
+                      value={couponInput}
+                      onChange={(e) => setCouponInput(e.target.value.toUpperCase())}
+                      placeholder="Digite seu cupom (Ex: REGIAO20)"
+                      className="flex-1 bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white font-mono uppercase focus:outline-none focus:border-amber-500"
+                    />
+                    <button
+                      type="submit"
+                      disabled={couponLoading || !couponInput.trim()}
+                      className="bg-amber-600 hover:bg-amber-500 disabled:opacity-50 text-slate-950 font-black px-4 py-2 rounded-xl text-xs flex items-center gap-1.5 shadow transition-all active:scale-95 shrink-0"
+                    >
+                      {couponLoading ? (
+                        <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                      ) : (
+                        <ArrowRight className="w-3.5 h-3.5" />
+                      )}
+                      <span>Aplicar</span>
+                    </button>
+                  </form>
+                )}
+
+                {couponError && (
+                  <div className="text-[11px] text-rose-400 flex items-center gap-1.5">
+                    <AlertCircle className="w-3 h-3" />
+                    <span>{couponError}</span>
+                  </div>
+                )}
+              </div>
+
+              {/* Final Summary & WhatsApp Activation Button */}
+              <div className="pt-1 space-y-2">
+                <div className="bg-slate-950 p-3 rounded-2xl border border-slate-800 flex items-center justify-between text-xs">
+                  <div>
+                    <span className="text-[10px] uppercase font-bold text-slate-400 block">Total do Plano Escolhido:</span>
+                    <span className="font-extrabold text-white text-sm">{selectedPlan.name}</span>
+                  </div>
+                  <div className="text-right">
+                    <span className="text-xl sm:text-2xl font-black text-emerald-400 font-mono">
+                      R$ {finalPrice.toFixed(2)}
+                    </span>
+                    <span className="text-[11px] text-slate-400">/mês</span>
+                  </div>
+                </div>
+
                 <button
                   type="button"
                   onClick={handleOpenWhatsApp}
                   className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold py-3 px-4 rounded-2xl shadow-xl shadow-emerald-950/50 transition-all flex items-center justify-center gap-2 text-xs sm:text-sm active:scale-98"
                 >
                   <Send className="w-4 h-4" />
-                  <span>Liberar no WhatsApp / Iniciar Teste Grátis</span>
+                  <span>Liberar Acesso no WhatsApp com Desconto</span>
                 </button>
-                <p className="text-[10px] text-center text-slate-400 mt-1.5">
-                  Fale com a nossa equipe para ativação imediata e orientações de uso.
+                <p className="text-[10px] text-center text-slate-400">
+                  Fale com nossa equipe para liberação imediata da sua conta e orientações de uso.
                 </p>
               </div>
             </div>

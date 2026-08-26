@@ -43,6 +43,18 @@ export interface PromoCoupon {
   notes?: string;
 }
 
+export interface PlanItemConfig {
+  id: string;
+  name: string;
+  tag: string;
+  originalPrice: number; // Preço inteiro cheio (riscado)
+  price: number; // Preço promocional com desconto
+  discountBadge?: string; // Ex: '35% OFF' ou 'Preço Promocional'
+  billingPeriod: string; // '/mês'
+  features: string[];
+  highlight?: boolean;
+}
+
 export interface SystemBillingConfig {
   pixKey: string;
   pixKeyType: 'cnpj' | 'email' | 'phone' | 'random';
@@ -51,6 +63,7 @@ export interface SystemBillingConfig {
   defaultTrialDays: number;
   whatsappSupportNumber: string;
   customMessageTemplate: string;
+  plans?: PlanItemConfig[];
 }
 
 export type Language = 'pt' | 'en' | 'es';
