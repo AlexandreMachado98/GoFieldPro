@@ -37,7 +37,7 @@ export const PdfExportModal: React.FC<PdfExportModalProps> = ({
   onClose,
 }) => {
   const { notifySuccess, notifyInfo, notifyError } = useApp();
-  const [activeFormat, setActiveFormat] = useState<'pdf' | 'kml' | 'geojson' | 'gpx'>('pdf');
+  const [activeFormat, setActiveFormat] = useState<'pdf' | 'kml' | 'kmz' | 'geojson' | 'gpx'>('kml');
   const [isGenerating, setIsGenerating] = useState(false);
   const [generatingLabel, setGeneratingLabel] = useState('');
 

@@ -204,23 +204,36 @@ export function parseOdometerKm(val: string | number | undefined | null): number
   if (val === undefined || val === null) return 0;
   if (typeof val === 'number') {
     if (isNaN(val) || val <= 0) return 0;
+    // Auto-heal old database records where "97.912" was saved as float 97.912
+    if (!Number.isInteger(val) && val < 500) {
+      return Math.round(val * 1000);
+    }
     return Math.round(val);
   }
   
   const clean = String(val).trim();
   if (!clean) return 0;
 
-  let normalized = clean;
-  // If string contains dots (e.g. 123.450 or 5.200)
+  let normalized = clean.replace(/\s+/g, '');
+  // If string contains dots (e.g. 97.912 or 123.450)
   if (normalized.includes('.')) {
     normalized = normalized.replace(/\./g, '');
   }
   if (normalized.includes(',')) {
-    normalized = normalized.replace(/,/g, '.');
+    const parts = normalized.split(',');
+    if (parts.length === 2 && parts[1].length === 3) {
+      normalized = parts[0] + parts[1];
+    } else {
+      normalized = normalized.replace(/,/g, '.');
+    }
   }
 
   const num = parseFloat(normalized);
-  return isNaN(num) || num <= 0 ? 0 : Math.round(num);
+  if (isNaN(num) || num <= 0) return 0;
+  if (!Number.isInteger(num) && num < 500) {
+    return Math.round(num * 1000);
+  }
+  return Math.round(num);
 }
 
 /**

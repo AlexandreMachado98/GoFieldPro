@@ -217,13 +217,13 @@ export const FieldRoundsPanel: React.FC = () => {
       return;
     }
 
-    const initKm = parseFloat(formData.initialKm);
+    const initKm = parseOdometerKm(formData.initialKm);
     if (isNaN(initKm) || initKm < 0) {
       notifyWarning('KM Inválido', 'Por favor, informe um KM Inicial válido.');
       return;
     }
 
-    let finKm = parseFloat(formData.finalKm);
+    let finKm = parseOdometerKm(formData.finalKm);
     if (isNaN(finKm)) {
       finKm = 0;
     }
@@ -319,8 +319,8 @@ export const FieldRoundsPanel: React.FC = () => {
 
   // Real-time calculation in modal
   const calcModalTotalKm = () => {
-    const init = parseFloat(formData.initialKm);
-    const fin = parseFloat(formData.finalKm);
+    const init = parseOdometerKm(formData.initialKm);
+    const fin = parseOdometerKm(formData.finalKm);
     if (!isNaN(init) && !isNaN(fin) && fin >= init) {
       return fin - init;
     }
@@ -1052,9 +1052,9 @@ export const FieldRoundsPanel: React.FC = () => {
                   onChange={(e) => setQuickFinalKm(e.target.value)}
                   className="w-full px-3 py-2 bg-slate-950 border border-slate-700 rounded-xl text-sm font-mono text-white focus:outline-none focus:border-emerald-500"
                 />
-                {parseFloat(quickFinalKm) > finishingRound.initialKm && (
+                {parseOdometerKm(quickFinalKm) > finishingRound.initialKm && (
                   <p className="text-xs text-emerald-400 font-semibold mt-1">
-                    Total: {parseFloat(quickFinalKm) - finishingRound.initialKm} KM rodados nesta viagem.
+                    Total: {parseOdometerKm(quickFinalKm) - finishingRound.initialKm} KM rodados nesta viagem.
                   </p>
                 )}
               </div>
