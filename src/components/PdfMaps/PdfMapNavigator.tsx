@@ -833,7 +833,7 @@ export const PdfMapNavigator: React.FC = () => {
 
       if (currentDataUrl) {
         try {
-          imageOverlayRef.current = L.imageOverlay(currentDataUrl, bounds).addTo(map);
+          imageOverlayRef.current = L.imageOverlay(currentDataUrl, bounds, { pane: 'pdfImagePane' }).addTo(map);
           map.fitBounds(bounds, { padding: [15, 15] });
           map.setMaxBounds(bounds.pad(1.5));
           
@@ -868,7 +868,11 @@ export const PdfMapNavigator: React.FC = () => {
     
     try {
       markersLayerRef.current.clearLayers();
-      const markers = Array.isArray(activeDoc.markers) ? activeDoc.markers : [];
+      const hMax = (activeDoc.height && !isNaN(activeDoc.height) ? activeDoc.height : 1200) + 100;
+      const wMax = (activeDoc.width && !isNaN(activeDoc.width) ? activeDoc.width : 1600) + 100;
+      const markers = (Array.isArray(activeDoc.markers) ? activeDoc.markers : []).filter(
+        m => typeof m.x === 'number' && typeof m.y === 'number' && !isNaN(m.x) && !isNaN(m.y) && m.x >= -100 && m.x <= hMax && m.y >= -100 && m.y <= wMax
+      );
 
       markers.forEach((marker) => {
         if (!marker || typeof marker.x !== 'number' || typeof marker.y !== 'number' || isNaN(marker.x) || isNaN(marker.y)) {
