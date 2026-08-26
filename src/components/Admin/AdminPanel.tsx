@@ -361,14 +361,17 @@ export const AdminPanel: React.FC = () => {
         .map((f) => f.replace(/^[-*•]\s*/, '').trim())
         .filter((f) => f.length > 0);
 
+      const cleanOrigPrice = Number(planModalOriginalPrice) || 0;
+      const cleanPrice = Number(planModalPrice) || 0;
+
       const updatedPlans = plans.map((p) => {
         if (p.id === editingPlan.id) {
           return {
             ...p,
             name: planModalName.trim() || p.name,
             tag: planModalTag.trim() || p.tag,
-            originalPrice: Number(planModalOriginalPrice) || 0,
-            price: Number(planModalPrice) || 0,
+            originalPrice: cleanOrigPrice,
+            price: cleanPrice,
             discountBadge: planModalBadge.trim(),
             features: updatedFeatures.length > 0 ? updatedFeatures : p.features,
           };
@@ -379,23 +382,23 @@ export const AdminPanel: React.FC = () => {
       // 1. Update State immediately
       setPlans(updatedPlans);
 
-      // 2. Persist to localStorage
+      // 2. Persist to localStorage immediately
       localStorage.setItem('gofield_custom_plans', JSON.stringify(updatedPlans));
       const updatedConfig = { ...billingConfig, plans: updatedPlans };
       localStorage.setItem('gofield_billing_config', JSON.stringify(updatedConfig));
 
-      // 3. Persist to Firestore
+      // 3. Persist to Firestore asynchronously
       try {
         await setDoc(doc(db, 'system_config', 'billing'), updatedConfig, { merge: true });
       } catch (cloudErr) {
         console.warn('Saved plans locally (cloud notice):', cloudErr);
       }
 
-      notifySuccess('Plano Atualizado com Sucesso!', `O ${planModalName} agora está com novos valores e serviços.`);
+      notifySuccess('Plano Atualizado com Sucesso!', `O ${planModalName} agora está com o valor de R$ ${cleanPrice.toFixed(2)}/mês.`);
       setEditingPlan(null);
     } catch (err: any) {
       console.error('Error saving plan changes:', err);
-      notifyError('Erro ao Salvar Plano', 'Ocorreu um erro ao salvar as alterações do plano.');
+      notifyError('Erro ao Salvar Plano', err?.message || 'Ocorreu um erro ao salvar as alterações do plano.');
     } finally {
       setSavingPlanChanges(false);
     }
@@ -526,21 +529,36 @@ export const AdminPanel: React.FC = () => {
 
     setSavingSubChanges(true);
     try {
-      const userRef = doc(db, 'users', editingUserSubscription.uid);
-      await updateDoc(userRef, {
+      const subVal = Number(subModalValue) || 0;
+      const updateData = {
         subscriptionPlan: subModalPlan,
         subscriptionStatus: subModalStatus,
-        subscriptionValue: Number(subModalValue) || 0,
+        subscriptionValue: subVal,
         subscriptionExpiresAt: subModalExpiresAt,
         billingNotes: subModalNotes.trim(),
-        status: subModalStatus === 'suspended' ? 'blocked' : 'active',
-      });
+        status: subModalStatus === 'suspended' ? ('blocked' as UserStatus) : ('active' as UserStatus),
+      };
 
-      notifySuccess('Assinatura Atualizada!', `Os dados comerciais de ${editingUserSubscription.name} foram salvos.`);
+      // 1. Update local users state immediately
+      setUsers((prev) =>
+        prev.map((u) =>
+          u.uid === editingUserSubscription.uid ? { ...u, ...updateData } : u
+        )
+      );
+
+      // 2. Persist to Firestore with setDoc merge
+      try {
+        const userRef = doc(db, 'users', editingUserSubscription.uid);
+        await setDoc(userRef, updateData, { merge: true });
+      } catch (cloudErr) {
+        console.warn('Saved subscription locally (cloud notice):', cloudErr);
+      }
+
+      notifySuccess('Assinatura Atualizada!', `Os dados comerciais de ${editingUserSubscription.name} foram salvos com sucesso.`);
       setEditingUserSubscription(null);
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error saving subscription changes:', err);
-      notifyError('Erro ao Salvar', 'Não foi possível salvar as alterações da assinatura.');
+      notifyError('Erro ao Salvar', err?.message || 'Não foi possível salvar as alterações da assinatura.');
     } finally {
       setSavingSubChanges(false);
     }

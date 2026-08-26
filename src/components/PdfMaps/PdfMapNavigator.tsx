@@ -2629,7 +2629,7 @@ export const PdfMapNavigator: React.FC = () => {
         type="file"
         ref={fileInputRef}
         onChange={handleFileUpload}
-        accept="application/pdf,image/png,image/jpeg,image/webp"
+        accept=".pdf,application/pdf"
         className="hidden"
       />
       {/* File input for gallery photo upload */}
