@@ -833,7 +833,7 @@ export const PdfMapNavigator: React.FC = () => {
 
       if (currentDataUrl) {
         try {
-          imageOverlayRef.current = L.imageOverlay(currentDataUrl, bounds, { pane: 'pdfImagePane' }).addTo(map);
+          imageOverlayRef.current = L.imageOverlay(currentDataUrl, bounds, { pane: 'tilePane' }).addTo(map);
           map.fitBounds(bounds, { padding: [15, 15] });
           map.setMaxBounds(bounds.pad(1.5));
           
