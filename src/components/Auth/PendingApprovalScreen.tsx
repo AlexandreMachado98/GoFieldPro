@@ -15,8 +15,13 @@ import {
   Gift,
   ArrowRight,
   AlertCircle,
+  Phone,
+  Building2,
+  UserCheck,
+  Save,
+  MessageSquare,
 } from 'lucide-react';
-import { doc, getDoc, collection, getDocs } from 'firebase/firestore';
+import { doc, getDoc, updateDoc, collection, getDocs } from 'firebase/firestore';
 import { db } from '../../lib/firebase';
 import { SystemBillingConfig, PlanItemConfig, PromoCoupon } from '../../types';
 
@@ -85,6 +90,13 @@ export const PendingApprovalScreen: React.FC = () => {
   const [selectedPlanId, setSelectedPlanId] = useState<string>('equipe');
   const [supportPhone, setSupportPhone] = useState('5511999999999');
 
+  // WhatsApp & Company Missing Capture State (for Google Login / Incomplete profiles)
+  const [inputPhone, setInputPhone] = useState(profile?.phone || '');
+  const [inputCompany, setInputCompany] = useState(profile?.company || '');
+  const [savingContact, setSavingContact] = useState(false);
+  const [contactError, setContactError] = useState('');
+  const [contactSuccess, setContactSuccess] = useState(false);
+
   // Coupon State
   const [couponInput, setCouponInput] = useState('');
   const [appliedCoupon, setAppliedCoupon] = useState<PromoCoupon | null>(null);
@@ -95,7 +107,13 @@ export const PendingApprovalScreen: React.FC = () => {
   useEffect(() => {
     refreshProfile();
 
-    // Fetch dynamic plans & support phone from Firestore
+    if (profile?.phone) {
+      setInputPhone(profile.phone);
+    }
+    if (profile?.company) {
+      setInputCompany(profile.company);
+    }
+
     const loadBillingAndPlans = async () => {
       try {
         const configDoc = await getDoc(doc(db, 'system_config', 'billing'));
@@ -115,7 +133,7 @@ export const PendingApprovalScreen: React.FC = () => {
     };
 
     loadBillingAndPlans();
-  }, []);
+  }, [profile?.phone, profile?.company]);
 
   const handleCheckStatus = async () => {
     setChecking(true);
@@ -123,6 +141,51 @@ export const PendingApprovalScreen: React.FC = () => {
     setTimeout(() => {
       setChecking(false);
     }, 800);
+  };
+
+  // Format phone automatically: (XX) XXXXX-XXXX
+  const handlePhoneChange = (val: string) => {
+    const digits = val.replace(/\D/g, '').slice(0, 11);
+    let formatted = digits;
+    if (digits.length > 2) {
+      formatted = `(${digits.slice(0, 2)}) ${digits.slice(2)}`;
+    }
+    if (digits.length > 7) {
+      formatted = `(${digits.slice(0, 2)}) ${digits.slice(2, 7)}-${digits.slice(7)}`;
+    }
+    setInputPhone(formatted);
+  };
+
+  // Save mandatory WhatsApp to Firestore profile
+  const handleSaveContactInfo = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setContactError('');
+
+    const cleanPhone = inputPhone.replace(/\D/g, '');
+    if (cleanPhone.length < 10) {
+      setContactError('Por favor, informe um número de WhatsApp válido com DDD (ex: 11 99999-9999).');
+      return;
+    }
+
+    if (!profile?.uid) return;
+
+    setSavingContact(true);
+    try {
+      const userRef = doc(db, 'users', profile.uid);
+      await updateDoc(userRef, {
+        phone: inputPhone.trim(),
+        company: inputCompany.trim() || 'Não informada',
+      });
+
+      await refreshProfile();
+      setContactSuccess(true);
+      setTimeout(() => setContactSuccess(false), 3000);
+    } catch (err: any) {
+      console.error('Error saving contact phone:', err);
+      setContactError('Não foi possível salvar os dados. Tente novamente.');
+    } finally {
+      setSavingContact(false);
+    }
   };
 
   // Validate and Apply Promo Coupon
@@ -146,7 +209,6 @@ export const PendingApprovalScreen: React.FC = () => {
           setCouponError('Este cupom expirou ou não está mais ativo.');
         }
       } else {
-        // Search by code case-insensitive
         const allCouponsSnap = await getDocs(collection(db, 'coupons'));
         const matched = allCouponsSnap.docs
           .map((d) => d.data() as PromoCoupon)
@@ -176,7 +238,6 @@ export const PendingApprovalScreen: React.FC = () => {
 
   const selectedPlan = plans.find((p) => p.id === selectedPlanId) || plans[0] || FALLBACK_PLANS[0];
 
-  // Calculate final discounted price if coupon applied
   const basePrice = selectedPlan.price;
   let finalPrice = basePrice;
   if (appliedCoupon && appliedCoupon.discountPercent) {
@@ -184,11 +245,21 @@ export const PendingApprovalScreen: React.FC = () => {
   }
 
   const handleOpenWhatsApp = () => {
+    const currentPhone = profile?.phone || inputPhone;
+    const cleanDigits = currentPhone.replace(/\D/g, '');
+
+    // If phone is still missing, focus on mandatory contact form
+    if (cleanDigits.length < 10) {
+      setContactError('⚠️ Por favor, preencha e salve seu WhatsApp abaixo antes de prosseguir.');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      return;
+    }
+
     const userName = profile?.name || 'Cliente';
     const userEmail = profile?.email || '';
-    const userCompany = profile?.company || 'Não informada';
+    const userCompany = profile?.company || inputCompany || 'Não informada';
 
-    let message = `Olá! Realizei meu cadastro no GoField Pro com o e-mail: ${userEmail} (Nome: ${userName}, Empresa: ${userCompany}).\n\nGostaria de liberar o meu acesso e ativar o ${selectedPlan.name} (Valor: R$ ${finalPrice.toFixed(2)}/mês).`;
+    let message = `Olá! Realizei meu cadastro no GoField Pro com o e-mail: ${userEmail} (Nome: ${userName}, WhatsApp: ${currentPhone}, Empresa: ${userCompany}).\n\nGostaria de liberar o meu acesso e ativar o ${selectedPlan.name} (Valor: R$ ${finalPrice.toFixed(2)}/mês).`;
 
     if (appliedCoupon) {
       message += `\n🏷️ Cupom de desconto aplicado: ${appliedCoupon.code} (${appliedCoupon.discountPercent}% OFF extra).`;
@@ -196,12 +267,13 @@ export const PendingApprovalScreen: React.FC = () => {
 
     message += '\n\nAguardo as orientações para início imediato!';
 
-    const cleanPhone = supportPhone.startsWith('55') ? supportPhone : `55${supportPhone}`;
-    const whatsappUrl = `https://wa.me/${cleanPhone}?text=${encodeURIComponent(message)}`;
+    const cleanSupportPhone = supportPhone.startsWith('55') ? supportPhone : `55${supportPhone}`;
+    const whatsappUrl = `https://wa.me/${cleanSupportPhone}?text=${encodeURIComponent(message)}`;
     window.open(whatsappUrl, '_blank');
   };
 
   const isBlocked = profile?.status === 'blocked';
+  const hasValidPhone = Boolean(profile?.phone && profile.phone.replace(/\D/g, '').length >= 10);
 
   return (
     <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center p-3 sm:p-6 relative overflow-x-hidden py-6 sm:py-10 text-slate-100 w-full">
@@ -269,6 +341,115 @@ export const PendingApprovalScreen: React.FC = () => {
           </div>
 
           {/* ========================================================================= */}
+          {/* OBRIGATORIEDADE DE WHATSAPP (SE CADASTRO GOOGLE SEM TELEFONE)              */}
+          {/* ========================================================================= */}
+          {!isBlocked && !hasValidPhone && (
+            <div className="bg-amber-950/40 border border-amber-500/60 rounded-2xl p-3.5 sm:p-4 space-y-2.5 animate-in fade-in duration-300 ring-1 ring-amber-500/40">
+              <div className="flex items-start gap-2.5">
+                <div className="w-8 h-8 rounded-xl bg-amber-500/20 border border-amber-500/40 flex items-center justify-center text-amber-400 shrink-0">
+                  <Phone className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="text-xs sm:text-sm font-extrabold text-amber-300 leading-tight">
+                    WhatsApp Obrigatório para Contato e Liberação
+                  </h3>
+                  <p className="text-[11px] text-slate-300 mt-0.5 leading-relaxed">
+                    Como você acessou com a Conta Google, informe seu WhatsApp para que o Administrador possa registrar sua conta e liberar seu acesso.
+                  </p>
+                </div>
+              </div>
+
+              <form onSubmit={handleSaveContactInfo} className="space-y-2.5 pt-1">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  <div>
+                    <label className="block text-[10px] uppercase font-bold text-slate-300 mb-1">
+                      WhatsApp com DDD *
+                    </label>
+                    <div className="relative">
+                      <div className="absolute inset-y-0 left-0 pl-2.5 flex items-center pointer-events-none">
+                        <MessageSquare className="w-3.5 h-3.5 text-slate-500" />
+                      </div>
+                      <input
+                        type="tel"
+                        required
+                        value={inputPhone}
+                        onChange={(e) => handlePhoneChange(e.target.value)}
+                        placeholder="(00) 00000-0000"
+                        className="w-full bg-slate-950 border border-slate-700 rounded-xl pl-8 pr-3 py-2 text-xs text-white focus:outline-none focus:border-amber-500"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-[10px] uppercase font-bold text-slate-300 mb-1">
+                      Empresa / Órgão
+                    </label>
+                    <div className="relative">
+                      <div className="absolute inset-y-0 left-0 pl-2.5 flex items-center pointer-events-none">
+                        <Building2 className="w-3.5 h-3.5 text-slate-500" />
+                      </div>
+                      <input
+                        type="text"
+                        value={inputCompany}
+                        onChange={(e) => setInputCompany(e.target.value)}
+                        placeholder="Ex: Madeireira / Fazenda"
+                        className="w-full bg-slate-950 border border-slate-700 rounded-xl pl-8 pr-3 py-2 text-xs text-white focus:outline-none focus:border-amber-500"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {contactError && (
+                  <div className="text-[11px] text-red-400 flex items-center gap-1.5 font-semibold">
+                    <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                    <span>{contactError}</span>
+                  </div>
+                )}
+
+                {contactSuccess && (
+                  <div className="text-[11px] text-emerald-400 flex items-center gap-1.5 font-semibold">
+                    <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
+                    <span>WhatsApp salvo com sucesso! Agora você já pode escolher seu plano abaixo.</span>
+                  </div>
+                )}
+
+                <button
+                  type="submit"
+                  disabled={savingContact}
+                  className="w-full bg-amber-600 hover:bg-amber-500 text-slate-950 font-black py-2.5 px-4 rounded-xl text-xs flex items-center justify-center gap-2 shadow-md transition-all active:scale-98"
+                >
+                  <Save className="w-3.5 h-3.5" />
+                  <span>{savingContact ? 'Salvando WhatsApp...' : 'Salvar WhatsApp e Prosseguir'}</span>
+                </button>
+              </form>
+            </div>
+          )}
+
+          {/* User WhatsApp verified badge */}
+          {!isBlocked && hasValidPhone && (
+            <div className="bg-slate-950 p-2.5 rounded-xl border border-slate-800 flex items-center justify-between text-xs">
+              <div className="flex items-center gap-2 text-slate-300">
+                <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                <span>
+                  WhatsApp Cadastrado: <b className="text-white font-mono">{profile?.phone}</b>
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setInputPhone(profile?.phone || '');
+                  setInputCompany(profile?.company || '');
+                  // Temporarily trigger edit
+                  updateDoc(doc(db, 'users', profile!.uid), { phone: '' }).then(() => refreshProfile());
+                }}
+                className="text-[10px] text-sky-400 hover:underline font-semibold"
+              >
+                Alterar
+              </button>
+            </div>
+          )}
+
+          {/* ========================================================================= */}
           {/* VITRINE DE PLANOS COM PREÇO CHEIO, DESCONTO & SERVIÇOS                    */}
           {/* ========================================================================= */}
           {!isBlocked && (
@@ -284,7 +465,7 @@ export const PendingApprovalScreen: React.FC = () => {
                 </span>
               </div>
 
-              {/* Plans Grid (1 Col on mobile, 3 Cols on sm+) */}
+              {/* Plans Grid */}
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
                 {plans.map((plan) => {
                   const isSelected = plan.id === selectedPlanId;
@@ -309,7 +490,6 @@ export const PendingApprovalScreen: React.FC = () => {
                       )}
 
                       <div>
-                        {/* Tag & Discount Badge */}
                         <div className="flex items-center justify-between gap-1 flex-wrap mb-1.5">
                           <span className="text-[8px] sm:text-[9px] font-black uppercase px-2 py-0.2 rounded bg-slate-800 text-slate-300 border border-slate-700">
                             {plan.tag}
@@ -323,7 +503,6 @@ export const PendingApprovalScreen: React.FC = () => {
 
                         <div className="font-extrabold text-white text-xs sm:text-sm">{plan.name}</div>
 
-                        {/* Pricing with Original Crossed-Out Price and Discounted Price */}
                         <div className="mt-1.5 bg-slate-900/80 p-2 rounded-xl border border-slate-800">
                           {plan.originalPrice > plan.price && (
                             <div className="flex items-center gap-1.5 text-[9px] sm:text-[10px] text-slate-400">
@@ -342,7 +521,6 @@ export const PendingApprovalScreen: React.FC = () => {
                           </div>
                         </div>
 
-                        {/* Features List */}
                         <ul className="mt-2 space-y-1 text-[10px] text-slate-300">
                           {plan.features.map((feat, idx) => (
                             <li key={idx} className="flex items-start gap-1 leading-tight">
@@ -353,7 +531,6 @@ export const PendingApprovalScreen: React.FC = () => {
                         </ul>
                       </div>
 
-                      {/* Selection Indicator */}
                       <div className="mt-2.5 pt-2 border-t border-slate-800/80">
                         {isSelected ? (
                           <div className="text-[10px] font-bold text-emerald-400 flex items-center gap-1">
@@ -368,9 +545,7 @@ export const PendingApprovalScreen: React.FC = () => {
                 })}
               </div>
 
-              {/* ========================================================================= */}
-              {/* CUPOM DE DESCONTO PERSONALIZADO                                           */}
-              {/* ========================================================================= */}
+              {/* Cupom de Desconto */}
               <div className="bg-slate-950 border border-slate-800 rounded-2xl p-3 space-y-2">
                 <div className="flex items-center justify-between">
                   <span className="text-[11px] sm:text-xs font-bold text-slate-300 flex items-center gap-1.5">
