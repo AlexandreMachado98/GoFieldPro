@@ -26,7 +26,13 @@ export function parseKMLString(kmlText: string, layerId: string = 'kml-layer', i
   const xmlDoc = parser.parseFromString(kmlText, 'text/xml');
   const features: KMLFeature[] = [];
 
-  const placemarks = xmlDoc.getElementsByTagName('Placemark');
+  const allElements = xmlDoc.getElementsByTagName('*');
+  const placemarks: Element[] = [];
+  for (let i = 0; i < allElements.length; i++) {
+    if (allElements[i].nodeName.includes('Placemark')) {
+      placemarks.push(allElements[i]);
+    }
+  }
 
   for (let i = 0; i < placemarks.length; i++) {
     const pm = placemarks[i];
@@ -57,7 +63,13 @@ export function parseKMLString(kmlText: string, layerId: string = 'kml-layer', i
 
     // A Placemark can have Point, LineString, Polygon, MultiGeometry, gx:Track
     // Let's aggressively search for ANY <coordinates> tag inside this placemark
-    const coordTags = pm.getElementsByTagName('coordinates');
+    const allPmTags = pm.getElementsByTagName('*');
+    const coordTags: Element[] = [];
+    for (let k = 0; k < allPmTags.length; k++) {
+      if (allPmTags[k].nodeName.includes('coordinates')) {
+        coordTags.push(allPmTags[k]);
+      }
+    }
     
     if (coordTags.length > 0) {
       for (let j = 0; j < coordTags.length; j++) {
@@ -91,7 +103,12 @@ export function parseKMLString(kmlText: string, layerId: string = 'kml-layer', i
       }
     } else {
       // Look for gx:coord in gx:Track (Google Earth specific format for tracks)
-      const gxCoords = pm.getElementsByTagName('gx:coord');
+      const gxCoords: Element[] = [];
+      for (let k = 0; k < allPmTags.length; k++) {
+        if (allPmTags[k].nodeName.includes('coord') && !allPmTags[k].nodeName.includes('coordinates')) {
+          gxCoords.push(allPmTags[k]);
+        }
+      }
       if (gxCoords.length > 0) {
         const coords: GeoCoordinate[] = [];
         for (let j = 0; j < gxCoords.length; j++) {

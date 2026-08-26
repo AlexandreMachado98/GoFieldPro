@@ -261,12 +261,17 @@ export const PdfMapNavigator: React.FC = () => {
   const importKmlInputRef = useRef<HTMLInputElement>(null);
 
   // KML/KMZ Import Handler
+  // KML/KMZ Import Handler
   const handleImportKml = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file || !activeDoc) return;
     
+    setIsDrawerOpen(false); // Close drawer to show full screen loading
     setIsProcessing(true);
-    setProcessingProgress('Importando KML/KMZ e projetando no mapa...');
+    setProcessingProgress('Importando e analisando arquivo...');
+    
+    // Give React time to render the loading screen
+    await new Promise(resolve => setTimeout(resolve, 150));
     
     try {
       let features: KMLFeature[] = [];
@@ -277,28 +282,76 @@ export const PdfMapNavigator: React.FC = () => {
         const text = await file.text();
         features = parseKMLString(text);
       }
+
+      setProcessingProgress('Projetando coordenadas KML no mapa PDF...');
+      await new Promise(resolve => setTimeout(resolve, 100));
       
       let newTracks: PdfTrack[] = [...(activeDoc.tracks || [])];
       let newMarkers: PdfMarker[] = [...(activeDoc.markers || [])];
+
+      // AUTO-CALIBRATION: If map isn't calibrated, auto-fit to KML bounding box
+      let isAutoCalibrated = false;
+      const cal = activeDoc.calibration;
+      if ((!cal || !cal.isCalibrated) && features.length > 0) {
+        let minLat = 90, maxLat = -90, minLng = 180, maxLng = -180;
+        let hasValidCoords = false;
+        
+        features.forEach((feat) => {
+          if (feat.type === 'Point' && !Array.isArray(feat.coordinates)) {
+            const coord = feat.coordinates as GeoCoordinate;
+            if (coord.lat !== undefined && coord.lng !== undefined) {
+              minLat = Math.min(minLat, coord.lat); maxLat = Math.max(maxLat, coord.lat);
+              minLng = Math.min(minLng, coord.lng); maxLng = Math.max(maxLng, coord.lng);
+              hasValidCoords = true;
+            }
+          } else if (feat.type === 'LineString' && Array.isArray(feat.coordinates)) {
+            (feat.coordinates as GeoCoordinate[]).forEach(coord => {
+              if (coord.lat !== undefined && coord.lng !== undefined) {
+                minLat = Math.min(minLat, coord.lat); maxLat = Math.max(maxLat, coord.lat);
+                minLng = Math.min(minLng, coord.lng); maxLng = Math.max(maxLng, coord.lng);
+                hasValidCoords = true;
+              }
+            });
+          }
+        });
+
+        if (hasValidCoords) {
+           const h = activeDoc.height || 1200;
+           const w = activeDoc.width || 1600;
+           // Expand bounds by 10%
+           const latPad = Math.abs(maxLat - minLat) * 0.1 || 0.001;
+           const lngPad = Math.abs(maxLng - minLng) * 0.1 || 0.001;
+           
+           activeDoc.calibration = {
+             isCalibrated: true,
+             ref1: { x: h * 0.9, y: w * 0.1, lat: maxLat + latPad, lng: minLng - lngPad },
+             ref2: { x: h * 0.1, y: w * 0.9, lat: minLat - latPad, lng: maxLng + lngPad },
+             scaleMetersPerPixel: 1
+           };
+           isAutoCalibrated = true;
+        }
+      }
       
       features.forEach((feat) => {
         if (feat.type === 'Point' && !Array.isArray(feat.coordinates)) {
           const coord = feat.coordinates as GeoCoordinate;
           if (coord.lat !== undefined && coord.lng !== undefined) {
             const pdfCoord = gpsToPdf(coord.lat, coord.lng, activeDoc);
-            newMarkers.push({
-              id: `kmz-pt-${Date.now()}-${Math.random().toString(36).substr(2,9)}`,
-              x: pdfCoord.x,
-              y: pdfCoord.y,
-              lat: coord.lat,
-              lng: coord.lng,
-              title: feat.name || 'Ponto Importado',
-              notes: feat.description || '',
-              category: 'checkpoint',
-              color: feat.color || '#10b981',
-              createdAt: new Date().toISOString(),
-              photos: feat.photos || []
-            });
+            if (!isNaN(pdfCoord.x) && !isNaN(pdfCoord.y)) {
+              newMarkers.push({
+                id: `kmz-pt-${Date.now()}-${Math.random().toString(36).substr(2,9)}`,
+                x: pdfCoord.x,
+                y: pdfCoord.y,
+                lat: coord.lat,
+                lng: coord.lng,
+                title: feat.name || 'Ponto Importado',
+                notes: feat.description || '',
+                category: 'checkpoint',
+                color: feat.color || '#10b981',
+                createdAt: new Date().toISOString(),
+                photos: feat.photos || []
+              });
+            }
           }
         } else if (feat.type === 'LineString' && Array.isArray(feat.coordinates)) {
           const pts = (feat.coordinates as GeoCoordinate[])
@@ -306,7 +359,7 @@ export const PdfMapNavigator: React.FC = () => {
             .map(c => {
                const pc = gpsToPdf(c.lat, c.lng, activeDoc);
                return { x: pc.x, y: pc.y, lat: c.lat, lng: c.lng };
-            });
+            }).filter(p => !isNaN(p.x) && !isNaN(p.y));
           
           if (pts.length > 1) {
             newTracks.push({
@@ -328,7 +381,10 @@ export const PdfMapNavigator: React.FC = () => {
       };
       
       updateDocumentInStore(updatedDoc);
-      notifySuccess('Importação Concluída', `${features.length} elementos georreferenciados foram projetados neste mapa PDF.`);
+      notifySuccess(
+        isAutoCalibrated ? 'Mapa Auto-Calibrado e Importado' : 'Importação Concluída', 
+        `${features.length} elementos foram projetados neste mapa PDF.`
+      );
       
     } catch(err) {
       console.error('Error importing KML/KMZ', err);
