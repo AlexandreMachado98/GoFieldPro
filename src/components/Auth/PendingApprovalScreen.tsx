@@ -17,7 +17,6 @@ import {
   AlertCircle,
   Phone,
   Building2,
-  UserCheck,
   Save,
   MessageSquare,
 } from 'lucide-react';
@@ -163,7 +162,7 @@ export const PendingApprovalScreen: React.FC = () => {
 
     const cleanPhone = inputPhone.replace(/\D/g, '');
     if (cleanPhone.length < 10) {
-      setContactError('Por favor, informe um número de WhatsApp válido com DDD (ex: 11 99999-9999).');
+      setContactError('Informe seu WhatsApp com DDD (ex: 11 99999-9999).');
       return;
     }
 
@@ -204,9 +203,9 @@ export const PendingApprovalScreen: React.FC = () => {
         const couponData = couponDoc.data() as PromoCoupon;
         if (couponData.active) {
           setAppliedCoupon(couponData);
-          setCouponSuccess(`Cupom ${couponData.code} aplicado com sucesso! (${couponData.discountPercent}% de desconto extra)`);
+          setCouponSuccess(`Cupom ${couponData.code} aplicado! (${couponData.discountPercent}% OFF extra)`);
         } else {
-          setCouponError('Este cupom expirou ou não está mais ativo.');
+          setCouponError('Este cupom expirou ou não está ativo.');
         }
       } else {
         const allCouponsSnap = await getDocs(collection(db, 'coupons'));
@@ -216,7 +215,7 @@ export const PendingApprovalScreen: React.FC = () => {
 
         if (matched) {
           setAppliedCoupon(matched);
-          setCouponSuccess(`Cupom ${matched.code} aplicado! (${matched.discountPercent}% de desconto extra)`);
+          setCouponSuccess(`Cupom ${matched.code} aplicado! (${matched.discountPercent}% OFF extra)`);
         } else {
           setCouponError('Cupom inválido ou não encontrado.');
         }
@@ -248,9 +247,9 @@ export const PendingApprovalScreen: React.FC = () => {
     const currentPhone = profile?.phone || inputPhone;
     const cleanDigits = currentPhone.replace(/\D/g, '');
 
-    // If phone is still missing, focus on mandatory contact form
+    // If phone is still missing, prompt user
     if (cleanDigits.length < 10) {
-      setContactError('⚠️ Por favor, preencha e salve seu WhatsApp abaixo antes de prosseguir.');
+      setContactError('⚠️ Preencha e salve seu WhatsApp abaixo antes de solicitar liberação.');
       window.scrollTo({ top: 0, behavior: 'smooth' });
       return;
     }
@@ -276,49 +275,49 @@ export const PendingApprovalScreen: React.FC = () => {
   const hasValidPhone = Boolean(profile?.phone && profile.phone.replace(/\D/g, '').length >= 10);
 
   return (
-    <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center p-3 sm:p-6 relative overflow-x-hidden py-6 sm:py-10 text-slate-100 w-full">
+    <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center p-2.5 sm:p-6 relative overflow-x-hidden py-4 sm:py-8 text-slate-100 w-full">
       {/* Background Glow */}
       <div className="absolute top-0 left-0 w-full h-full overflow-hidden z-0 pointer-events-none">
         <div className="absolute -top-[15%] left-[10%] w-[45%] h-[45%] rounded-full bg-amber-500/10 blur-[130px]" />
         <div className="absolute bottom-[10%] right-[10%] w-[40%] h-[40%] rounded-full bg-emerald-500/10 blur-[130px]" />
       </div>
 
-      <div className="w-full max-w-2xl z-10 space-y-3.5 sm:space-y-4">
+      <div className="w-full max-w-xl sm:max-w-2xl z-10 space-y-3 sm:space-y-4">
         {/* Main Card */}
-        <div className="bg-slate-900/95 backdrop-blur-xl border border-slate-800 rounded-2xl sm:rounded-3xl p-4 sm:p-6 shadow-2xl space-y-3.5 sm:space-y-4">
+        <div className="bg-slate-900/95 backdrop-blur-xl border border-slate-800 rounded-2xl sm:rounded-3xl p-3.5 sm:p-6 shadow-2xl space-y-3 sm:space-y-4">
           {/* Header */}
-          <div className="text-center space-y-1.5">
+          <div className="text-center space-y-1">
             <div
-              className={`w-12 h-12 sm:w-14 sm:h-14 rounded-2xl mx-auto flex items-center justify-center shadow-xl ${
+              className={`w-11 h-11 sm:w-14 sm:h-14 rounded-2xl mx-auto flex items-center justify-center shadow-xl ${
                 isBlocked
                   ? 'bg-rose-950 border border-rose-800 text-rose-400'
                   : 'bg-amber-950/80 border border-amber-500/40 text-amber-400'
               }`}
             >
-              {isBlocked ? <ShieldAlert className="w-6 h-6 sm:w-7 sm:h-7" /> : <Clock className="w-6 h-6 sm:w-7 sm:h-7 animate-pulse" />}
+              {isBlocked ? <ShieldAlert className="w-5 h-5 sm:w-7 sm:h-7" /> : <Clock className="w-5 h-5 sm:w-7 sm:h-7 animate-pulse" />}
             </div>
 
-            <h1 className="text-lg sm:text-2xl font-extrabold text-white tracking-tight">
+            <h1 className="text-base sm:text-2xl font-extrabold text-white tracking-tight">
               {isBlocked ? 'Acesso Suspenso' : 'Solicitação em Análise'}
             </h1>
 
-            <p className="text-xs sm:text-sm text-slate-300 max-w-lg mx-auto leading-relaxed">
+            <p className="text-[11px] sm:text-sm text-slate-300 max-w-lg mx-auto leading-relaxed">
               {isBlocked
-                ? 'Seu acesso ao sistema está suspenso. Fale com a nossa equipe comercial para reativar seu plano.'
+                ? 'Seu acesso ao sistema está suspenso. Fale com nossa equipe comercial para reativar seu plano.'
                 : 'Seu cadastro foi registrado com sucesso! Escolha o seu plano abaixo com valores promocionais e solicite a liberação imediata via WhatsApp.'}
             </p>
           </div>
 
           {/* User Identification Chip */}
-          <div className="bg-slate-950 border border-slate-800 rounded-2xl p-2.5 sm:p-3 flex items-center justify-between gap-2.5 min-w-0">
-            <div className="flex items-center gap-2.5 min-w-0">
+          <div className="bg-slate-950 border border-slate-800 rounded-xl sm:rounded-2xl p-2.5 sm:p-3 flex items-center justify-between gap-2 min-w-0">
+            <div className="flex items-center gap-2 min-w-0">
               <img
                 src={
                   profile?.avatar ||
                   `https://ui-avatars.com/api/?name=${encodeURIComponent(profile?.name || 'U')}&background=0284c7&color=fff`
                 }
                 alt={profile?.name}
-                className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl border border-slate-700 object-cover shrink-0"
+                className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl border border-slate-700 object-cover shrink-0"
               />
               <div className="min-w-0">
                 <div className="font-bold text-xs sm:text-sm text-white truncate">{profile?.name}</div>
@@ -344,30 +343,30 @@ export const PendingApprovalScreen: React.FC = () => {
           {/* OBRIGATORIEDADE DE WHATSAPP (SE CADASTRO GOOGLE SEM TELEFONE)              */}
           {/* ========================================================================= */}
           {!isBlocked && !hasValidPhone && (
-            <div className="bg-amber-950/40 border border-amber-500/60 rounded-2xl p-3.5 sm:p-4 space-y-2.5 animate-in fade-in duration-300 ring-1 ring-amber-500/40">
-              <div className="flex items-start gap-2.5">
-                <div className="w-8 h-8 rounded-xl bg-amber-500/20 border border-amber-500/40 flex items-center justify-center text-amber-400 shrink-0">
-                  <Phone className="w-4 h-4" />
+            <div className="bg-amber-950/40 border border-amber-500/60 rounded-xl sm:rounded-2xl p-3 sm:p-4 space-y-2 animate-in fade-in duration-300 ring-1 ring-amber-500/40">
+              <div className="flex items-start gap-2">
+                <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-xl bg-amber-500/20 border border-amber-500/40 flex items-center justify-center text-amber-400 shrink-0 mt-0.5">
+                  <Phone className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                 </div>
-                <div>
+                <div className="min-w-0">
                   <h3 className="text-xs sm:text-sm font-extrabold text-amber-300 leading-tight">
-                    WhatsApp Obrigatório para Contato e Liberação
+                    WhatsApp Obrigatório para Liberação
                   </h3>
-                  <p className="text-[11px] text-slate-300 mt-0.5 leading-relaxed">
-                    Como você acessou com a Conta Google, informe seu WhatsApp para que o Administrador possa registrar sua conta e liberar seu acesso.
+                  <p className="text-[10px] sm:text-[11px] text-slate-300 mt-0.5 leading-relaxed">
+                    Informe seu WhatsApp com DDD para que o Administrador possa registrar sua conta e liberar seu acesso.
                   </p>
                 </div>
               </div>
 
-              <form onSubmit={handleSaveContactInfo} className="space-y-2.5 pt-1">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              <form onSubmit={handleSaveContactInfo} className="space-y-2 pt-0.5">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 sm:gap-2">
                   <div>
-                    <label className="block text-[10px] uppercase font-bold text-slate-300 mb-1">
+                    <label className="block text-[9px] sm:text-[10px] uppercase font-bold text-slate-300 mb-0.5">
                       WhatsApp com DDD *
                     </label>
                     <div className="relative">
                       <div className="absolute inset-y-0 left-0 pl-2.5 flex items-center pointer-events-none">
-                        <MessageSquare className="w-3.5 h-3.5 text-slate-500" />
+                        <MessageSquare className="w-3 h-3 text-slate-500" />
                       </div>
                       <input
                         type="tel"
@@ -375,51 +374,51 @@ export const PendingApprovalScreen: React.FC = () => {
                         value={inputPhone}
                         onChange={(e) => handlePhoneChange(e.target.value)}
                         placeholder="(00) 00000-0000"
-                        className="w-full bg-slate-950 border border-slate-700 rounded-xl pl-8 pr-3 py-2 text-xs text-white focus:outline-none focus:border-amber-500"
+                        className="w-full bg-slate-950 border border-slate-700 rounded-xl pl-8 pr-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-amber-500"
                       />
                     </div>
                   </div>
 
                   <div>
-                    <label className="block text-[10px] uppercase font-bold text-slate-300 mb-1">
-                      Empresa / Órgão
+                    <label className="block text-[9px] sm:text-[10px] uppercase font-bold text-slate-300 mb-0.5">
+                      Empresa / Atividade
                     </label>
                     <div className="relative">
                       <div className="absolute inset-y-0 left-0 pl-2.5 flex items-center pointer-events-none">
-                        <Building2 className="w-3.5 h-3.5 text-slate-500" />
+                        <Building2 className="w-3 h-3 text-slate-500" />
                       </div>
                       <input
                         type="text"
                         value={inputCompany}
                         onChange={(e) => setInputCompany(e.target.value)}
-                        placeholder="Ex: Madeireira / Fazenda"
-                        className="w-full bg-slate-950 border border-slate-700 rounded-xl pl-8 pr-3 py-2 text-xs text-white focus:outline-none focus:border-amber-500"
+                        placeholder="Ex: Madeireira / Autônomo"
+                        className="w-full bg-slate-950 border border-slate-700 rounded-xl pl-8 pr-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-amber-500"
                       />
                     </div>
                   </div>
                 </div>
 
                 {contactError && (
-                  <div className="text-[11px] text-red-400 flex items-center gap-1.5 font-semibold">
-                    <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                  <div className="text-[10px] sm:text-[11px] text-red-400 flex items-center gap-1 font-semibold">
+                    <AlertCircle className="w-3 h-3 shrink-0" />
                     <span>{contactError}</span>
                   </div>
                 )}
 
                 {contactSuccess && (
-                  <div className="text-[11px] text-emerald-400 flex items-center gap-1.5 font-semibold">
-                    <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
-                    <span>WhatsApp salvo com sucesso! Agora você já pode escolher seu plano abaixo.</span>
+                  <div className="text-[10px] sm:text-[11px] text-emerald-400 flex items-center gap-1 font-semibold">
+                    <CheckCircle2 className="w-3 h-3 shrink-0" />
+                    <span>WhatsApp salvo! Você já pode escolher seu plano abaixo.</span>
                   </div>
                 )}
 
                 <button
                   type="submit"
                   disabled={savingContact}
-                  className="w-full bg-amber-600 hover:bg-amber-500 text-slate-950 font-black py-2.5 px-4 rounded-xl text-xs flex items-center justify-center gap-2 shadow-md transition-all active:scale-98"
+                  className="w-full bg-amber-600 hover:bg-amber-500 text-slate-950 font-black py-2 px-3 rounded-xl text-xs flex items-center justify-center gap-1.5 shadow-md transition-all active:scale-98"
                 >
                   <Save className="w-3.5 h-3.5" />
-                  <span>{savingContact ? 'Salvando WhatsApp...' : 'Salvar WhatsApp e Prosseguir'}</span>
+                  <span>{savingContact ? 'Salvando...' : 'Salvar WhatsApp e Prosseguir'}</span>
                 </button>
               </form>
             </div>
@@ -427,11 +426,11 @@ export const PendingApprovalScreen: React.FC = () => {
 
           {/* User WhatsApp verified badge */}
           {!isBlocked && hasValidPhone && (
-            <div className="bg-slate-950 p-2.5 rounded-xl border border-slate-800 flex items-center justify-between text-xs">
-              <div className="flex items-center gap-2 text-slate-300">
-                <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
-                <span>
-                  WhatsApp Cadastrado: <b className="text-white font-mono">{profile?.phone}</b>
+            <div className="bg-slate-950 p-2 sm:p-2.5 rounded-xl border border-slate-800 flex items-center justify-between text-xs gap-2 min-w-0">
+              <div className="flex items-center gap-1.5 text-slate-300 min-w-0 truncate">
+                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                <span className="truncate text-[11px] sm:text-xs">
+                  WhatsApp: <b className="text-white font-mono">{profile?.phone}</b>
                 </span>
               </div>
               <button
@@ -439,10 +438,9 @@ export const PendingApprovalScreen: React.FC = () => {
                 onClick={() => {
                   setInputPhone(profile?.phone || '');
                   setInputCompany(profile?.company || '');
-                  // Temporarily trigger edit
                   updateDoc(doc(db, 'users', profile!.uid), { phone: '' }).then(() => refreshProfile());
                 }}
-                className="text-[10px] text-sky-400 hover:underline font-semibold"
+                className="text-[10px] text-sky-400 hover:underline font-bold shrink-0"
               >
                 Alterar
               </button>
@@ -453,20 +451,20 @@ export const PendingApprovalScreen: React.FC = () => {
           {/* VITRINE DE PLANOS COM PREÇO CHEIO, DESCONTO & SERVIÇOS                    */}
           {/* ========================================================================= */}
           {!isBlocked && (
-            <div className="space-y-3 pt-1">
+            <div className="space-y-2.5 pt-0.5">
               <div className="flex items-center justify-between flex-wrap gap-1">
-                <h3 className="text-[11px] sm:text-xs font-black uppercase tracking-wider text-slate-300 flex items-center gap-1.5">
+                <h3 className="text-[10px] sm:text-xs font-black uppercase tracking-wider text-slate-300 flex items-center gap-1.5">
                   <Tag className="w-3.5 h-3.5 text-sky-400" />
-                  <span>Escolha seu Plano de Assinatura:</span>
+                  <span>Escolha seu Plano:</span>
                 </h3>
-                <span className="text-[10px] text-emerald-400 font-bold flex items-center gap-1">
+                <span className="text-[9px] sm:text-[10px] text-emerald-400 font-bold flex items-center gap-1">
                   <Sparkles className="w-3 h-3" />
                   Valores Promocionais
                 </span>
               </div>
 
-              {/* Plans Grid */}
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+              {/* Plans Grid (1 Col on mobile, 3 Cols on sm+) */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                 {plans.map((plan) => {
                   const isSelected = plan.id === selectedPlanId;
 
@@ -475,7 +473,7 @@ export const PendingApprovalScreen: React.FC = () => {
                       key={plan.id}
                       type="button"
                       onClick={() => setSelectedPlanId(plan.id)}
-                      className={`p-3 rounded-2xl border text-left transition-all relative flex flex-col justify-between ${
+                      className={`p-2.5 sm:p-3 rounded-2xl border text-left transition-all relative flex flex-col justify-between ${
                         isSelected
                           ? plan.highlight
                             ? 'bg-emerald-950/60 border-emerald-500 ring-2 ring-emerald-500/60 shadow-xl'
@@ -490,8 +488,9 @@ export const PendingApprovalScreen: React.FC = () => {
                       )}
 
                       <div>
-                        <div className="flex items-center justify-between gap-1 flex-wrap mb-1.5">
-                          <span className="text-[8px] sm:text-[9px] font-black uppercase px-2 py-0.2 rounded bg-slate-800 text-slate-300 border border-slate-700">
+                        {/* Tag & Discount Badge */}
+                        <div className="flex items-center justify-between gap-1 flex-wrap mb-1">
+                          <span className="text-[8px] sm:text-[9px] font-black uppercase px-1.5 py-0.2 rounded bg-slate-800 text-slate-300 border border-slate-700">
                             {plan.tag}
                           </span>
                           {plan.discountBadge && (
@@ -503,9 +502,10 @@ export const PendingApprovalScreen: React.FC = () => {
 
                         <div className="font-extrabold text-white text-xs sm:text-sm">{plan.name}</div>
 
-                        <div className="mt-1.5 bg-slate-900/80 p-2 rounded-xl border border-slate-800">
+                        {/* Pricing with Original Crossed-Out Price and Discounted Price */}
+                        <div className="mt-1 bg-slate-900/80 p-1.5 sm:p-2 rounded-xl border border-slate-800">
                           {plan.originalPrice > plan.price && (
-                            <div className="flex items-center gap-1.5 text-[9px] sm:text-[10px] text-slate-400">
+                            <div className="flex items-center gap-1 text-[9px] text-slate-400">
                               <span className="text-slate-500">De:</span>
                               <span className="line-through font-mono font-bold text-slate-500">
                                 R$ {plan.originalPrice.toFixed(2)}
@@ -514,14 +514,15 @@ export const PendingApprovalScreen: React.FC = () => {
                           )}
                           <div className="flex items-baseline gap-1">
                             <span className="text-[9px] sm:text-[10px] font-bold text-slate-300">Por:</span>
-                            <span className="text-base sm:text-lg font-black text-emerald-400 font-mono">
+                            <span className="text-sm sm:text-base font-black text-emerald-400 font-mono">
                               R$ {plan.price.toFixed(2)}
                             </span>
-                            <span className="text-[10px] text-slate-400">{plan.billingPeriod}</span>
+                            <span className="text-[9px] sm:text-[10px] text-slate-400">{plan.billingPeriod}</span>
                           </div>
                         </div>
 
-                        <ul className="mt-2 space-y-1 text-[10px] text-slate-300">
+                        {/* Features List */}
+                        <ul className="mt-1.5 space-y-0.5 sm:space-y-1 text-[9px] sm:text-[10px] text-slate-300">
                           {plan.features.map((feat, idx) => (
                             <li key={idx} className="flex items-start gap-1 leading-tight">
                               <CheckCircle2 className="w-3 h-3 text-emerald-400 shrink-0 mt-0.5" />
@@ -531,13 +532,14 @@ export const PendingApprovalScreen: React.FC = () => {
                         </ul>
                       </div>
 
-                      <div className="mt-2.5 pt-2 border-t border-slate-800/80">
+                      {/* Selection Indicator */}
+                      <div className="mt-2 pt-1.5 border-t border-slate-800/80">
                         {isSelected ? (
-                          <div className="text-[10px] font-bold text-emerald-400 flex items-center gap-1">
-                            <Check className="w-3 h-3" /> Plano Selecionado
+                          <div className="text-[9px] sm:text-[10px] font-bold text-emerald-400 flex items-center gap-1">
+                            <Check className="w-3 h-3" /> Selecionado
                           </div>
                         ) : (
-                          <div className="text-[10px] text-slate-500">Toque para selecionar</div>
+                          <div className="text-[9px] text-slate-500">Toque para selecionar</div>
                         )}
                       </div>
                     </button>
@@ -546,9 +548,9 @@ export const PendingApprovalScreen: React.FC = () => {
               </div>
 
               {/* Cupom de Desconto */}
-              <div className="bg-slate-950 border border-slate-800 rounded-2xl p-3 space-y-2">
+              <div className="bg-slate-950 border border-slate-800 rounded-xl sm:rounded-2xl p-2.5 sm:p-3 space-y-1.5">
                 <div className="flex items-center justify-between">
-                  <span className="text-[11px] sm:text-xs font-bold text-slate-300 flex items-center gap-1.5">
+                  <span className="text-[10px] sm:text-xs font-bold text-slate-300 flex items-center gap-1.5">
                     <Gift className="w-3.5 h-3.5 text-amber-400 shrink-0" />
                     <span>Tem um Cupom de Desconto?</span>
                   </span>
@@ -556,7 +558,7 @@ export const PendingApprovalScreen: React.FC = () => {
                     <button
                       type="button"
                       onClick={handleRemoveCoupon}
-                      className="text-[10px] text-rose-400 hover:underline font-bold"
+                      className="text-[9px] sm:text-[10px] text-rose-400 hover:underline font-bold"
                     >
                       Remover
                     </button>
@@ -564,18 +566,18 @@ export const PendingApprovalScreen: React.FC = () => {
                 </div>
 
                 {appliedCoupon ? (
-                  <div className="bg-emerald-950/40 border border-emerald-500/50 p-2.5 rounded-xl flex items-center justify-between text-xs text-emerald-300 gap-2">
-                    <div className="flex items-center gap-2 min-w-0">
-                      <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                  <div className="bg-emerald-950/40 border border-emerald-500/50 p-2 rounded-xl flex items-center justify-between text-xs text-emerald-300 gap-2">
+                    <div className="flex items-center gap-1.5 min-w-0">
+                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
                       <div className="min-w-0">
-                        <span className="font-bold block truncate">Cupom {appliedCoupon.code} Ativo!</span>
-                        <span className="text-[10px] text-slate-300 block truncate">
-                          Desconto extra de {appliedCoupon.discountPercent}% aplicado.
+                        <span className="font-bold block truncate text-[11px] sm:text-xs">Cupom {appliedCoupon.code} Ativo!</span>
+                        <span className="text-[9px] sm:text-[10px] text-slate-300 block truncate">
+                          {appliedCoupon.discountPercent}% de desconto extra aplicado.
                         </span>
                       </div>
                     </div>
                     <div className="text-right shrink-0">
-                      <span className="text-[9px] text-slate-400 block line-through">
+                      <span className="text-[8px] sm:text-[9px] text-slate-400 block line-through">
                         R$ {basePrice.toFixed(2)}
                       </span>
                       <span className="font-black text-emerald-400 font-mono text-xs sm:text-sm">
@@ -584,18 +586,18 @@ export const PendingApprovalScreen: React.FC = () => {
                     </div>
                   </div>
                 ) : (
-                  <form onSubmit={handleApplyCoupon} className="flex gap-2">
+                  <form onSubmit={handleApplyCoupon} className="flex gap-1.5">
                     <input
                       type="text"
                       value={couponInput}
                       onChange={(e) => setCouponInput(e.target.value.toUpperCase())}
                       placeholder="Cupom (Ex: REGIAO20)"
-                      className="flex-1 min-w-0 bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white font-mono uppercase focus:outline-none focus:border-amber-500"
+                      className="flex-1 min-w-0 bg-slate-900 border border-slate-700 rounded-xl px-2.5 py-1.5 text-xs text-white font-mono uppercase focus:outline-none focus:border-amber-500"
                     />
                     <button
                       type="submit"
                       disabled={couponLoading || !couponInput.trim()}
-                      className="bg-amber-600 hover:bg-amber-500 disabled:opacity-50 text-slate-950 font-black px-3.5 py-2 rounded-xl text-xs flex items-center gap-1.5 shadow transition-all active:scale-95 shrink-0"
+                      className="bg-amber-600 hover:bg-amber-500 disabled:opacity-50 text-slate-950 font-black px-3 py-1.5 rounded-xl text-xs flex items-center gap-1 shadow transition-all active:scale-95 shrink-0"
                     >
                       {couponLoading ? (
                         <RefreshCw className="w-3.5 h-3.5 animate-spin" />
@@ -608,7 +610,7 @@ export const PendingApprovalScreen: React.FC = () => {
                 )}
 
                 {couponError && (
-                  <div className="text-[10px] sm:text-[11px] text-rose-400 flex items-center gap-1.5">
+                  <div className="text-[10px] text-rose-400 flex items-center gap-1">
                     <AlertCircle className="w-3 h-3 shrink-0" />
                     <span>{couponError}</span>
                   </div>
@@ -616,29 +618,29 @@ export const PendingApprovalScreen: React.FC = () => {
               </div>
 
               {/* Final Summary & WhatsApp Activation Button */}
-              <div className="pt-1 space-y-2">
-                <div className="bg-slate-950 p-2.5 sm:p-3 rounded-2xl border border-slate-800 flex items-center justify-between text-xs">
+              <div className="pt-1 space-y-1.5">
+                <div className="bg-slate-950 p-2 sm:p-2.5 rounded-xl sm:rounded-2xl border border-slate-800 flex items-center justify-between text-xs">
                   <div>
-                    <span className="text-[9px] sm:text-[10px] uppercase font-bold text-slate-400 block">Total do Plano:</span>
+                    <span className="text-[8px] sm:text-[9px] uppercase font-bold text-slate-400 block">Total do Plano:</span>
                     <span className="font-extrabold text-white text-xs sm:text-sm truncate">{selectedPlan.name}</span>
                   </div>
                   <div className="text-right">
-                    <span className="text-lg sm:text-2xl font-black text-emerald-400 font-mono">
+                    <span className="text-base sm:text-xl font-black text-emerald-400 font-mono">
                       R$ {finalPrice.toFixed(2)}
                     </span>
-                    <span className="text-[10px] text-slate-400">/mês</span>
+                    <span className="text-[9px] sm:text-[10px] text-slate-400">/mês</span>
                   </div>
                 </div>
 
                 <button
                   type="button"
                   onClick={handleOpenWhatsApp}
-                  className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold py-3 px-4 rounded-2xl shadow-xl shadow-emerald-950/50 transition-all flex items-center justify-center gap-2 text-xs sm:text-sm active:scale-98"
+                  className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold py-2.5 sm:py-3 px-3.5 rounded-xl sm:rounded-2xl shadow-xl shadow-emerald-950/50 transition-all flex items-center justify-center gap-2 text-xs sm:text-sm active:scale-98"
                 >
-                  <Send className="w-4 h-4 shrink-0" />
+                  <Send className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" />
                   <span>Liberar no WhatsApp com Desconto</span>
                 </button>
-                <p className="text-[10px] text-center text-slate-400">
+                <p className="text-[9px] sm:text-[10px] text-center text-slate-400">
                   Fale com a nossa equipe para liberação imediata e orientações de uso.
                 </p>
               </div>
@@ -646,13 +648,13 @@ export const PendingApprovalScreen: React.FC = () => {
           )}
 
           {/* Secondary Actions */}
-          <div className="space-y-2 pt-2 border-t border-slate-800">
+          <div className="space-y-1.5 pt-1.5 border-t border-slate-800">
             {!isBlocked && (
               <button
                 type="button"
                 onClick={handleCheckStatus}
                 disabled={checking}
-                className="w-full bg-slate-950 hover:bg-slate-800 border border-slate-750 text-sky-400 font-bold py-2.5 px-3 rounded-xl transition-all flex items-center justify-center gap-2 text-xs"
+                className="w-full bg-slate-950 hover:bg-slate-800 border border-slate-750 text-sky-400 font-bold py-2 px-3 rounded-xl transition-all flex items-center justify-center gap-1.5 text-xs"
               >
                 <RefreshCw className={`w-3.5 h-3.5 ${checking ? 'animate-spin' : ''}`} />
                 <span className="truncate">{checking ? 'Verificando...' : 'Verificar se meu Acesso foi Liberado'}</span>
@@ -662,7 +664,7 @@ export const PendingApprovalScreen: React.FC = () => {
             <button
               type="button"
               onClick={logout}
-              className="w-full py-2 text-xs text-slate-400 hover:text-white rounded-xl hover:bg-slate-850 transition-colors flex items-center justify-center gap-1.5 text-center"
+              className="w-full py-1.5 text-xs text-slate-400 hover:text-white rounded-xl hover:bg-slate-850 transition-colors flex items-center justify-center gap-1.5 text-center"
             >
               <LogOut className="w-3.5 h-3.5" />
               <span>Sair / Trocar de Conta</span>
@@ -671,7 +673,7 @@ export const PendingApprovalScreen: React.FC = () => {
         </div>
 
         {/* Footer */}
-        <div className="text-center text-[10px] sm:text-[11px] text-slate-500 font-medium">
+        <div className="text-center text-[9px] sm:text-[10px] text-slate-500 font-medium pb-4">
           GoField Pro • AM TST SAÚDE E SEGURANÇA DO TRABALHO
         </div>
       </div>
