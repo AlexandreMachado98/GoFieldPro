@@ -28,7 +28,6 @@ import {
   Loader2,
   KeyRound,
   ArrowLeft,
-  Sparkles,
 } from 'lucide-react';
 
 export const LoginScreen: React.FC = () => {
@@ -102,6 +101,9 @@ export const LoginScreen: React.FC = () => {
             requestedRole: requestedRole,
             role: isOwner ? 'super_admin' : requestedRole,
             status: isOwner ? 'active' : 'pending',
+            subscriptionPlan: 'free_trial',
+            subscriptionStatus: isOwner ? 'active' : 'trial',
+            subscriptionValue: isOwner ? 0 : 97,
             avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(name.trim())}&background=0284c7&color=fff`,
             createdAt: new Date().toISOString(),
           },
@@ -136,7 +138,7 @@ export const LoginScreen: React.FC = () => {
     }
   };
 
-  // 2. Handle Google One-Tap / Popup Login
+  // 2. Handle Google One-Tap / Popup Login with Detailed Guidance
   const handleGoogleLogin = async () => {
     setError('');
     setSuccess('');
@@ -146,18 +148,27 @@ export const LoginScreen: React.FC = () => {
       const provider = new GoogleAuthProvider();
       provider.setCustomParameters({ prompt: 'select_account' });
       await signInWithPopup(auth, provider);
-      // AuthContext will catch onAuthStateChanged and configure user in Firestore
     } catch (err: any) {
-      console.warn('Google Login notice:', err);
+      console.warn('Firebase Google Auth error:', err);
+      let errorMsg = 'Não foi possível autenticar com o Google.';
+
       if (err.code === 'auth/popup-closed-by-user') {
-        setError('O login com o Google foi cancelado.');
+        errorMsg = 'O login com o Google foi cancelado.';
       } else if (err.code === 'auth/popup-blocked') {
-        setError('A janela do Google foi bloqueada pelo navegador. Permita pop-ups.');
-      } else if (err.code === 'auth/account-exists-with-different-credential') {
-        setError('Já existe uma conta cadastrada com este mesmo e-mail.');
-      } else {
-        setError(err.message || 'Erro ao autenticar com o Google. Tente com e-mail e senha.');
+        errorMsg = 'A janela do Google foi bloqueada pelo navegador. Permita pop-ups no seu navegador.';
+      } else if (err.code === 'auth/operation-not-allowed' || err.code === 'auth/admin-restricted-operation') {
+        errorMsg =
+          'O provedor Google precisa ser ativado no Firebase Console (Authentication > Sign-in method > Google).';
+      } else if (err.code === 'auth/unauthorized-domain') {
+        errorMsg =
+          'Domínio não autorizado no Firebase. Adicione o domínio atual em Authentication > Settings > Authorized domains no Firebase Console.';
+      } else if (err.code === 'auth/network-request-failed') {
+        errorMsg = 'Falha de conexão com os servidores. Verifique sua internet.';
+      } else if (err.message) {
+        errorMsg = `Erro do Google Auth: ${err.message}`;
       }
+
+      setError(errorMsg);
     } finally {
       setGoogleLoading(false);
     }
@@ -187,7 +198,7 @@ export const LoginScreen: React.FC = () => {
       } else if (err.code === 'auth/invalid-email') {
         msg = 'O endereço de e-mail informado é inválido.';
       } else if (err.code === 'auth/too-many-requests') {
-        msg = 'Muitas solicitações em sequência. Aguarde alguns minutos e tente novamente.';
+        msg = 'Muitas solicitações seguidas. Aguarde alguns minutos e tente novamente.';
       }
       setResetError(msg);
     } finally {
@@ -196,23 +207,23 @@ export const LoginScreen: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center p-3 sm:p-6 relative overflow-hidden py-10">
+    <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center p-3 sm:p-6 relative overflow-x-hidden py-6 sm:py-10">
       {/* Background ambient glow */}
       <div className="absolute top-0 left-0 w-full h-full overflow-hidden z-0 pointer-events-none">
         <div className="absolute -top-[20%] -left-[10%] w-[50%] h-[50%] rounded-full bg-sky-900/20 blur-[120px]" />
         <div className="absolute top-[60%] -right-[10%] w-[40%] h-[50%] rounded-full bg-emerald-900/20 blur-[120px]" />
       </div>
 
-      <div className="w-full max-w-md z-10 space-y-4">
-        {/* Brand Logo & Title */}
+      <div className="w-full max-w-md z-10 space-y-3 sm:space-y-4">
+        {/* Brand Logo & Title (Compact for Mobile) */}
         <div className="flex flex-col items-center">
-          <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-gradient-to-br from-sky-500 to-emerald-500 flex items-center justify-center text-white shadow-2xl mb-3">
-            <Map className="w-7 h-7 sm:w-8 sm:h-8" />
+          <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl bg-gradient-to-br from-sky-500 to-emerald-500 flex items-center justify-center text-white shadow-xl mb-2">
+            <Map className="w-6 h-6 sm:w-7 sm:h-7" />
           </div>
-          <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">
+          <h1 className="text-xl sm:text-2xl font-extrabold text-white tracking-tight">
             GoField <span className="text-sky-400">Pro</span>
           </h1>
-          <p className="text-slate-400 mt-1 text-center text-xs">
+          <p className="text-slate-400 mt-0.5 text-center text-[11px] sm:text-xs">
             Navegação GPS, Mapas PDF e Gestão de Campo
           </p>
         </div>
@@ -221,17 +232,17 @@ export const LoginScreen: React.FC = () => {
         {/* VIEW 1: PASSWORD RECOVERY MICRO-FORM                     */}
         {/* ======================================================== */}
         {viewMode === 'forgot_password' ? (
-          <div className="bg-slate-900/90 backdrop-blur-xl border border-slate-800 rounded-3xl p-5 sm:p-7 shadow-2xl animate-in fade-in zoom-in-95 duration-200">
-            <div className="flex items-center justify-between mb-4 border-b border-slate-800 pb-3">
+          <div className="bg-slate-900/95 backdrop-blur-xl border border-slate-800 rounded-2xl sm:rounded-3xl p-4 sm:p-6 shadow-2xl animate-in fade-in duration-200">
+            <div className="flex items-center justify-between mb-3 border-b border-slate-800 pb-2.5">
               <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-xl bg-amber-500/20 border border-amber-500/30 flex items-center justify-center text-amber-400">
-                  <KeyRound className="w-4 h-4" />
+                <div className="w-7 h-7 rounded-xl bg-amber-500/20 border border-amber-500/30 flex items-center justify-center text-amber-400">
+                  <KeyRound className="w-3.5 h-3.5" />
                 </div>
                 <div>
-                  <h2 className="text-base sm:text-lg font-bold text-white leading-tight">
+                  <h2 className="text-sm sm:text-base font-bold text-white leading-tight">
                     Recuperar Senha
                   </h2>
-                  <p className="text-[11px] text-slate-400">Redefinição rápida por e-mail</p>
+                  <p className="text-[10px] text-slate-400">Redefinição rápida por e-mail</p>
                 </div>
               </div>
 
@@ -245,30 +256,30 @@ export const LoginScreen: React.FC = () => {
                 className="p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 transition-colors"
                 title="Voltar ao login"
               >
-                <ArrowLeft className="w-5 h-5" />
+                <ArrowLeft className="w-4 h-4" />
               </button>
             </div>
 
             {resetError && (
-              <div className="mb-4 p-3 rounded-xl bg-red-950/60 border border-red-800 text-red-300 text-xs flex items-start gap-2 animate-in fade-in">
+              <div className="mb-3 p-2.5 rounded-xl bg-red-950/60 border border-red-800 text-red-300 text-xs flex items-start gap-2 animate-in fade-in">
                 <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
                 <span>{resetError}</span>
               </div>
             )}
 
             {resetSuccess ? (
-              <div className="space-y-4 py-2 animate-in fade-in">
-                <div className="p-4 rounded-2xl bg-emerald-950/60 border border-emerald-500/50 text-emerald-200 text-xs space-y-2">
-                  <div className="flex items-center gap-2 font-bold text-emerald-400 text-sm">
-                    <CheckCircle2 className="w-5 h-5 shrink-0" />
-                    <span>Link de Recuperação Enviado!</span>
+              <div className="space-y-3 py-1 animate-in fade-in">
+                <div className="p-3.5 rounded-2xl bg-emerald-950/60 border border-emerald-500/50 text-emerald-200 text-xs space-y-1.5">
+                  <div className="flex items-center gap-2 font-bold text-emerald-400 text-xs sm:text-sm">
+                    <CheckCircle2 className="w-4 h-4 shrink-0" />
+                    <span>Link Enviado com Sucesso!</span>
                   </div>
                   <p className="text-slate-300 leading-relaxed text-[11px]">
                     Enviamos as instruções para <b>{resetEmail.trim() || email.trim()}</b>. Abra o seu
                     e-mail e clique no link recebido para cadastrar sua nova senha.
                   </p>
                   <p className="text-[10px] text-slate-400 italic">
-                    💡 Caso não localize na caixa de entrada, verifique sua pasta de <b>Spam</b> ou <b>Lixo Eletrônico</b>.
+                    💡 Caso não localize na caixa de entrada, verifique a pasta de <b>Spam</b>.
                   </p>
                 </div>
 
@@ -278,16 +289,16 @@ export const LoginScreen: React.FC = () => {
                     setViewMode('login');
                     setResetSuccess(false);
                   }}
-                  className="w-full bg-sky-600 hover:bg-sky-500 text-white font-bold py-3 rounded-xl shadow-lg transition-all flex items-center justify-center gap-2 text-xs"
+                  className="w-full bg-sky-600 hover:bg-sky-500 text-white font-bold py-2.5 rounded-xl shadow-lg transition-all flex items-center justify-center gap-2 text-xs"
                 >
                   <ArrowLeft className="w-4 h-4" />
-                  <span>Voltar para a Tela de Login</span>
+                  <span>Voltar para Realizar Login</span>
                 </button>
               </div>
             ) : (
-              <form onSubmit={handlePasswordReset} className="space-y-4">
+              <form onSubmit={handlePasswordReset} className="space-y-3">
                 <p className="text-xs text-slate-300 leading-relaxed">
-                  Digite seu e-mail cadastrado abaixo. Enviaremos instantaneamente um link seguro para você definir uma nova senha.
+                  Digite seu e-mail cadastrado. Enviaremos instantaneamente um link seguro para você definir uma nova senha.
                 </p>
 
                 <div>
@@ -304,18 +315,17 @@ export const LoginScreen: React.FC = () => {
                       value={resetEmail || email}
                       onChange={(e) => setResetEmail(e.target.value)}
                       disabled={resetLoading}
-                      className="w-full bg-slate-950 border border-slate-700 rounded-xl pl-10 pr-4 py-2.5 text-sm text-white focus:outline-none focus:border-amber-500 transition-colors disabled:opacity-50"
-                      placeholder="seu.email@empresa.com"
+                      className="w-full bg-slate-950 border border-slate-700 rounded-xl pl-9 pr-3 py-2 text-xs sm:text-sm text-white focus:outline-none focus:border-amber-500 transition-colors disabled:opacity-50"
                       autoFocus
                     />
                   </div>
                 </div>
 
-                <div className="pt-2 flex flex-col gap-2">
+                <div className="pt-1 flex flex-col gap-2">
                   <button
                     type="submit"
                     disabled={resetLoading}
-                    className="w-full bg-gradient-to-r from-amber-600 to-amber-500 hover:from-amber-500 hover:to-amber-400 disabled:opacity-50 text-slate-950 font-black py-3 rounded-xl shadow-lg transition-all flex items-center justify-center gap-2 text-xs active:scale-98"
+                    className="w-full bg-gradient-to-r from-amber-600 to-amber-500 hover:from-amber-500 hover:to-amber-400 disabled:opacity-50 text-slate-950 font-black py-2.5 rounded-xl shadow-lg transition-all flex items-center justify-center gap-2 text-xs active:scale-98"
                   >
                     {resetLoading ? (
                       <>
@@ -336,9 +346,9 @@ export const LoginScreen: React.FC = () => {
                       setViewMode('login');
                       setResetError('');
                     }}
-                    className="w-full py-2.5 text-xs text-slate-400 hover:text-white rounded-xl hover:bg-slate-850 transition-colors text-center"
+                    className="w-full py-2 text-xs text-slate-400 hover:text-white rounded-xl hover:bg-slate-850 transition-colors text-center"
                   >
-                    Cancelar e Voltar ao Login
+                    Cancelar e Voltar
                   </button>
                 </div>
               </form>
@@ -348,20 +358,20 @@ export const LoginScreen: React.FC = () => {
           /* ======================================================== */
           /* VIEW 2: LOGIN / REGISTER MAIN CARD                       */
           /* ======================================================== */
-          <div className="bg-slate-900/85 backdrop-blur-xl border border-slate-800 rounded-3xl p-5 sm:p-7 shadow-2xl animate-in fade-in duration-200">
+          <div className="bg-slate-900/90 backdrop-blur-xl border border-slate-800 rounded-2xl sm:rounded-3xl p-4 sm:p-6 shadow-2xl animate-in fade-in duration-200">
             {/* Header / Mode Indicator */}
-            <div className="flex items-center justify-between mb-4 border-b border-slate-800 pb-3">
-              <h2 className="text-lg font-bold text-white">
-                {viewMode === 'login' ? 'Entrar no Sistema' : 'Solicitar Cadastro de Acesso'}
+            <div className="flex items-center justify-between mb-3 border-b border-slate-800 pb-2.5">
+              <h2 className="text-base sm:text-lg font-bold text-white">
+                {viewMode === 'login' ? 'Realizar Login' : 'Solicitar Cadastro'}
               </h2>
-              <span className="text-[11px] font-semibold text-sky-400 bg-sky-950/60 border border-sky-800/60 px-2.5 py-0.5 rounded-full">
-                {viewMode === 'login' ? 'Login' : 'Novo Usuário'}
+              <span className="text-[10px] sm:text-[11px] font-semibold text-sky-400 bg-sky-950/60 border border-sky-800/60 px-2.5 py-0.5 rounded-full">
+                {viewMode === 'login' ? 'Login' : 'Novo Cadastro'}
               </span>
             </div>
 
             {/* Error Message Alert */}
             {error && (
-              <div className="mb-4 p-3 rounded-xl bg-red-950/60 border border-red-800 text-red-300 text-xs flex items-start gap-2 animate-in fade-in">
+              <div className="mb-3 p-2.5 rounded-xl bg-red-950/60 border border-red-800 text-red-300 text-xs flex items-start gap-2 animate-in fade-in leading-relaxed">
                 <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
                 <span>{error}</span>
               </div>
@@ -369,19 +379,19 @@ export const LoginScreen: React.FC = () => {
 
             {/* Success Message Alert */}
             {success && (
-              <div className="mb-4 p-3 rounded-xl bg-emerald-950/60 border border-emerald-800 text-emerald-300 text-xs flex items-start gap-2 animate-in fade-in">
+              <div className="mb-3 p-2.5 rounded-xl bg-emerald-950/60 border border-emerald-800 text-emerald-300 text-xs flex items-start gap-2 animate-in fade-in">
                 <CheckCircle2 className="w-4 h-4 shrink-0 mt-0.5" />
                 <span>{success}</span>
               </div>
             )}
 
             {/* Google Sign-In Button */}
-            <div className="mb-4">
+            <div className="mb-3">
               <button
                 type="button"
                 onClick={handleGoogleLogin}
                 disabled={googleLoading || loading}
-                className="w-full bg-white hover:bg-slate-100 text-slate-900 font-bold py-2.5 px-4 rounded-2xl shadow-md transition-all flex items-center justify-center gap-3 text-xs sm:text-sm active:scale-98 disabled:opacity-60"
+                className="w-full bg-white hover:bg-slate-100 text-slate-900 font-bold py-2.5 px-3 rounded-xl shadow-md transition-all flex items-center justify-center gap-2.5 text-xs sm:text-sm active:scale-98 disabled:opacity-60"
               >
                 {googleLoading ? (
                   <Loader2 className="w-4 h-4 animate-spin text-slate-800" />
@@ -407,24 +417,24 @@ export const LoginScreen: React.FC = () => {
                 )}
                 <span>
                   {googleLoading
-                    ? 'Conectando ao Google...'
+                    ? 'Conectando...'
                     : viewMode === 'login'
                     ? 'Entrar com Conta Google'
                     : 'Cadastrar com Conta Google'}
                 </span>
               </button>
 
-              <div className="relative flex items-center justify-center my-4">
+              <div className="relative flex items-center justify-center my-3">
                 <div className="border-t border-slate-800 w-full" />
-                <span className="bg-slate-900 px-3 text-[10px] uppercase font-bold text-slate-500 tracking-wider">
-                  ou continue com e-mail
+                <span className="bg-slate-900 px-2.5 text-[9px] uppercase font-bold text-slate-500 tracking-wider">
+                  ou com e-mail
                 </span>
                 <div className="border-t border-slate-800 w-full" />
               </div>
             </div>
 
             {/* Email/Password Form */}
-            <form onSubmit={handleSubmit} className="space-y-3.5">
+            <form onSubmit={handleSubmit} className="space-y-3">
               {viewMode === 'register' && (
                 <>
                   <div>
@@ -441,13 +451,12 @@ export const LoginScreen: React.FC = () => {
                         onChange={(e) => setName(e.target.value)}
                         disabled={loading}
                         required={viewMode === 'register'}
-                        className="w-full bg-slate-950 border border-slate-700 rounded-xl pl-10 pr-4 py-2.5 text-sm text-white focus:outline-none focus:border-sky-500 transition-colors disabled:opacity-50"
-                        placeholder="Ex: Alexandre Machado"
+                        className="w-full bg-slate-950 border border-slate-700 rounded-xl pl-9 pr-3 py-2 text-xs sm:text-sm text-white focus:outline-none focus:border-sky-500 transition-colors disabled:opacity-50"
                       />
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                     <div>
                       <label className="block text-[11px] font-bold text-slate-300 mb-1 uppercase tracking-wider">
                         Empresa / Órgão
@@ -461,8 +470,7 @@ export const LoginScreen: React.FC = () => {
                           value={company}
                           onChange={(e) => setCompany(e.target.value)}
                           disabled={loading}
-                          className="w-full bg-slate-950 border border-slate-700 rounded-xl pl-10 pr-3 py-2.5 text-xs text-white focus:outline-none focus:border-sky-500 transition-colors"
-                          placeholder="Ex: AM TST Engenharia"
+                          className="w-full bg-slate-950 border border-slate-700 rounded-xl pl-9 pr-3 py-2 text-xs text-white focus:outline-none focus:border-sky-500 transition-colors"
                         />
                       </div>
                     </div>
@@ -480,8 +488,7 @@ export const LoginScreen: React.FC = () => {
                           value={phone}
                           onChange={(e) => setPhone(e.target.value)}
                           disabled={loading}
-                          className="w-full bg-slate-950 border border-slate-700 rounded-xl pl-10 pr-3 py-2.5 text-xs text-white focus:outline-none focus:border-sky-500 transition-colors"
-                          placeholder="(00) 00000-0000"
+                          className="w-full bg-slate-950 border border-slate-700 rounded-xl pl-9 pr-3 py-2 text-xs text-white focus:outline-none focus:border-sky-500 transition-colors"
                         />
                       </div>
                     </div>
@@ -499,11 +506,11 @@ export const LoginScreen: React.FC = () => {
                         value={requestedRole}
                         onChange={(e) => setRequestedRole(e.target.value as UserRole)}
                         disabled={loading}
-                        className="w-full bg-slate-950 border border-slate-700 rounded-xl pl-10 pr-4 py-2.5 text-xs text-slate-200 focus:outline-none focus:border-sky-500 transition-colors"
+                        className="w-full bg-slate-950 border border-slate-700 rounded-xl pl-9 pr-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-sky-500 transition-colors"
                       >
-                        <option value="surveyor">Coletor de Campo (GPS, Trilhas, Alfinetes)</option>
+                        <option value="surveyor">Coletor de Campo (GPS, Mapas, Madeira)</option>
                         <option value="field_lead">Líder de Equipe (Gestão e Edição)</option>
-                        <option value="auditor">Auditor (Visualização de Mapas e Relatórios)</option>
+                        <option value="auditor">Auditor (Visualização de Laudos)</option>
                       </select>
                     </div>
                   </div>
@@ -512,7 +519,7 @@ export const LoginScreen: React.FC = () => {
 
               <div>
                 <label className="block text-[11px] font-bold text-slate-300 mb-1 uppercase tracking-wider">
-                  E-mail Corporativo *
+                  E-mail de Acesso *
                 </label>
                 <div className="relative">
                   <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -524,32 +531,15 @@ export const LoginScreen: React.FC = () => {
                     onChange={(e) => setEmail(e.target.value)}
                     disabled={loading}
                     required
-                    className="w-full bg-slate-950 border border-slate-700 rounded-xl pl-10 pr-4 py-2.5 text-sm text-white focus:outline-none focus:border-sky-500 transition-colors disabled:opacity-50"
-                    placeholder="usuario@empresa.com"
+                    className="w-full bg-slate-950 border border-slate-700 rounded-xl pl-9 pr-3 py-2 text-xs sm:text-sm text-white focus:outline-none focus:border-sky-500 transition-colors disabled:opacity-50"
                   />
                 </div>
               </div>
 
               <div>
-                <div className="flex items-center justify-between mb-1">
-                  <label className="text-[11px] font-bold text-slate-300 uppercase tracking-wider">
-                    Senha de Acesso *
-                  </label>
-                  {viewMode === 'login' && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setResetEmail(email);
-                        setViewMode('forgot_password');
-                        setError('');
-                        setSuccess('');
-                      }}
-                      className="text-[11px] text-sky-400 hover:text-sky-300 font-semibold hover:underline"
-                    >
-                      Esqueceu a senha?
-                    </button>
-                  )}
-                </div>
+                <label className="block text-[11px] font-bold text-slate-300 mb-1 uppercase tracking-wider">
+                  Senha de Acesso *
+                </label>
                 <div className="relative">
                   <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                     <Lock className="w-4 h-4 text-slate-500" />
@@ -560,8 +550,7 @@ export const LoginScreen: React.FC = () => {
                     onChange={(e) => setPassword(e.target.value)}
                     disabled={loading}
                     required
-                    className="w-full bg-slate-950 border border-slate-700 rounded-xl pl-10 pr-12 py-2.5 text-sm text-white focus:outline-none focus:border-sky-500 transition-colors disabled:opacity-50"
-                    placeholder="••••••••"
+                    className="w-full bg-slate-950 border border-slate-700 rounded-xl pl-9 pr-10 py-2 text-xs sm:text-sm text-white focus:outline-none focus:border-sky-500 transition-colors disabled:opacity-50"
                   />
                   <button
                     type="button"
@@ -571,23 +560,40 @@ export const LoginScreen: React.FC = () => {
                     {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                   </button>
                 </div>
+
+                {/* Elegantly placed "Esqueceu a senha?" link under password field */}
+                {viewMode === 'login' && (
+                  <div className="flex justify-end mt-1.5">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setResetEmail(email);
+                        setViewMode('forgot_password');
+                        setError('');
+                        setSuccess('');
+                      }}
+                      className="text-[11px] text-sky-400 hover:text-sky-300 font-semibold hover:underline transition-colors py-0.5"
+                    >
+                      Esqueceu a senha?
+                    </button>
+                  </div>
+                )}
               </div>
 
+              {/* Main Submit Button */}
               <button
                 type="submit"
                 disabled={loading || googleLoading}
-                className="w-full bg-sky-600 hover:bg-sky-500 disabled:bg-sky-800 text-white font-bold py-3 rounded-xl shadow-lg transition-all flex items-center justify-center gap-2 mt-5 text-sm active:scale-98"
+                className="w-full bg-sky-600 hover:bg-sky-500 disabled:bg-sky-800 text-white font-bold py-2.5 sm:py-3 rounded-xl shadow-lg transition-all flex items-center justify-center gap-2 mt-3 text-xs sm:text-sm active:scale-98"
               >
                 {loading ? (
                   <>
                     <Loader2 className="w-4 h-4 animate-spin" />
-                    <span>{viewMode === 'login' ? 'Autenticando...' : 'Enviando Solicitação...'}</span>
+                    <span>{viewMode === 'login' ? 'Autenticando...' : 'Enviando...'}</span>
                   </>
                 ) : (
                   <>
-                    <span>
-                      {viewMode === 'login' ? 'Entrar no Sistema' : 'Solicitar Liberação de Acesso'}
-                    </span>
+                    <span>{viewMode === 'login' ? 'Realizar Login' : 'Solicitar Cadastro'}</span>
                     <ArrowRight className="w-4 h-4" />
                   </>
                 )}
@@ -595,7 +601,7 @@ export const LoginScreen: React.FC = () => {
             </form>
 
             {/* Toggle between Login and Register */}
-            <div className="mt-5 pt-4 border-t border-slate-800 text-center space-y-3.5">
+            <div className="mt-3.5 pt-3 border-t border-slate-800 text-center space-y-2.5">
               <button
                 type="button"
                 onClick={() => {
@@ -606,8 +612,8 @@ export const LoginScreen: React.FC = () => {
                 className="text-xs font-semibold text-slate-400 hover:text-sky-400 transition-colors"
               >
                 {viewMode === 'login'
-                  ? 'Não tem acesso ainda? Solicitar cadastro'
-                  : 'Já possui cadastro aprovado? Fazer login'}
+                  ? 'Não tem conta? Solicitar cadastro'
+                  : 'Já possui cadastro? Realizar login'}
               </button>
 
               <PwaInstallButton variant="login" />
@@ -616,9 +622,9 @@ export const LoginScreen: React.FC = () => {
         )}
 
         {/* Footer info */}
-        <div className="flex flex-col items-center justify-center gap-1 text-[11px] text-slate-500 font-medium text-center">
+        <div className="flex flex-col items-center justify-center gap-1 text-[10px] sm:text-[11px] text-slate-500 font-medium text-center">
           <div className="flex items-center gap-1.5">
-            <ShieldCheck className="w-4 h-4 text-emerald-400" />
+            <ShieldCheck className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
             <span>GoField Pro • AM TST SAÚDE E SEGURANÇA DO TRABALHO</span>
           </div>
         </div>
