@@ -107,15 +107,36 @@ export const PlanUpgradeModal: React.FC = () => {
   const [copied, setCopied] = useState<boolean>(false);
   const [isCheckingPayment, setIsCheckingPayment] = useState<boolean>(false);
 
-  // Active showcase plans configured by Admin
+  // Active showcase plans strictly filtered by Admin configuration
   const availablePlans = useMemo(() => {
-    const rawPlans = (billingConfig?.plans && billingConfig.plans.length > 0)
-      ? billingConfig.plans
-      : FALLBACK_PLANS;
+    let rawPlans: PlanItemConfig[] = [];
 
-    // Filter only plans marked as active in showcase
+    if (billingConfig?.plans && Array.isArray(billingConfig.plans) && billingConfig.plans.length > 0) {
+      rawPlans = billingConfig.plans;
+    } else {
+      try {
+        const local = localStorage.getItem('gofield_custom_plans');
+        if (local) {
+          const parsed = JSON.parse(local);
+          if (Array.isArray(parsed) && parsed.length > 0) rawPlans = parsed;
+        }
+      } catch {}
+    }
+
+    if (rawPlans.length === 0) {
+      rawPlans = FALLBACK_PLANS;
+    }
+
+    // Filter STRICTLY by activeInShowcase !== false
     const filtered = rawPlans.filter((p) => p.activeInShowcase !== false);
-    return filtered.length > 0 ? filtered : FALLBACK_PLANS;
+    
+    // If the admin hid everything except 1 plan, return EXACTLY that 1 plan!
+    if (filtered.length > 0) {
+      return filtered;
+    }
+
+    // Safety fallback: only return the primary plan if all were hidden
+    return [rawPlans[0] || FALLBACK_PLANS[0]];
   }, [billingConfig?.plans]);
 
   // Selected plan state

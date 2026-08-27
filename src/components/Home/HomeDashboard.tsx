@@ -43,7 +43,9 @@ export const HomeDashboard: React.FC = () => {
     showConfirm,
     notifySuccess,
     notifyWarning,
-    notifyError 
+    notifyError,
+    isProUser,
+    openUpgradeModal,
   } = useApp();
 
   const { profile, user } = useAuth();
@@ -159,6 +161,11 @@ export const HomeDashboard: React.FC = () => {
   };
 
   const handleOpenCreate = () => {
+    const isOwnerAdmin = profile?.role === 'super_admin' || profile?.email?.toLowerCase() === 'alexandre1604981@gmail.com';
+    if (!isProUser && !isOwnerAdmin) {
+      openUpgradeModal('Registrar Atividade de Campo');
+      return;
+    }
     setEditingRoundId(null);
     setFormData({
       date: new Date().toISOString().slice(0, 10),

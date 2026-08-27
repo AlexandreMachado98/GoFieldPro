@@ -25,6 +25,9 @@ import {
   Check,
   ArrowRight,
   Sparkles,
+  Lock,
+  Zap,
+  Crown,
 } from 'lucide-react';
 
 export const FieldRoundsPanel: React.FC = () => {
@@ -38,9 +41,47 @@ export const FieldRoundsPanel: React.FC = () => {
     notifySuccess,
     notifyWarning,
     notifyError,
+    isProUser,
+    openUpgradeModal,
   } = useApp();
 
   const { profile, user } = useAuth();
+
+  const isOwnerAdmin = profile?.role === 'super_admin' || profile?.email?.toLowerCase() === 'alexandre1604981@gmail.com';
+  const hasFullAccess = isOwnerAdmin || isProUser;
+
+  // Strict Access Barrier for Overdue / Non-Pro users
+  if (!hasFullAccess) {
+    return (
+      <div className="flex-1 h-full w-full bg-slate-950 flex items-center justify-center p-4">
+        <div className="max-w-md w-full bg-slate-900 border-2 border-amber-500/40 rounded-3xl p-6 sm:p-8 text-center space-y-4 shadow-2xl animate-in fade-in">
+          <div className="w-16 h-16 rounded-3xl bg-amber-500/20 text-amber-400 border border-amber-500/30 flex items-center justify-center mx-auto shadow-lg">
+            <Lock className="w-8 h-8" />
+          </div>
+          <div className="space-y-1.5">
+            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/40 text-[10px] font-black uppercase tracking-wider">
+              <Crown className="w-3.5 h-3.5" />
+              Recurso Exclusivo Pro
+            </div>
+            <h3 className="text-xl sm:text-2xl font-black text-white">Registro de Atividades Bloqueado</h3>
+            <p className="text-xs text-slate-300 leading-relaxed">
+              O módulo de controle de rondas, frota, odômetro e relatórios de campo em PDF com fotos é exclusivo para assinantes com plano ativo.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => openUpgradeModal('Registro de Atividades de Campo')}
+            className="w-full py-3.5 px-4 bg-gradient-to-r from-amber-500 via-sky-500 to-amber-500 hover:from-amber-400 hover:to-sky-400 text-slate-950 font-black text-xs sm:text-sm uppercase tracking-wider rounded-2xl shadow-xl flex items-center justify-center gap-2 cursor-pointer active:scale-95 transition-all"
+          >
+            <Zap className="w-4 h-4 fill-current" />
+            <span>Liberar Registro de Atividades via PIX</span>
+            <ArrowRight className="w-4 h-4" />
+          </button>
+        </div>
+      </div>
+    );
+  }
+
 
   // Search & Filter state
   const [searchTerm, setSearchTerm] = useState('');
