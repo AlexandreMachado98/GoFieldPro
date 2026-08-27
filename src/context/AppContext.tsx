@@ -1,4 +1,7 @@
-import React, { createContext, useContext, useState, useEffect, useRef, ReactNode, useCallback } from 'react';
+import { doc, onSnapshot } from 'firebase/firestore';
+import { db } from '../lib/firebase';
+import { useAuth } from './AuthContext';
+import React, { createContext, useContext, useState, useEffect, useRef, ReactNode, useCallback, useMemo } from 'react';
 import { parseOdometerKm } from '../utils/geoUtils';
 import { saveAppState, loadAppState } from '../utils/stateStorage';
 import {
@@ -21,6 +24,7 @@ import {
   FieldRound,
   FireIncident,
   AppSettings,
+  SystemBillingConfig,
 } from '../types';
 import {
   initialProjects,
@@ -50,10 +54,20 @@ interface AppContextType {
   setCurrentRole: (role: UserRole) => void;
 
   // Active View Tab
-  activeTab: 'home' | 'map' | 'pdf_maps' | 'layers' | 'tracks' | 'field_rounds' | 'team' | 'reports' | 'analytics' | 'offline';
-  setActiveTab: (tab: 'home' | 'map' | 'pdf_maps' | 'layers' | 'tracks' | 'field_rounds' | 'team' | 'reports' | 'analytics' | 'offline') => void;
+  activeTab: 'home' | 'map' | 'pdf_maps' | 'layers' | 'tracks' | 'field_rounds' | 'fire_incidents' | 'team' | 'reports' | 'analytics' | 'offline' | 'admin';
+  setActiveTab: (tab: 'home' | 'map' | 'pdf_maps' | 'layers' | 'tracks' | 'field_rounds' | 'fire_incidents' | 'team' | 'reports' | 'analytics' | 'offline' | 'admin') => void;
   isMobileMenuOpen: boolean;
   setIsMobileMenuOpen: (isOpen: boolean) => void;
+  isSidebarCollapsed: boolean;
+  setIsSidebarCollapsed: (val: boolean | ((prev: boolean) => boolean)) => void;
+  toggleSidebarCollapsed: () => void;
+  isProUser: boolean;
+  isUpgradeModalOpen: boolean;
+  setIsUpgradeModalOpen: (val: boolean) => void;
+  upgradeModalFeature: string | null;
+  openUpgradeModal: (featureName?: string) => void;
+  billingConfig: SystemBillingConfig;
+  canAddPdfMap: (currentMapCount: number) => { allowed: boolean; reason?: string; isFourthMapBlock?: boolean };
 
   // Field Trips / Rodada de Campo (Quilometragem)
   fieldRounds: FieldRound[];
@@ -61,6 +75,13 @@ interface AppContextType {
   updateFieldRound: (id: string, round: Partial<FieldRound>) => void;
   deleteFieldRound: (id: string) => void;
   addPhotoToFieldRound: (id: string, photoBase64: string) => void;
+
+  // Fire Incidents & Sinistros Florestais
+  fireIncidents: FireIncident[];
+  addFireIncident: (incident: Omit<FireIncident, 'id' | 'createdAt' | 'updatedAt'>) => void;
+  updateFireIncident: (id: string, incident: Partial<FireIncident>) => void;
+  deleteFireIncident: (id: string) => void;
+  addPhotoToFireIncident: (id: string, photoBase64: string) => void;
 
   // Projects
   projects: ProjectFolder[];
@@ -193,6 +214,7 @@ interface AppContextType {
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
 export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
+  const { profile } = useAuth();
   // Localization & Role
   const [language, setLanguage] = useState<Language>('pt');
   const [currentRole, setCurrentRole] = useState<UserRole>('super_admin');
@@ -207,6 +229,78 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       return false;
     }
   });
+
+
+  // System Billing Config
+  const [billingConfig, setBillingConfig] = useState<SystemBillingConfig>({
+    pixKey: '48.123.456/0001-90',
+    pixKeyType: 'cnpj',
+    beneficiaryName: 'AM TST SAÚDE E SEGURANÇA DO TRABALHO',
+    bankName: 'Banco Inter PJ / Nubank PJ',
+    defaultTrialDays: 14,
+    whatsappSupportNumber: '5511999999999',
+    customMessageTemplate: 'Olá {nome}, sua assinatura GoField Pro está disponível.',
+    proOriginalPrice: 97.99,
+    proLaunchPrice: 44.99,
+    proDiscountBadge: '54% OFF • LANÇAMENTO',
+  });
+
+  useEffect(() => {
+    const billDocRef = doc(db, 'system_config', 'billing');
+    const unsub = onSnapshot(billDocRef, (snap) => {
+      if (snap.exists()) {
+        setBillingConfig((prev) => ({ ...prev, ...snap.data() as SystemBillingConfig }));
+      }
+    }, (err) => console.warn('Billing config listener notice:', err.message));
+    return () => unsub();
+  }, []);
+
+  // Upgrade Modal State
+  const [isUpgradeModalOpen, setIsUpgradeModalOpen] = useState<boolean>(false);
+  const [upgradeModalFeature, setUpgradeModalFeature] = useState<string | null>(null);
+
+  const openUpgradeModal = useCallback((featureName?: string) => {
+    setUpgradeModalFeature(featureName || null);
+    setIsUpgradeModalOpen(true);
+  }, []);
+
+  // Is Pro User check
+  const isProUser = useMemo(() => {
+    if (!profile) return false;
+    if (profile.role === 'super_admin') return true;
+    if (profile.email?.toLowerCase() === 'alexandre1604981@gmail.com') return true;
+    if (profile.subscriptionPlan && profile.subscriptionPlan !== 'free' && profile.subscriptionStatus === 'active') return true;
+    return false;
+  }, [profile]);
+
+  // Check if user can add a PDF map (Free plan: max 2 concurrent maps; block on 4th total map)
+  const canAddPdfMap = useCallback((currentMapCount: number): { allowed: boolean; reason?: string; isFourthMapBlock?: boolean } => {
+    if (isProUser) {
+      return { allowed: true };
+    }
+
+    const lifetimeCount = profile?.lifetimeMapsUploaded || 0;
+
+    // Block on 4th map upload in lifetime
+    if (lifetimeCount >= 3) {
+      return {
+        allowed: false,
+        isFourthMapBlock: true,
+        reason: 'Você atingiu o limite de teste do Plano Gratuito (4º mapa). Faça upgrade para o Plano Profissional para importar mapas ilimitados.',
+      };
+    }
+
+    // Limit to 2 concurrent maps
+    if (currentMapCount >= 2) {
+      return {
+        allowed: false,
+        isFourthMapBlock: false,
+        reason: 'O Plano Gratuito permite usar até 2 mapas PDF ao mesmo tempo. Exclua um dos 2 mapas atuais para adicionar outro, ou faça upgrade para o Plano Profissional ilimitado.',
+      };
+    }
+
+    return { allowed: true };
+  }, [isProUser, profile]);
 
   const toggleSidebarCollapsed = useCallback(() => {
     setIsSidebarCollapsed((prev) => {

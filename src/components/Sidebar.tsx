@@ -8,6 +8,9 @@ import { APP_VERSION } from '../config/version';
 import { PwaInstallButton } from './PWA/PwaInstallButton';
 import {
   Map,
+  Crown,
+  Lock,
+  Zap,
   Home,
   HardDrive,
   UserCog,
@@ -39,6 +42,9 @@ export const Sidebar: React.FC = () => {
     setIsWoodpileModalOpen,
     setIsPoliciesModalOpen,
     fireIncidents,
+    isProUser,
+    openUpgradeModal,
+    billingConfig,
   } = useApp();
   const { profile, logout } = useAuth();
   const { isUpdateAvailable, latestVersion, applyUpdate } = useUpdate();
@@ -82,6 +88,7 @@ export const Sidebar: React.FC = () => {
     badge?: number;
     badgeColor?: string;
     iconColor?: string;
+    isPremium?: boolean;
   }
 
   const tabs: TabItem[] = [
@@ -89,7 +96,7 @@ export const Sidebar: React.FC = () => {
     { id: 'map', label: t.tabMap || 'Mapa de Navegação', icon: Map },
     { id: 'pdf_maps', label: t.tabPdfMaps || 'Mapas & Plantas PDF', icon: FileText },
     { id: 'field_rounds', label: t.tabFieldRounds || 'Registrar Atividade', icon: Gauge },
-    { id: 'offline', label: t.tabOffline || 'Mapas Offline', icon: HardDrive },
+    { id: 'offline', label: t.tabOffline || 'Mapas Offline', icon: HardDrive, isPremium: true },
   ];
 
   if (profile?.role === 'super_admin') {
@@ -161,6 +168,10 @@ export const Sidebar: React.FC = () => {
               <button
                 key={tab.id}
                 onClick={() => {
+                  if ((tab as any).isPremium && !isProUser) {
+                    openUpgradeModal(tab.label);
+                    return;
+                  }
                   setActiveTab(tab.id as any);
                   setIsMobileMenuOpen(false);
                 }}
@@ -179,7 +190,14 @@ export const Sidebar: React.FC = () => {
                       isActive ? 'text-white' : tab.iconColor || 'text-sky-400'
                     }`}
                   />
-                  {!isCollapsed && <span className="truncate">{tab.label}</span>}
+                  {!isCollapsed && (
+                    <div className="flex items-center gap-1.5 truncate">
+                      <span className="truncate">{tab.label}</span>
+                      {(tab as any).isPremium && !isProUser && (
+                        <Lock className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                      )}
+                    </div>
+                  )}
                 </div>
 
                 {badgeCount > 0 && (
@@ -201,6 +219,10 @@ export const Sidebar: React.FC = () => {
             <button
               onClick={() => {
                 setIsMobileMenuOpen(false);
+                if (!isProUser) {
+                  openUpgradeModal('Cubagem Florestal (m³)');
+                  return;
+                }
                 setIsWoodpileModalOpen(true);
               }}
               title={isSidebarCollapsed && !isMobileMenuOpen ? 'Cubagem Florestal (m³)' : undefined}
@@ -213,7 +235,10 @@ export const Sidebar: React.FC = () => {
                 {(!isSidebarCollapsed || isMobileMenuOpen) && <span>Cubagem Florestal</span>}
               </div>
               {(!isSidebarCollapsed || isMobileMenuOpen) && (
-                <span className="text-[9px] uppercase font-black px-1.5 py-0.2 rounded-full bg-emerald-500 text-slate-950">
+                <span className="text-[9px] uppercase font-black px-1.5 py-0.2 rounded-full ${
+                  !isProUser ? 'bg-amber-500 text-slate-950 flex items-center gap-0.5' : 'bg-emerald-500 text-slate-950'
+                }">
+                  {!isProUser && <Lock className="w-2.5 h-2.5" />}
                   m³
                 </span>
               )}
@@ -250,6 +275,33 @@ export const Sidebar: React.FC = () => {
             </button>
 
             {(!isSidebarCollapsed || isMobileMenuOpen) && <PwaInstallButton variant="sidebar" />}
+
+          {/* Pro Upgrade Banner for Free Users */}
+          {!isProUser && (!isSidebarCollapsed || isMobileMenuOpen) && (
+            <div className="p-2.5 bg-gradient-to-br from-amber-500/10 via-sky-500/10 to-transparent border border-amber-500/30 rounded-2xl space-y-2 mt-2">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-1.5">
+                  <Crown className="w-4 h-4 text-amber-400" />
+                  <span className="text-xs font-black text-white">GoField Pro</span>
+                </div>
+                <span className="text-[9px] font-extrabold bg-amber-500 text-slate-950 px-1.5 py-0.5 rounded-full">
+                  {billingConfig.proDiscountBadge || '54% OFF'}
+                </span>
+              </div>
+              <p className="text-[10px] text-slate-400 leading-tight">
+                Mapas PDF ilimitados, cubagem de madeira e mapas offline.
+              </p>
+              <button
+                type="button"
+                onClick={() => openUpgradeModal()}
+                className="w-full py-2 px-3 bg-gradient-to-r from-amber-500 to-sky-500 hover:from-amber-400 hover:to-sky-400 text-slate-950 font-black text-xs rounded-xl shadow-md transition-all flex items-center justify-center gap-1.5 active:scale-95 cursor-pointer"
+              >
+                <Zap className="w-3.5 h-3.5 fill-current" />
+                <span>Assinar R$ {(billingConfig.proLaunchPrice || 44.99).toFixed(2).replace('.', ',')}/mês</span>
+              </button>
+            </div>
+          )}
+
           </div>
         </nav>
 

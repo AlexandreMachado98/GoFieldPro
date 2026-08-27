@@ -161,6 +161,9 @@ export const PdfMapNavigator: React.FC = () => {
     currentGps,
     notifySuccess,
     notifyError,
+    isProUser,
+    openUpgradeModal,
+    canAddPdfMap,
     notifyWarning,
     notifyInfo,
     showConfirm,
@@ -2793,7 +2796,12 @@ export const PdfMapNavigator: React.FC = () => {
                     : 'text-slate-400 hover:text-amber-400 hover:bg-slate-800/60'
                 }`}
               >
-                <WoodpileIcon className="w-5 h-5 text-amber-400 mb-0.5" />
+                <div className="relative">
+                  <WoodpileIcon className="w-5 h-5 text-amber-400 mb-0.5" />
+                  {!isProUser && (
+                    <Lock className="w-2.5 h-2.5 text-amber-400 absolute -top-1 -right-1" />
+                  )}
+                </div>
                 <span className="text-[10px] font-extrabold tracking-tight">Madeira</span>
                 {activeDoc?.markers?.filter((m) => m.category === 'woodpile').length ? (
                   <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-amber-500 text-slate-950 text-[9px] font-black flex items-center justify-center">

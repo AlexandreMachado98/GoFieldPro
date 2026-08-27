@@ -1,3 +1,4 @@
+import { PlanUpgradeModal } from './components/Billing/PlanUpgradeModal';
 import React from 'react';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { AppProvider, useApp } from './context/AppContext';
@@ -61,7 +62,7 @@ const MainAppContent: React.FC = () => {
   }
 
   // If the user's account is pending approval or blocked (and not the owner super_admin)
-  if (profile.role !== 'super_admin' && (profile.status === 'pending' || profile.status === 'blocked')) {
+  if (profile.role !== 'super_admin' && profile.status === 'blocked') {
     return <PendingApprovalScreen />;
   }
 
@@ -106,6 +107,7 @@ const MainAppContent: React.FC = () => {
       <WoodpileCubageModal isOpen={isWoodpileModalOpen} onClose={() => setIsWoodpileModalOpen(false)} />
       <LegalPoliciesModal isOpen={isPoliciesModalOpen} onClose={() => setIsPoliciesModalOpen(false)} />
       <ConfirmModal />
+      <PlanUpgradeModal />
       <ToastContainer />
     </div>
   );

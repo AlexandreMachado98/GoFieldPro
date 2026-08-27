@@ -1,7 +1,7 @@
 export type UserRole = 'super_admin' | 'field_lead' | 'surveyor' | 'auditor';
 export type UserStatus = 'pending' | 'active' | 'blocked';
 
-export type SubscriptionPlanType = 'free_trial' | 'pro_mensal' | 'equipe_mensal' | 'florestal_corporativo' | 'personalizado';
+export type SubscriptionPlanType = 'free' | 'free_trial' | 'pro_mensal' | 'equipe_mensal' | 'florestal_corporativo' | 'personalizado';
 export type SubscriptionStatusType = 'active' | 'trial' | 'overdue' | 'suspended' | 'canceled';
 export type PaymentMethodType = 'pix' | 'boleto' | 'cartao' | 'transferencia' | 'cortesia';
 
@@ -64,7 +64,15 @@ export interface SystemBillingConfig {
   whatsappSupportNumber: string;
   customMessageTemplate: string;
   plans?: PlanItemConfig[];
+  proOriginalPrice?: number;
+  proLaunchPrice?: number;
+  proDiscountBadge?: string;
+  asaasApiKey?: string;
+  asaasEnvironment?: 'sandbox' | 'production';
+  asaasWebhookSecret?: string;
+  asaasWalletId?: string;
 }
+
 
 export type Language = 'pt' | 'en' | 'es';
 
