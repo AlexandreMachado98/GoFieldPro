@@ -185,14 +185,19 @@ export const PlanUpgradeModal: React.FC = () => {
     }
   };
 
-  const handleStartCheckout = async () => {
+  const handleStartCheckout = async (targetPlan?: PlanItemConfig) => {
     if (!profile) return;
+    const planToUse = targetPlan || currentPlan;
+    if (targetPlan && targetPlan.id !== selectedPlanId) {
+      setSelectedPlanId(targetPlan.id);
+    }
+    const priceToCharge = planToUse.price;
     setIsGeneratingPix(true);
 
     try {
       // 1. Try Asaas API
       if (billingConfig?.asaasApiKey?.trim()) {
-        const asaasRes = await createAsaasPixPayment(profile, launchPrice, billingConfig);
+        const asaasRes = await createAsaasPixPayment(profile, priceToCharge, billingConfig);
         if (asaasRes) {
           setPaymentId(asaasRes.paymentId);
           setPixPayload(asaasRes.pixPayload);
@@ -280,136 +285,109 @@ export const PlanUpgradeModal: React.FC = () => {
                   </p>
                 ) : (
                   <p className="text-xs text-slate-400">
-                    Escolha o plano ideal para suas operações florestais, topográficas e de campo.
+                    Clique no plano desejado abaixo para gerar o pagamento instantâneo via PIX.
                   </p>
                 )}
               </div>
 
-              {/* Dynamic Plan Selector (if more than 1 plan is active) */}
-              {availablePlans.length > 1 && (
-                <div className="space-y-1.5">
-                  <span className="text-[10px] font-bold uppercase text-slate-400 tracking-wider block text-center">
-                    Selecione um Plano:
-                  </span>
-                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                    {availablePlans.map((plan) => {
-                      const isSelected = plan.id === selectedPlanId;
-                      return (
-                        <button
-                          key={plan.id}
-                          type="button"
-                          onClick={() => setSelectedPlanId(plan.id)}
-                          className={`p-2.5 rounded-2xl border text-left transition-all relative flex flex-col justify-between cursor-pointer active:scale-95 ${
-                            isSelected
-                              ? 'bg-gradient-to-b from-sky-950/60 to-slate-900 border-sky-400 ring-2 ring-sky-500/40 shadow-lg shadow-sky-950/50'
-                              : 'bg-slate-900/80 border-slate-800 hover:border-slate-700 opacity-80 hover:opacity-100'
-                          }`}
-                        >
-                          {plan.highlight && (
-                            <span className="absolute -top-2 right-2 px-1.5 py-0.5 bg-amber-500 text-slate-950 text-[8px] font-black rounded-full flex items-center gap-0.5 shadow">
-                              <Star className="w-2 h-2 fill-current" />
-                              Destaque
-                            </span>
-                          )}
-                          <div>
-                            <span className="text-[9px] font-extrabold uppercase text-slate-400 block truncate">
+              {/* Plan Cards Grid with 1-Click Action */}
+              <div className="space-y-4">
+                {availablePlans.map((plan) => {
+                  const origPrice = plan.originalPrice || (plan.price * 1.5);
+                  const isSelected = plan.id === selectedPlanId;
+
+                  return (
+                    <div
+                      key={plan.id}
+                      onClick={() => handleStartCheckout(plan)}
+                      className={`relative p-4 sm:p-5 rounded-3xl border-2 transition-all cursor-pointer shadow-xl ${
+                        isSelected || plan.highlight
+                          ? 'bg-gradient-to-br from-slate-900 via-slate-900 to-sky-950/60 border-emerald-500 ring-2 ring-emerald-500/30 hover:border-emerald-400'
+                          : 'bg-slate-900/90 border-slate-800 hover:border-slate-700'
+                      } hover:scale-[1.01] active:scale-98`}
+                    >
+                      {plan.discountBadge && (
+                        <div className="absolute -top-2.5 right-4 px-3 py-0.5 bg-gradient-to-r from-amber-500 to-rose-500 text-slate-950 text-[10px] font-black rounded-full shadow-md animate-pulse">
+                          {plan.discountBadge}
+                        </div>
+                      )}
+
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-800/80">
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <span className="text-base sm:text-lg font-black text-white">{plan.name}</span>
+                            <span className="text-[9px] font-black px-2 py-0.5 rounded-full bg-slate-800 text-slate-300 border border-slate-700">
                               {plan.tag}
                             </span>
-                            <span className="text-xs font-black text-white block truncate mt-0.5">
-                              {plan.name}
-                            </span>
                           </div>
-                          <div className="mt-2 pt-1 border-t border-slate-800/80">
-                            <span className="text-xs sm:text-sm font-black text-emerald-400 font-mono">
+                          <p className="text-[11px] text-slate-400 mt-0.5">Acesso completo e liberação imediata via PIX</p>
+                        </div>
+
+                        <div className="text-left sm:text-right">
+                          {origPrice > plan.price && (
+                            <span className="text-xs line-through text-slate-500 font-bold block">
+                              R$ {origPrice.toFixed(2).replace('.', ',')}
+                            </span>
+                          )}
+                          <div className="flex items-baseline sm:justify-end gap-1">
+                            <span className="text-2xl sm:text-3xl font-black text-emerald-400 font-mono">
                               R$ {plan.price.toFixed(2).replace('.', ',')}
                             </span>
-                            <span className="text-[9px] text-slate-400 font-medium">{plan.billingPeriod}</span>
+                            <span className="text-xs text-slate-400 font-bold">{plan.billingPeriod || '/mês'}</span>
                           </div>
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
-
-              {/* Selected Plan Details Card */}
-              <div className="relative p-5 rounded-2xl bg-gradient-to-br from-slate-900 via-slate-900/90 to-sky-950/40 border-2 border-sky-500/60 shadow-xl overflow-hidden">
-                {discountBadge && (
-                  <div className="absolute top-3 right-3 px-2.5 py-1 bg-gradient-to-r from-amber-500 to-rose-500 text-slate-950 text-[10px] font-black rounded-full shadow-md animate-pulse">
-                    {discountBadge}
-                  </div>
-                )}
-
-                <div className="space-y-1">
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">{currentPlan.name}</span>
-                    <span className="text-[9px] font-black px-2 py-0.5 rounded-full bg-slate-800 text-slate-300 border border-slate-700">
-                      {currentPlan.tag}
-                    </span>
-                  </div>
-                  <div className="flex items-baseline gap-2">
-                    {originalPrice > launchPrice && (
-                      <span className="text-sm line-through text-slate-500 font-bold">
-                        R$ {originalPrice.toFixed(2).replace('.', ',')}
-                      </span>
-                    )}
-                    <span className="text-3xl sm:text-4xl font-black text-white font-mono">
-                      R$ {launchPrice.toFixed(2).replace('.', ',')}
-                    </span>
-                    <span className="text-xs text-slate-400 font-bold">{currentPlan.billingPeriod || '/mês'}</span>
-                  </div>
-                  <p className="text-[11px] text-emerald-400 font-bold">Cancele quando quiser • Sem fidelidade</p>
-                </div>
-
-                {/* Features List */}
-                <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-2 pt-3 border-t border-slate-800 text-xs text-slate-200">
-                  {currentPlan.features.map((feat, idx) => (
-                    <div key={idx} className="flex items-center gap-2">
-                      <div className="w-5 h-5 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center shrink-0">
-                        <Check className="w-3.5 h-3.5" />
+                        </div>
                       </div>
-                      <span className="text-[11px] font-medium leading-tight">{feat}</span>
+
+                      {/* Features */}
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 py-3 text-xs text-slate-200">
+                        {plan.features.map((feat, idx) => (
+                          <div key={idx} className="flex items-center gap-2">
+                            <div className="w-4 h-4 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center shrink-0">
+                              <Check className="w-3 h-3" />
+                            </div>
+                            <span className="text-[11px] font-medium leading-tight">{feat}</span>
+                          </div>
+                        ))}
+                      </div>
+
+                      {/* 1-Click Subscribe Button inside each card */}
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleStartCheckout(plan);
+                        }}
+                        disabled={isGeneratingPix}
+                        className="w-full mt-2 py-3 px-4 rounded-2xl bg-gradient-to-r from-emerald-500 via-sky-500 to-emerald-500 hover:from-emerald-400 hover:to-emerald-400 text-slate-950 font-black text-xs sm:text-sm uppercase tracking-wider shadow-lg shadow-emerald-950/60 transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-95"
+                      >
+                        {isGeneratingPix && selectedPlanId === plan.id ? (
+                          <>
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                            <span>Gerando PIX...</span>
+                          </>
+                        ) : (
+                          <>
+                            <Zap className="w-4 h-4 fill-current text-slate-950" />
+                            <span>Assinar {plan.name} • R$ {plan.price.toFixed(2).replace('.', ',')}</span>
+                            <ArrowRight className="w-4 h-4 ml-1" />
+                          </>
+                        )}
+                      </button>
                     </div>
-                  ))}
-                </div>
+                  );
+                })}
               </div>
 
-              {/* Free vs Pro Comparison */}
-              <div className="p-3.5 rounded-2xl bg-slate-900/60 border border-slate-800/80 space-y-2 text-xs">
-                <h4 className="font-extrabold text-slate-300 text-xs">Comparativo com o Plano Gratuito:</h4>
-                <div className="flex items-center justify-between py-0.5 border-b border-slate-800/80 text-slate-400 text-[11px]">
-                  <span>Limite de Mapas PDF Simultâneos</span>
-                  <span className="font-bold text-slate-200">2 no Grátis <strong className="text-emerald-400">vs Ilimitado no Pro</strong></span>
-                </div>
-                <div className="flex items-center justify-between py-0.5 border-b border-slate-800/80 text-slate-400 text-[11px]">
-                  <span>Cubagem de Pilhas de Madeira</span>
-                  <span className="font-bold text-slate-200"><Lock className="w-3 h-3 inline text-amber-400 mr-1" />Liberado no Plano</span>
-                </div>
-                <div className="flex items-center justify-between py-0.5 text-slate-400 text-[11px]">
-                  <span>Download de Satélite Offline</span>
-                  <span className="font-bold text-slate-200"><Lock className="w-3 h-3 inline text-amber-400 mr-1" />Liberado no Plano</span>
+              {/* Security & Warranty Note */}
+              <div className="text-center pt-2 text-[11px] text-slate-400 space-y-1">
+                <div className="flex items-center justify-center gap-3 text-slate-300">
+                  <span className="flex items-center gap-1"><ShieldCheck className="w-3.5 h-3.5 text-emerald-400" /> Pagamento 100% Seguro</span>
+                  <span>•</span>
+                  <span>Liberação Automática</span>
+                  <span>•</span>
+                  <span>Sem Fidelidade</span>
                 </div>
               </div>
-
-              {/* Action Button */}
-              <button
-                onClick={handleStartCheckout}
-                disabled={isGeneratingPix}
-                className="w-full py-3.5 px-6 rounded-2xl bg-gradient-to-r from-emerald-500 via-sky-500 to-emerald-500 text-slate-950 font-black text-sm uppercase tracking-wider shadow-lg shadow-emerald-950/60 hover:scale-[1.02] active:scale-98 transition-all flex items-center justify-center gap-2 cursor-pointer"
-              >
-                {isGeneratingPix ? (
-                  <>
-                    <Loader2 className="w-5 h-5 animate-spin" />
-                    <span>Gerando Cobrança Asaas...</span>
-                  </>
-                ) : (
-                  <>
-                    <Zap className="w-5 h-5 fill-current text-slate-950" />
-                    <span>Assinar {currentPlan.name} por R$ {launchPrice.toFixed(2).replace('.', ',')}{currentPlan.billingPeriod || '/mês'}</span>
-                    <ArrowRight className="w-4 h-4 ml-1" />
-                  </>
-                )}
-              </button>
             </>
           )}
 
