@@ -470,7 +470,7 @@ export const LayerManagerModal: React.FC = () => {
                   <p className="text-[10px] text-slate-500 mt-1">Converta seu PDF para PNG ou JPG (Máx recomendado 5MB)</p>
                   <input
                     ref={fileInputRef}
-                    type="file"
+                    type="file" onClick={(e) => e.stopPropagation()}
                     accept=".jpg,.jpeg,.png"
                     className="hidden"
                     onChange={(e) => setPdfFile(e.target.files?.[0] || null)}
@@ -509,7 +509,7 @@ export const LayerManagerModal: React.FC = () => {
 
               <div className="border-2 border-dashed border-slate-700 hover:border-emerald-500 rounded-xl p-8 text-center cursor-pointer bg-slate-800/40 hover:bg-slate-800/70 transition-all relative">
                 <input
-                  type="file"
+                  type="file" onClick={(e) => e.stopPropagation()}
                   accept=".kml,.kmz"
                   disabled={isProcessing}
                   onChange={handleKmlKmzUpload}

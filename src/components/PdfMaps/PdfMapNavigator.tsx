@@ -1645,6 +1645,17 @@ export const PdfMapNavigator: React.FC = () => {
     }, 0);
   }, [recordedPoints]);
 
+  const triggerFileInput = (inputRef: React.RefObject<HTMLInputElement | null>) => {
+    if (!inputRef.current) return;
+    setTimeout(() => {
+      try {
+        inputRef.current?.click();
+      } catch (err) {
+        console.warn('Error triggering file input:', err);
+      }
+    }, 0);
+  };
+
   // Process and Render PDF / Image File safely
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -2535,7 +2546,7 @@ export const PdfMapNavigator: React.FC = () => {
             </p>
             <div className="flex flex-col sm:flex-row items-center gap-3">
               <button
-                onClick={() => fileInputRef.current?.click()}
+                onClick={() => triggerFileInput(fileInputRef)}
                 className="flex items-center gap-2 px-5 py-3 rounded-2xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-extrabold text-sm shadow-xl shadow-emerald-900/30 transition-all active:scale-95"
               >
                 <UploadCloud className="w-5 h-5" />
@@ -3113,7 +3124,7 @@ export const PdfMapNavigator: React.FC = () => {
                 <div className="grid grid-cols-2 gap-2">
                   <button
                     type="button"
-                    onClick={() => markerCameraInputRef.current?.click()}
+                    onClick={() => triggerFileInput(markerCameraInputRef)}
                     className="flex items-center justify-center gap-1.5 p-2.5 rounded-xl bg-slate-800 hover:bg-slate-750 border border-slate-700 text-emerald-400 font-bold text-xs active:scale-95"
                   >
                     <Camera className="w-4 h-4" />
@@ -3121,7 +3132,7 @@ export const PdfMapNavigator: React.FC = () => {
                   </button>
                   <button
                     type="button"
-                    onClick={() => markerPhotoInputRef.current?.click()}
+                    onClick={() => triggerFileInput(markerPhotoInputRef)}
                     className="flex items-center justify-center gap-1.5 p-2.5 rounded-xl bg-slate-800 hover:bg-slate-750 border border-slate-700 text-sky-400 font-bold text-xs active:scale-95"
                   >
                     <ImageIcon className="w-4 h-4" />
@@ -3491,7 +3502,7 @@ export const PdfMapNavigator: React.FC = () => {
                     Fotos Anexadas ({selectedMarker.photos?.length || 0})
                   </span>
                   <button
-                    onClick={() => editPhotoInputRef.current?.click()}
+                    onClick={() => triggerFileInput(editPhotoInputRef)}
                     className="text-emerald-400 font-bold text-xs flex items-center gap-1 hover:underline"
                   >
                     <Plus className="w-3.5 h-3.5" />
@@ -3604,7 +3615,7 @@ export const PdfMapNavigator: React.FC = () => {
             <div className="flex-1 overflow-y-auto p-4 space-y-5 text-xs pb-32">
               
               <button
-                onClick={() => fileInputRef.current?.click()}
+                onClick={() => triggerFileInput(fileInputRef)}
                 disabled={isProcessing}
                 className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-extrabold rounded-xl shadow-lg transition-all active:scale-98"
               >
@@ -3633,7 +3644,7 @@ export const PdfMapNavigator: React.FC = () => {
                 <button
                   onClick={() => {
                     setIsDrawerOpen(false);
-                    importKmlInputRef.current?.click();
+                    triggerFileInput(importKmlInputRef);
                   }}
                   className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-sky-900/40 hover:bg-sky-800/60 border border-sky-500/40 text-sky-400 font-extrabold rounded-xl shadow transition-all active:scale-98"
                 >

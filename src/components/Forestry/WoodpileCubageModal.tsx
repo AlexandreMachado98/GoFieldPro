@@ -409,7 +409,7 @@ export const WoodpileCubageModal: React.FC<WoodpileCubageModalProps> = ({ isOpen
                 </label>
                 <div className="flex items-center gap-2 flex-wrap">
                   <input
-                    type="file"
+                    type="file" onClick={(e) => e.stopPropagation()}
                     accept="image/*"
                     ref={photoInputRef}
                     onChange={handlePhotoUpload}

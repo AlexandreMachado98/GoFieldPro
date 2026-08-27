@@ -220,7 +220,7 @@ export const PointDetailModal: React.FC<PointDetailModalProps> = ({
 
             <input
               ref={fileInputRef}
-              type="file"
+              type="file" onClick={(e) => e.stopPropagation()}
               accept="image/*"
               multiple
               className="hidden"

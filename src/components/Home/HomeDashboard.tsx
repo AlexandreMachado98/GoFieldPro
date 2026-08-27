@@ -718,7 +718,7 @@ export const HomeDashboard: React.FC = () => {
       {/* Hidden input for direct photo */}
       <input
         ref={directPhotoInputRef}
-        type="file"
+        type="file" onClick={(e) => e.stopPropagation()}
         accept="image/*"
         capture="environment"
         onChange={handleDirectPhotoUpload}
@@ -930,7 +930,7 @@ export const HomeDashboard: React.FC = () => {
 
                 <input
                   ref={photoInputRef}
-                  type="file"
+                  type="file" onClick={(e) => e.stopPropagation()}
                   accept="image/*"
                   multiple
                   onChange={handlePhotoUpload}

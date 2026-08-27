@@ -315,14 +315,14 @@ export const AddWaypointModal: React.FC<AddWaypointModalProps> = ({
 
             {/* Hidden File Inputs */}
             <input
-              type="file"
+              type="file" onClick={(e) => e.stopPropagation()}
               ref={fileInputRef}
               accept="image/*"
               className="hidden"
               onChange={handleFileUpload}
             />
             <input
-              type="file"
+              type="file" onClick={(e) => e.stopPropagation()}
               ref={cameraInputRef}
               accept="image/*"
               capture="environment"

@@ -660,7 +660,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
                       Logotipo da Empresa (PNG / JPG)
                     </label>
                     <input
-                      type="file"
+                      type="file" onClick={(e) => e.stopPropagation()}
                       accept="image/*"
                       ref={logoInputRef}
                       onChange={(e) => {

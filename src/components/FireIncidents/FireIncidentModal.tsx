@@ -503,7 +503,7 @@ export const FireIncidentModal: React.FC<FireIncidentModalProps> = ({
                 <Upload className="w-3.5 h-3.5" />
                 Anexar Fotos
                 <input
-                  type="file"
+                  type="file" onClick={(e) => e.stopPropagation()}
                   accept="image/*"
                   multiple
                   onChange={handlePhotoUpload}

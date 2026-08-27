@@ -708,7 +708,7 @@ export const FieldRoundsPanel: React.FC = () => {
       {/* Hidden input for direct photo addition */}
       <input
         ref={directPhotoInputRef}
-        type="file"
+        type="file" onClick={(e) => e.stopPropagation()}
         accept="image/*"
         capture="environment"
         onChange={handleDirectPhotoUpload}
@@ -945,7 +945,7 @@ export const FieldRoundsPanel: React.FC = () => {
 
                 <input
                   ref={photoInputRef}
-                  type="file"
+                  type="file" onClick={(e) => e.stopPropagation()}
                   accept="image/*"
                   multiple
                   onChange={handlePhotoUpload}
