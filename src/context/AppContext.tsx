@@ -217,7 +217,15 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const { profile } = useAuth();
   // Localization & Role
   const [language, setLanguage] = useState<Language>('pt');
-  const [currentRole, setCurrentRole] = useState<UserRole>('super_admin');
+  const [currentRole, setCurrentRole] = useState<UserRole>('surveyor');
+
+  useEffect(() => {
+    if (profile?.role) {
+      setCurrentRole(profile.role);
+    } else {
+      setCurrentRole('surveyor');
+    }
+  }, [profile?.role]);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<'home' | 'map' | 'pdf_maps' | 'layers' | 'tracks' | 'field_rounds' | 'fire_incidents' | 'team' | 'reports' | 'analytics' | 'offline' | 'admin'>('home');
 
@@ -264,64 +272,78 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     setIsUpgradeModalOpen(true);
   }, []);
 
-  // Is Pro User check: Strict check against Expiry, Suspensions and Trial periods
+  // Is Pro User check: STRICT SECURITY, ZERO ROLE LEAKAGE
   const isProUser = useMemo(() => {
-    if (!profile) return true; // Default to full access during initial loading
-    if (profile.role === 'super_admin') return true;
-    if (profile.email?.toLowerCase() === 'alexandre1604981@gmail.com') return true;
-    if (currentRole === 'super_admin') return true;
+    if (!profile) return false; // Strictly false if not authenticated
 
-    // 1. If user account is blocked
-    if (profile.status === 'blocked') return false;
+    // Only the actual Super Admin Owner has permanent unrestricted access
+    const isSuperAdminOwner =
+      profile.role === 'super_admin' ||
+      profile.email?.toLowerCase() === 'alexandre1604981@gmail.com';
 
-    // 2. If admin marked subscription as overdue, expired, suspended or canceled
-    const subStatus = (profile as any).subscriptionStatus;
+    if (isSuperAdminOwner) return true;
+
+    // 1. If user account is blocked, pending or suspended
     if (
-      subStatus === 'suspended' ||
-      subStatus === 'overdue' ||
-      subStatus === 'expired' ||
-      subStatus === 'canceled' ||
+      profile.status === 'blocked' ||
+      profile.status === 'pending' ||
+      profile.status === 'suspended' ||
       profile.status === 'expired'
     ) {
       return false;
     }
 
+    // 2. Subscription Status: STRICT BLOCK for overdue, suspended, expired, canceled
+    const subStatus = (profile as any).subscriptionStatus;
+    if (
+      subStatus === 'overdue' ||
+      subStatus === 'suspended' ||
+      subStatus === 'expired' ||
+      subStatus === 'canceled'
+    ) {
+      return false; // INADIMPLENTE / VENCIDO / SUSPENSO -> ACESSO BLOQUEADO!
+    }
+
     // 3. Strict Date-based Expiration Check
     if (profile.subscriptionExpiresAt) {
       const expiryTime = new Date(profile.subscriptionExpiresAt).getTime();
-      // If date has passed, immediately revoke all Pro features
-      if (expiryTime <= Date.now()) {
-        return false;
+      if (isNaN(expiryTime) || expiryTime <= Date.now()) {
+        return false; // Expirou no calendário -> ACESSO BLOQUEADO!
       }
     } else {
-      // If user has no expiration date configured, they cannot be Pro unless they have an active paid subscription
-      if (subStatus !== 'active') {
-        return false;
-      }
+      // Se não possui data de expiração cadastrada, não pode ser Pro
+      return false;
     }
 
-    // 4. Active Trial check (must have unexpired expiration date)
-    const isTrial = profile.status === 'trial' || profile.subscriptionPlan === 'free_trial' || subStatus === 'trial';
+    // 4. Período de Teste Grátis (Trial 14 dias ativo)
+    const isTrial =
+      profile.status === 'trial' ||
+      profile.subscriptionPlan === 'free_trial' ||
+      subStatus === 'trial';
+
     if (isTrial) {
       if (!profile.subscriptionExpiresAt) return false;
       return new Date(profile.subscriptionExpiresAt).getTime() > Date.now();
     }
 
-    // 5. Active Paid Subscription
+    // 5. Assinante Pago com Contrato em Dia
     const isPaidPlan = profile.subscriptionPlan && profile.subscriptionPlan !== 'free';
-    if (isPaidPlan && (subStatus === 'active' || profile.status === 'active')) {
+    const isActiveSub = subStatus === 'active';
+
+    if (isPaidPlan && isActiveSub) {
       if (profile.subscriptionExpiresAt) {
         return new Date(profile.subscriptionExpiresAt).getTime() > Date.now();
       }
-      return true;
+      return false;
     }
 
     return false;
-  }, [profile, currentRole]);
+  }, [profile]);
 
   // Check if user can add a PDF map (Free plan: max 2 concurrent maps; block on 4th total map)
   const canAddPdfMap = useCallback((currentMapCount: number): { allowed: boolean; reason?: string; isFourthMapBlock?: boolean } => {
-    if (isProUser || profile?.role === 'super_admin' || currentRole === 'super_admin' || profile?.email?.toLowerCase() === 'alexandre1604981@gmail.com') {
+    const isOwner = profile?.role === 'super_admin' || profile?.email?.toLowerCase() === 'alexandre1604981@gmail.com';
+    if (isProUser || isOwner) {
       return { allowed: true };
     }
 
@@ -1437,6 +1459,12 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   };
 
   const addFieldRound = (roundData: Omit<FieldRound, 'id' | 'createdAt' | 'updatedAt' | 'totalKm'>) => {
+    const isOwner = profile?.role === 'super_admin' || profile?.email?.toLowerCase() === 'alexandre1604981@gmail.com';
+    if (!isProUser && !isOwner) {
+      openUpgradeModal('Registro de Atividades de Campo');
+      notifyWarning('Assinatura Inativa ou Vencida', 'Regularize sua assinatura para registrar atividades de campo.');
+      return;
+    }
     const finalKmNum = Number(roundData.finalKm) || 0;
     const initKmNum = Number(roundData.initialKm) || 0;
     const totalKm = finalKmNum > 0 ? Math.max(0, finalKmNum - initKmNum) : 0;
