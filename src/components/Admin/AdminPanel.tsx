@@ -121,7 +121,8 @@ const DEFAULT_BILLING_CONFIG: SystemBillingConfig = {
 
 export const AdminPanel: React.FC = () => {
   const { profile } = useAuth();
-  const { notifySuccess, notifyError, showConfirm } = useApp();
+  const { notifySuccess, notifyError, notifyInfo, showConfirm } = useApp();
+
 
   // Navigation subtabs inside Admin
   const [adminTab, setAdminTab] = useState<'users' | 'subscriptions' | 'plans' | 'billing_settings'>('users');
@@ -164,6 +165,11 @@ export const AdminPanel: React.FC = () => {
   const [planModalBadge, setPlanModalBadge] = useState('');
   const [planModalFeaturesText, setPlanModalFeaturesText] = useState('');
   const [savingPlanChanges, setSavingPlanChanges] = useState(false);
+  const [isCreatingPlan, setIsCreatingPlan] = useState<boolean>(false);
+  const [planModalActiveInShowcase, setPlanModalActiveInShowcase] = useState<boolean>(true);
+  const [planModalHighlight, setPlanModalHighlight] = useState<boolean>(false);
+  const [planModalPeriod, setPlanModalPeriod] = useState<string>('/mês');
+
 
   // Promo Coupons State
   const [coupons, setCoupons] = useState<PromoCoupon[]>([]);
@@ -398,6 +404,98 @@ export const AdminPanel: React.FC = () => {
     } finally {
       setSavingBilling(false);
     }
+  };
+
+
+  const handleTogglePlanShowcase = async (planId: string) => {
+    const updatedPlans = plans.map((p) => {
+      if (p.id === planId) {
+        const nextState = p.activeInShowcase === false ? true : false;
+        return { ...p, activeInShowcase: nextState };
+      }
+      return p;
+    });
+
+    setPlans(updatedPlans);
+    localStorage.setItem('gofield_custom_plans', JSON.stringify(updatedPlans));
+    const updatedConfig = { ...billingConfig, plans: updatedPlans };
+    setBillingConfig(updatedConfig);
+    localStorage.setItem('gofield_billing_config', JSON.stringify(updatedConfig));
+
+    try {
+      await setDoc(doc(db, 'system_config', 'billing'), updatedConfig, { merge: true });
+    } catch (err) {
+      console.warn('Cloud write notice:', err);
+    }
+
+    const plan = updatedPlans.find((p) => p.id === planId);
+    if (plan?.activeInShowcase !== false) {
+      notifySuccess('Plano Ativado na Vitrine!', `O plano "${plan?.name}" agora está visível para todos os usuários.`);
+    } else {
+      notifyInfo('Plano Oculto da Vitrine', `O plano "${plan?.name}" foi ocultado da vitrine pública.`);
+    }
+  };
+
+  const handleToggleHighlight = async (planId: string) => {
+    const updatedPlans = plans.map((p) => ({
+      ...p,
+      highlight: p.id === planId ? !p.highlight : false,
+    }));
+
+    setPlans(updatedPlans);
+    localStorage.setItem('gofield_custom_plans', JSON.stringify(updatedPlans));
+    const updatedConfig = { ...billingConfig, plans: updatedPlans };
+    setBillingConfig(updatedConfig);
+    localStorage.setItem('gofield_billing_config', JSON.stringify(updatedConfig));
+
+    try {
+      await setDoc(doc(db, 'system_config', 'billing'), updatedConfig, { merge: true });
+    } catch (err) {}
+  };
+
+  const handleDeletePlan = (planId: string) => {
+    showConfirm(
+      'Excluir Plano',
+      'Tem certeza de que deseja remover este plano da lista?',
+      async () => {
+        const updatedPlans = plans.filter((p) => p.id !== planId);
+        setPlans(updatedPlans);
+        localStorage.setItem('gofield_custom_plans', JSON.stringify(updatedPlans));
+        const updatedConfig = { ...billingConfig, plans: updatedPlans };
+        setBillingConfig(updatedConfig);
+        localStorage.setItem('gofield_billing_config', JSON.stringify(updatedConfig));
+
+        try {
+          await setDoc(doc(db, 'system_config', 'billing'), updatedConfig, { merge: true });
+        } catch (err) {}
+        notifySuccess('Plano Removido', 'O plano foi excluído com sucesso.');
+      }
+    );
+  };
+
+  const handleOpenCreatePlan = () => {
+    setIsCreatingPlan(true);
+    setEditingPlan({
+      id: `plan_${Date.now()}`,
+      name: '',
+      tag: 'Novo Plano',
+      originalPrice: 97.99,
+      price: 44.99,
+      discountBadge: '54% OFF',
+      billingPeriod: '/mês',
+      features: ['Mapas PDF Ilimitados', 'Medição de Madeira (m³)', 'GPS e Apontamentos'],
+      highlight: false,
+      activeInShowcase: true,
+    });
+    setPlanModalName('');
+    setPlanModalTag('Novo');
+    setPlanModalOriginalPrice(97.99);
+    setPlanModalPrice(44.99);
+    setPlanModalBadge('54% OFF • LANÇAMENTO');
+    setPlanModalPeriod('/mês');
+    setPlanModalActiveInShowcase(true);
+    setPlanModalHighlight(false);
+    setPlanModalFeaturesText('Mapas PDF Ilimitados\nMedição de Madeira (m³)\nRelatórios com Fotos\nGPS em Tempo Real');
   };
 
   // Save Plan Changes (Resilient to Firestore / Offline)

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   X,
   Crown,
@@ -18,12 +18,72 @@ import {
   ArrowRight,
   Loader2,
   RefreshCw,
+  Star,
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { useAuth } from '../../context/AuthContext';
 import { doc, updateDoc } from 'firebase/firestore';
 import { db } from '../../lib/firebase';
 import { createAsaasPixPayment, checkAsaasPaymentStatus } from '../../utils/asaasGateway';
+import { PlanItemConfig } from '../../types';
+
+const FALLBACK_PLANS: PlanItemConfig[] = [
+  {
+    id: 'pro',
+    name: 'Plano Profissional',
+    tag: 'Individual',
+    originalPrice: 97.99,
+    price: 44.99,
+    discountBadge: '54% OFF • LANÇAMENTO',
+    billingPeriod: '/mês',
+    features: [
+      'Mapas PDF e GPS Ilimitados',
+      'Medição de Pilha de Madeira (m³)',
+      'Mapas Satélite Offline',
+      'Exportação KML, KMZ & GPX',
+      'Laudos Periciais em PDF com Fotos',
+      'Rondas & Odômetro Ilimitados',
+    ],
+    highlight: true,
+    activeInShowcase: true,
+  },
+  {
+    id: 'equipe',
+    name: 'Plano Equipe Topografia',
+    tag: 'Mais Popular',
+    originalPrice: 390.00,
+    price: 289.00,
+    discountBadge: 'Economize R$ 101/mês',
+    billingPeriod: '/mês',
+    features: [
+      'Até 5 Técnicos de Campo',
+      'Painel de Gestão da Frota & Odômetro',
+      'Cubagem Florestal e Laudos em Lote',
+      'Backup e Sincronização em Nuvem',
+      'Exportação Ilimitada em Alta Resolução',
+    ],
+    highlight: false,
+    activeInShowcase: true,
+  },
+  {
+    id: 'florestal',
+    name: 'Florestal & Usinas',
+    tag: 'Corporativo',
+    originalPrice: 950.00,
+    price: 690.00,
+    discountBadge: '27% OFF',
+    billingPeriod: '/mês',
+    features: [
+      '15 a 30 Operadores simultâneos',
+      'Logotipo da Empresa nos Laudos PDF',
+      'Contratos e Faturamento PJ',
+      'Treinamento e Suporte VIP Prioritário',
+      'Backup Dedicado e SLA Garantido',
+    ],
+    highlight: false,
+    activeInShowcase: true,
+  },
+];
 
 export const PlanUpgradeModal: React.FC = () => {
   const {
@@ -45,9 +105,40 @@ export const PlanUpgradeModal: React.FC = () => {
   const [copied, setCopied] = useState<boolean>(false);
   const [isCheckingPayment, setIsCheckingPayment] = useState<boolean>(false);
 
-  const originalPrice = billingConfig?.proOriginalPrice ?? 97.99;
-  const launchPrice = billingConfig?.proLaunchPrice ?? 44.99;
-  const discountBadge = billingConfig?.proDiscountBadge || '54% OFF • LANÇAMENTO';
+  // Active showcase plans configured by Admin
+  const availablePlans = useMemo(() => {
+    const rawPlans = (billingConfig?.plans && billingConfig.plans.length > 0)
+      ? billingConfig.plans
+      : FALLBACK_PLANS;
+
+    // Filter only plans marked as active in showcase
+    const filtered = rawPlans.filter((p) => p.activeInShowcase !== false);
+    return filtered.length > 0 ? filtered : FALLBACK_PLANS;
+  }, [billingConfig?.plans]);
+
+  // Selected plan state
+  const [selectedPlanId, setSelectedPlanId] = useState<string>(() => {
+    const defaultHighlighted = availablePlans.find((p) => p.highlight) || availablePlans[0];
+    return defaultHighlighted ? defaultHighlighted.id : 'pro';
+  });
+
+  // Keep selected plan valid if available plans change
+  useEffect(() => {
+    if (!availablePlans.some((p) => p.id === selectedPlanId)) {
+      const defaultHighlighted = availablePlans.find((p) => p.highlight) || availablePlans[0];
+      if (defaultHighlighted) {
+        setSelectedPlanId(defaultHighlighted.id);
+      }
+    }
+  }, [availablePlans, selectedPlanId]);
+
+  const currentPlan = useMemo(() => {
+    return availablePlans.find((p) => p.id === selectedPlanId) || availablePlans[0] || FALLBACK_PLANS[0];
+  }, [availablePlans, selectedPlanId]);
+
+  const originalPrice = currentPlan.originalPrice || (currentPlan.price * 1.5);
+  const launchPrice = currentPlan.price;
+  const discountBadge = currentPlan.discountBadge || 'OFERTA ESPECIAL';
 
   // Reset state when opened
   useEffect(() => {
@@ -79,7 +170,7 @@ export const PlanUpgradeModal: React.FC = () => {
       const userRef = doc(db, 'users', profile.uid);
       const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
       await updateDoc(userRef, {
-        subscriptionPlan: 'pro_mensal',
+        subscriptionPlan: currentPlan.id || 'pro_mensal',
         subscriptionStatus: 'active',
         subscriptionExpiresAt: expiresAt,
         subscriptionValue: launchPrice,
@@ -88,9 +179,9 @@ export const PlanUpgradeModal: React.FC = () => {
       });
       await refreshProfile();
       setPaymentStep('success');
-      notifySuccess('Assinatura Pro Ativada!', 'Seu acesso ilimitado a todos os recursos foi liberado com sucesso.');
+      notifySuccess('Assinatura Ativada!', `Seu plano "${currentPlan.name}" foi liberado com sucesso.`);
     } catch (e) {
-      console.error('Error activating pro plan:', e);
+      console.error('Error activating plan:', e);
     }
   };
 
@@ -170,101 +261,133 @@ export const PlanUpgradeModal: React.FC = () => {
         </button>
 
         {/* Modal Content */}
-        <div className="p-5 sm:p-7 overflow-y-auto flex-1 space-y-6">
+        <div className="p-5 sm:p-7 overflow-y-auto flex-1 space-y-5">
 
           {paymentStep === 'showcase' && (
             <>
               {/* Badge & Title */}
-              <div className="text-center space-y-2 pt-2">
+              <div className="text-center space-y-1.5 pt-1">
                 <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-gradient-to-r from-amber-500/20 to-sky-500/20 border border-amber-500/40 text-amber-400 text-xs font-black uppercase tracking-wider">
                   <Crown className="w-3.5 h-3.5" />
-                  <span>GoField Pro</span>
+                  <span>Vitrine de Planos GoField Pro</span>
                 </div>
-                <h2 className="text-2xl sm:text-3xl font-black text-white tracking-tight">
+                <h2 className="text-xl sm:text-2xl font-black text-white tracking-tight">
                   Desbloqueie o Poder Total do Campo
                 </h2>
                 {upgradeModalFeature ? (
                   <p className="text-xs text-sky-300 font-medium">
-                    O recurso <strong className="text-white">"{upgradeModalFeature}"</strong> é exclusivo para assinantes do Plano Profissional.
+                    O recurso <strong className="text-white">"{upgradeModalFeature}"</strong> é exclusivo para assinantes dos planos profissionais.
                   </p>
                 ) : (
                   <p className="text-xs text-slate-400">
-                    Aproveite mapas PDF ilimitados, cubagem de madeira, mapas offline e laudos técnicos completos.
+                    Escolha o plano ideal para suas operações florestais, topográficas e de campo.
                   </p>
                 )}
               </div>
 
-              {/* Pricing Showcase Card */}
-              <div className="relative p-5 rounded-2xl bg-gradient-to-br from-slate-900 via-slate-900/90 to-sky-950/40 border-2 border-sky-500/60 shadow-xl overflow-hidden">
-                <div className="absolute top-3 right-3 px-2.5 py-1 bg-gradient-to-r from-amber-500 to-rose-500 text-slate-950 text-[10px] font-black rounded-full shadow-md animate-pulse">
-                  {discountBadge}
+              {/* Dynamic Plan Selector (if more than 1 plan is active) */}
+              {availablePlans.length > 1 && (
+                <div className="space-y-1.5">
+                  <span className="text-[10px] font-bold uppercase text-slate-400 tracking-wider block text-center">
+                    Selecione um Plano:
+                  </span>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                    {availablePlans.map((plan) => {
+                      const isSelected = plan.id === selectedPlanId;
+                      return (
+                        <button
+                          key={plan.id}
+                          type="button"
+                          onClick={() => setSelectedPlanId(plan.id)}
+                          className={`p-2.5 rounded-2xl border text-left transition-all relative flex flex-col justify-between cursor-pointer active:scale-95 ${
+                            isSelected
+                              ? 'bg-gradient-to-b from-sky-950/60 to-slate-900 border-sky-400 ring-2 ring-sky-500/40 shadow-lg shadow-sky-950/50'
+                              : 'bg-slate-900/80 border-slate-800 hover:border-slate-700 opacity-80 hover:opacity-100'
+                          }`}
+                        >
+                          {plan.highlight && (
+                            <span className="absolute -top-2 right-2 px-1.5 py-0.5 bg-amber-500 text-slate-950 text-[8px] font-black rounded-full flex items-center gap-0.5 shadow">
+                              <Star className="w-2 h-2 fill-current" />
+                              Destaque
+                            </span>
+                          )}
+                          <div>
+                            <span className="text-[9px] font-extrabold uppercase text-slate-400 block truncate">
+                              {plan.tag}
+                            </span>
+                            <span className="text-xs font-black text-white block truncate mt-0.5">
+                              {plan.name}
+                            </span>
+                          </div>
+                          <div className="mt-2 pt-1 border-t border-slate-800/80">
+                            <span className="text-xs sm:text-sm font-black text-emerald-400 font-mono">
+                              R$ {plan.price.toFixed(2).replace('.', ',')}
+                            </span>
+                            <span className="text-[9px] text-slate-400 font-medium">{plan.billingPeriod}</span>
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
+              )}
+
+              {/* Selected Plan Details Card */}
+              <div className="relative p-5 rounded-2xl bg-gradient-to-br from-slate-900 via-slate-900/90 to-sky-950/40 border-2 border-sky-500/60 shadow-xl overflow-hidden">
+                {discountBadge && (
+                  <div className="absolute top-3 right-3 px-2.5 py-1 bg-gradient-to-r from-amber-500 to-rose-500 text-slate-950 text-[10px] font-black rounded-full shadow-md animate-pulse">
+                    {discountBadge}
+                  </div>
+                )}
 
                 <div className="space-y-1">
-                  <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Plano Profissional</span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">{currentPlan.name}</span>
+                    <span className="text-[9px] font-black px-2 py-0.5 rounded-full bg-slate-800 text-slate-300 border border-slate-700">
+                      {currentPlan.tag}
+                    </span>
+                  </div>
                   <div className="flex items-baseline gap-2">
-                    <span className="text-sm line-through text-slate-500 font-bold">R$ {originalPrice.toFixed(2).replace('.', ',')}</span>
-                    <span className="text-3xl sm:text-4xl font-black text-white">R$ {launchPrice.toFixed(2).replace('.', ',')}</span>
-                    <span className="text-xs text-slate-400 font-bold">/mês</span>
+                    {originalPrice > launchPrice && (
+                      <span className="text-sm line-through text-slate-500 font-bold">
+                        R$ {originalPrice.toFixed(2).replace('.', ',')}
+                      </span>
+                    )}
+                    <span className="text-3xl sm:text-4xl font-black text-white font-mono">
+                      R$ {launchPrice.toFixed(2).replace('.', ',')}
+                    </span>
+                    <span className="text-xs text-slate-400 font-bold">{currentPlan.billingPeriod || '/mês'}</span>
                   </div>
                   <p className="text-[11px] text-emerald-400 font-bold">Cancele quando quiser • Sem fidelidade</p>
                 </div>
 
                 {/* Features List */}
-                <div className="mt-5 grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-4 border-t border-slate-800 text-xs text-slate-200">
-                  <div className="flex items-center gap-2">
-                    <div className="w-5 h-5 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center shrink-0">
-                      <Check className="w-3.5 h-3.5" />
+                <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-2 pt-3 border-t border-slate-800 text-xs text-slate-200">
+                  {currentPlan.features.map((feat, idx) => (
+                    <div key={idx} className="flex items-center gap-2">
+                      <div className="w-5 h-5 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center shrink-0">
+                        <Check className="w-3.5 h-3.5" />
+                      </div>
+                      <span className="text-[11px] font-medium leading-tight">{feat}</span>
                     </div>
-                    <span><strong>Mapas PDF Ilimitados</strong></span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <div className="w-5 h-5 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center shrink-0">
-                      <Check className="w-3.5 h-3.5" />
-                    </div>
-                    <span><strong>Cubagem Florestal (m³)</strong></span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <div className="w-5 h-5 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center shrink-0">
-                      <Check className="w-3.5 h-3.5" />
-                    </div>
-                    <span><strong>Mapas Satélite Offline</strong></span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <div className="w-5 h-5 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center shrink-0">
-                      <Check className="w-3.5 h-3.5" />
-                    </div>
-                    <span><strong>Exportação KML, KMZ & GPX</strong></span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <div className="w-5 h-5 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center shrink-0">
-                      <Check className="w-3.5 h-3.5" />
-                    </div>
-                    <span><strong>Laudos Periciais em PDF</strong></span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <div className="w-5 h-5 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center shrink-0">
-                      <Check className="w-3.5 h-3.5" />
-                    </div>
-                    <span><strong>Rondas & Odômetro Ilimitados</strong></span>
-                  </div>
+                  ))}
                 </div>
               </div>
 
               {/* Free vs Pro Comparison */}
-              <div className="p-4 rounded-2xl bg-slate-900/60 border border-slate-800/80 space-y-2.5 text-xs">
-                <h4 className="font-extrabold text-slate-300">Comparativo Rápido:</h4>
-                <div className="flex items-center justify-between py-1 border-b border-slate-800 text-slate-400">
+              <div className="p-3.5 rounded-2xl bg-slate-900/60 border border-slate-800/80 space-y-2 text-xs">
+                <h4 className="font-extrabold text-slate-300 text-xs">Comparativo com o Plano Gratuito:</h4>
+                <div className="flex items-center justify-between py-0.5 border-b border-slate-800/80 text-slate-400 text-[11px]">
                   <span>Limite de Mapas PDF Simultâneos</span>
                   <span className="font-bold text-slate-200">2 no Grátis <strong className="text-emerald-400">vs Ilimitado no Pro</strong></span>
                 </div>
-                <div className="flex items-center justify-between py-1 border-b border-slate-800 text-slate-400">
+                <div className="flex items-center justify-between py-0.5 border-b border-slate-800/80 text-slate-400 text-[11px]">
                   <span>Cubagem de Pilhas de Madeira</span>
-                  <span className="font-bold text-slate-200"><Lock className="w-3 h-3 inline text-amber-400 mr-1" />Apenas no Pro</span>
+                  <span className="font-bold text-slate-200"><Lock className="w-3 h-3 inline text-amber-400 mr-1" />Liberado no Plano</span>
                 </div>
-                <div className="flex items-center justify-between py-1 text-slate-400">
+                <div className="flex items-center justify-between py-0.5 text-slate-400 text-[11px]">
                   <span>Download de Satélite Offline</span>
-                  <span className="font-bold text-slate-200"><Lock className="w-3 h-3 inline text-amber-400 mr-1" />Apenas no Pro</span>
+                  <span className="font-bold text-slate-200"><Lock className="w-3 h-3 inline text-amber-400 mr-1" />Liberado no Plano</span>
                 </div>
               </div>
 
@@ -282,7 +405,7 @@ export const PlanUpgradeModal: React.FC = () => {
                 ) : (
                   <>
                     <Zap className="w-5 h-5 fill-current text-slate-950" />
-                    <span>Assinar Agora por R$ {launchPrice.toFixed(2).replace('.', ',')}/mês</span>
+                    <span>Assinar {currentPlan.name} por R$ {launchPrice.toFixed(2).replace('.', ',')}{currentPlan.billingPeriod || '/mês'}</span>
                     <ArrowRight className="w-4 h-4 ml-1" />
                   </>
                 )}
@@ -299,103 +422,105 @@ export const PlanUpgradeModal: React.FC = () => {
               <div>
                 <h3 className="text-xl font-extrabold text-white">Pagamento Instantâneo via PIX</h3>
                 <p className="text-xs text-slate-400 mt-1">
-                  Pague com seu aplicativo bancário. A liberação de todos os recursos é <strong>automática e instantânea</strong>.
+                  Plano: <strong className="text-white">{currentPlan.name}</strong> • Valor: <strong className="text-emerald-400 font-mono">R$ {launchPrice.toFixed(2).replace('.', ',')}</strong>
                 </p>
               </div>
 
-              {/* QR Code Image if available */}
+              {/* QR Code Display (Asaas Base64 or Fallback) */}
               {pixQrCodeBase64 ? (
-                <div className="p-3 bg-white rounded-2xl inline-block shadow-xl mx-auto">
+                <div className="p-3 bg-white rounded-2xl inline-block mx-auto shadow-2xl border-4 border-emerald-500/40">
                   <img
                     src={`data:image/png;base64,${pixQrCodeBase64}`}
-                    alt="PIX QR Code"
-                    className="w-48 h-48 sm:w-56 sm:h-56 mx-auto object-contain"
+                    alt="QR Code Pix"
+                    className="w-48 h-48 sm:w-56 sm:h-56 object-contain"
                   />
                 </div>
               ) : (
-                <div className="p-6 bg-slate-900 border border-slate-800 rounded-2xl text-center space-y-2">
+                <div className="p-4 bg-slate-900 border border-slate-800 rounded-2xl space-y-2 text-left">
                   <p className="text-xs text-slate-400">Chave PIX Oficial ({billingConfig?.pixKeyType?.toUpperCase() || 'CNPJ'}):</p>
-                  <p className="text-sm font-mono font-black text-sky-400 select-all">{pixPayload}</p>
+                  <p className="text-sm font-mono font-bold text-amber-300 break-all">{pixPayload}</p>
                   <p className="text-[11px] text-slate-500 font-medium">Titular: {billingConfig?.beneficiaryName || 'GoField Pro'}</p>
                 </div>
               )}
 
-              {/* Copy Paste Code */}
-              <div className="space-y-2 text-left">
-                <label className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">
-                  PIX Copia e Cola / Chave
+              {/* Pix Copia e Cola */}
+              <div className="space-y-2">
+                <label className="block text-[11px] font-bold text-slate-400 uppercase tracking-wider text-left">
+                  Código Pix Copia e Cola:
                 </label>
-                <div className="flex items-center gap-2 bg-slate-900 border border-slate-800 rounded-xl p-2">
+                <div className="flex items-center gap-2 bg-slate-900 border border-slate-800 rounded-xl p-2 text-left">
                   <input
                     type="text"
                     readOnly
                     value={pixPayload}
-                    className="bg-transparent text-xs font-mono text-slate-300 w-full outline-none px-2 truncate select-all"
+                    className="bg-transparent text-xs text-slate-300 font-mono flex-1 outline-none truncate"
                   />
                   <button
+                    type="button"
                     onClick={handleCopyPix}
-                    className="px-3 py-1.5 bg-sky-600 hover:bg-sky-500 text-white rounded-lg text-xs font-bold shrink-0 flex items-center gap-1.5 active:scale-95 transition-all cursor-pointer"
+                    className="px-3 py-1.5 bg-sky-500 hover:bg-sky-400 text-slate-950 font-bold text-xs rounded-lg transition-all flex items-center gap-1 shrink-0 active:scale-95 cursor-pointer"
                   >
-                    {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+                    {copied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
                     <span>{copied ? 'Copiado!' : 'Copiar'}</span>
                   </button>
                 </div>
               </div>
 
-              {/* Status / Check Action */}
-              <div className="pt-2 space-y-3">
-                <div className="flex items-center justify-center gap-2 text-xs text-slate-400">
-                  <Loader2 className="w-4 h-4 animate-spin text-emerald-400" />
-                  <span>Aguardando confirmação do banco...</span>
-                </div>
+              {/* Real-time Status Notice */}
+              <div className="p-3 bg-slate-900/60 border border-slate-800 rounded-xl flex items-center justify-center gap-2 text-xs text-slate-400">
+                <Loader2 className="w-4 h-4 text-sky-400 animate-spin" />
+                <span>Aguardando confirmação do banco... O app liberará seu acesso na hora!</span>
+              </div>
 
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={() => setPaymentStep('showcase')}
-                    className="px-4 py-3 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-300 text-xs font-bold transition-all cursor-pointer"
-                  >
-                    Voltar
-                  </button>
-                  <button
-                    onClick={handleManualCheck}
-                    disabled={isCheckingPayment}
-                    className="flex-1 py-3 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-extrabold shadow-lg transition-all flex items-center justify-center gap-2 active:scale-95 cursor-pointer"
-                  >
-                    {isCheckingPayment ? (
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                    ) : (
-                      <CheckCircle2 className="w-4 h-4" />
-                    )}
-                    <span>Já Paguei / Validar Acesso Agora</span>
-                  </button>
-                </div>
+              {/* Manual Check Button */}
+              <div className="flex items-center justify-between gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setPaymentStep('showcase')}
+                  className="px-4 py-2.5 rounded-xl text-xs font-bold text-slate-400 hover:text-white bg-slate-900 border border-slate-800 transition-colors"
+                >
+                  Voltar aos Planos
+                </button>
+                <button
+                  type="button"
+                  onClick={handleManualCheck}
+                  disabled={isCheckingPayment}
+                  className="px-5 py-2.5 rounded-xl text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-500 transition-all flex items-center gap-1.5 shadow-lg active:scale-95 disabled:opacity-50"
+                >
+                  {isCheckingPayment ? (
+                    <RefreshCw className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <CheckCircle2 className="w-4 h-4" />
+                  )}
+                  <span>Já realizei o pagamento</span>
+                </button>
               </div>
             </div>
           )}
 
           {paymentStep === 'success' && (
-            <div className="space-y-5 text-center py-6">
-              <div className="inline-flex items-center justify-center w-16 h-16 rounded-3xl bg-emerald-500/20 border-2 border-emerald-500/50 text-emerald-400 mx-auto animate-bounce">
-                <Crown className="w-8 h-8" />
+            <div className="space-y-5 text-center py-4">
+              <div className="w-16 h-16 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center mx-auto ring-4 ring-emerald-500/30">
+                <CheckCircle2 className="w-8 h-8" />
               </div>
-
-              <div className="space-y-2">
-                <h3 className="text-2xl font-black text-white">Parabéns! Você é GoField Pro!</h3>
-                <p className="text-xs text-slate-300 max-w-sm mx-auto">
-                  Sua assinatura profissional foi ativada com sucesso. Todos os recursos, cubagem, mapas offline e downloads ilimitados estão desbloqueados!
+              <div>
+                <h3 className="text-2xl font-black text-white">Parabéns! Assinatura Ativada</h3>
+                <p className="text-xs text-slate-400 mt-1.5 max-w-sm mx-auto">
+                  Você agora é assinante oficial do <strong className="text-emerald-400">{currentPlan.name}</strong>. Todos os recursos ilimitados foram desbloqueados.
                 </p>
               </div>
-
               <button
+                type="button"
                 onClick={() => setIsUpgradeModalOpen(false)}
-                className="py-3.5 px-8 rounded-2xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs uppercase tracking-wider shadow-lg transition-all active:scale-95 cursor-pointer"
+                className="w-full py-3 px-6 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-sm uppercase tracking-wider transition-all shadow-lg active:scale-95"
               >
-                Acessar Recursos Pro Agora
+                Começar a Usar Agora
               </button>
             </div>
           )}
 
         </div>
+
       </div>
     </div>
   );

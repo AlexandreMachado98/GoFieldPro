@@ -49,11 +49,14 @@ export interface PlanItemConfig {
   tag: string;
   originalPrice: number; // Preço inteiro cheio (riscado)
   price: number; // Preço promocional com desconto
-  discountBadge?: string; // Ex: '35% OFF' ou 'Preço Promocional'
-  billingPeriod: string; // '/mês'
+  discountBadge?: string; // Ex: '54% OFF' ou 'Preço Promocional'
+  billingPeriod: string; // '/mês' ou '/ano'
   features: string[];
   highlight?: boolean;
+  activeInShowcase?: boolean;
+  description?: string;
 }
+
 
 export interface SystemBillingConfig {
   pixKey: string;
