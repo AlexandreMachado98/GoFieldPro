@@ -476,7 +476,7 @@ export const PdfMapNavigator: React.FC = () => {
   const liveRecordPolylineRef = useRef<L.Polyline | null>(null);
   const targetGuideLineRef = useRef<L.Polyline | null>(null);
   const gpsUserMarkerRef = useRef<L.Marker | null>(null);
-  const gpsAccuracyCircleRef = useRef<L.Circle | null>(null);
+  const gpsAccuracyCircleRef = useRef<L.CircleMarker | null>(null);
   const gpsWatchIdRef = useRef<number | null>(null);
   const lastLoadedDocPageRef = useRef<string>('');
 
