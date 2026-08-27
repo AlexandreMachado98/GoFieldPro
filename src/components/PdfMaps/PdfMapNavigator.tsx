@@ -1559,7 +1559,7 @@ export const PdfMapNavigator: React.FC = () => {
             gpsWatchIdRef.current = navigator.geolocation.watchPosition(
               (pos) => updateUserGpsPosition(pos),
               (err) => console.warn('GPS resume error:', err),
-              { enableHighAccuracy: true, timeout: 12000, maximumAge: 2000 }
+              { enableHighAccuracy: true, timeout: 15000, maximumAge: 4000 }
             );
           } catch {}
         }
