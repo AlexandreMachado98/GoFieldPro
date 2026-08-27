@@ -91,6 +91,7 @@ export const PlanUpgradeModal: React.FC = () => {
     setIsUpgradeModalOpen,
     upgradeModalFeature,
     billingConfig,
+    isProUser,
     notifySuccess,
     notifyInfo,
     notifyError,
@@ -277,7 +278,7 @@ export const PlanUpgradeModal: React.FC = () => {
                   <span>Vitrine de Planos GoField Pro</span>
                 </div>
                 <h2 className="text-xl sm:text-2xl font-black text-white tracking-tight">
-                  Desbloqueie o Poder Total do Campo
+                  {isProUser ? 'Gerenciar Planos & Assinatura' : 'Desbloqueie o Poder Total do Campo'}
                 </h2>
                 {upgradeModalFeature ? (
                   <p className="text-xs text-sky-300 font-medium">
@@ -289,6 +290,25 @@ export const PlanUpgradeModal: React.FC = () => {
                   </p>
                 )}
               </div>
+
+              {/* Pro / Trial Status Notice */}
+              {isProUser && (
+                <div className="p-3.5 bg-gradient-to-r from-emerald-950/80 via-slate-900 to-emerald-950/80 border border-emerald-500/40 rounded-2xl text-left space-y-1 shadow-md animate-in fade-in">
+                  <div className="flex items-center gap-2">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                    <span className="text-xs font-black text-emerald-300">
+                      {profile?.role === 'super_admin' || profile?.email?.toLowerCase() === 'alexandre1604981@gmail.com'
+                        ? 'Acesso Super Admin (Ilimitado)'
+                        : profile?.subscriptionStatus === 'active'
+                        ? 'Você já é um Assinante GoField Pro Ativo!'
+                        : 'Você está no Período de Teste Grátis (Acesso Pro Liberado)!'}
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-slate-300 leading-relaxed">
+                    Você pode visualizar os outros planos da vitrine abaixo e contratar para renovar antecipadamente ou migrar para um plano Equipe/Corporativo.
+                  </p>
+                </div>
+              )}
 
               {/* Plan Cards Grid with 1-Click Action */}
               <div className="space-y-4">
