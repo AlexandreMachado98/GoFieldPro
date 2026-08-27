@@ -117,7 +117,7 @@ const compressImageFile = (file: File, maxDim = 800, quality = 0.7): Promise<str
     try {
       const reader = new FileReader();
       reader.onload = (e) => {
-        const img = new Image();
+        const img = typeof window !== 'undefined' ? document.createElement('img') : new (window as any).Image();
         img.onload = () => {
           try {
             let { width, height } = img;
@@ -827,7 +827,7 @@ export const PdfMapNavigator: React.FC = () => {
 
       const h = activeDoc.height && !isNaN(activeDoc.height) ? activeDoc.height : 1000;
       const w = activeDoc.width && !isNaN(activeDoc.width) ? activeDoc.width : 1000;
-      const bounds = new L.LatLngBounds([0, 0], [h, w]);
+      const bounds = L.latLngBounds([[0, 0], [h, w]]);
 
       if (imageOverlayRef.current) {
         map.removeLayer(imageOverlayRef.current);
@@ -1740,7 +1740,7 @@ export const PdfMapNavigator: React.FC = () => {
         const reader = new FileReader();
         reader.onload = async (event) => {
           const dataUrl = event.target?.result as string;
-          const img = new Image();
+          const img = typeof window !== 'undefined' ? document.createElement('img') : new (window as any).Image();
           img.onload = async () => {
             const newDoc: PdfDocument = {
               id: `img-${Date.now()}`,
@@ -2168,7 +2168,7 @@ export const PdfMapNavigator: React.FC = () => {
       if (activeDoc && mapInstanceRef.current) {
         const h = activeDoc.height && !isNaN(activeDoc.height) ? activeDoc.height : 1000;
         const w = activeDoc.width && !isNaN(activeDoc.width) ? activeDoc.width : 1000;
-        const bounds = new L.LatLngBounds([0, 0], [h, w]);
+        const bounds = L.latLngBounds([[0, 0], [h, w]]);
         mapInstanceRef.current.fitBounds(bounds, { padding: [10, 10] });
       }
     } catch (err) {
