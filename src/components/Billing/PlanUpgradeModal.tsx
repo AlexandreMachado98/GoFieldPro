@@ -45,9 +45,9 @@ export const PlanUpgradeModal: React.FC = () => {
   const [copied, setCopied] = useState<boolean>(false);
   const [isCheckingPayment, setIsCheckingPayment] = useState<boolean>(false);
 
-  const originalPrice = billingConfig.proOriginalPrice || 97.99;
-  const launchPrice = billingConfig.proLaunchPrice || 44.99;
-  const discountBadge = billingConfig.proDiscountBadge || '54% OFF • LANÇAMENTO';
+  const originalPrice = billingConfig?.proOriginalPrice ?? 97.99;
+  const launchPrice = billingConfig?.proLaunchPrice ?? 44.99;
+  const discountBadge = billingConfig?.proDiscountBadge || '54% OFF • LANÇAMENTO';
 
   // Reset state when opened
   useEffect(() => {
@@ -100,7 +100,7 @@ export const PlanUpgradeModal: React.FC = () => {
 
     try {
       // 1. Try Asaas API
-      if (billingConfig.asaasApiKey?.trim()) {
+      if (billingConfig?.asaasApiKey?.trim()) {
         const asaasRes = await createAsaasPixPayment(profile, launchPrice, billingConfig);
         if (asaasRes) {
           setPaymentId(asaasRes.paymentId);
@@ -113,13 +113,13 @@ export const PlanUpgradeModal: React.FC = () => {
       }
 
       // 2. Fallback to System Static PIX Key if Asaas key is not yet set
-      const pixKey = billingConfig.pixKey || '48.123.456/0001-90';
+      const pixKey = billingConfig?.pixKey || '48.123.456/0001-90';
       setPixPayload(pixKey);
       setPixQrCodeBase64('');
       setPaymentStep('pix_checkout');
     } catch (err) {
       console.warn('Checkout error:', err);
-      const pixKey = billingConfig.pixKey || '48.123.456/0001-90';
+      const pixKey = billingConfig?.pixKey || '48.123.456/0001-90';
       setPixPayload(pixKey);
       setPaymentStep('pix_checkout');
     } finally {
@@ -314,9 +314,9 @@ export const PlanUpgradeModal: React.FC = () => {
                 </div>
               ) : (
                 <div className="p-6 bg-slate-900 border border-slate-800 rounded-2xl text-center space-y-2">
-                  <p className="text-xs text-slate-400">Chave PIX Oficial ({billingConfig.pixKeyType?.toUpperCase() || 'CNPJ'}):</p>
+                  <p className="text-xs text-slate-400">Chave PIX Oficial ({billingConfig?.pixKeyType?.toUpperCase() || 'CNPJ'}):</p>
                   <p className="text-sm font-mono font-black text-sky-400 select-all">{pixPayload}</p>
-                  <p className="text-[11px] text-slate-500 font-medium">Titular: {billingConfig.beneficiaryName}</p>
+                  <p className="text-[11px] text-slate-500 font-medium">Titular: {billingConfig?.beneficiaryName || 'GoField Pro'}</p>
                 </div>
               )}
 

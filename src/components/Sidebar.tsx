@@ -285,7 +285,7 @@ export const Sidebar: React.FC = () => {
                   <span className="text-xs font-black text-white">GoField Pro</span>
                 </div>
                 <span className="text-[9px] font-extrabold bg-amber-500 text-slate-950 px-1.5 py-0.5 rounded-full">
-                  {billingConfig.proDiscountBadge || '54% OFF'}
+                  {billingConfig?.proDiscountBadge || '54% OFF'}
                 </span>
               </div>
               <p className="text-[10px] text-slate-400 leading-tight">
@@ -297,7 +297,7 @@ export const Sidebar: React.FC = () => {
                 className="w-full py-2 px-3 bg-gradient-to-r from-amber-500 to-sky-500 hover:from-amber-400 hover:to-sky-400 text-slate-950 font-black text-xs rounded-xl shadow-md transition-all flex items-center justify-center gap-1.5 active:scale-95 cursor-pointer"
               >
                 <Zap className="w-3.5 h-3.5 fill-current" />
-                <span>Assinar R$ {(billingConfig.proLaunchPrice || 44.99).toFixed(2).replace('.', ',')}/mês</span>
+                <span>Assinar R$ {((billingConfig?.proLaunchPrice ?? 44.99)).toFixed(2).replace('.', ',')}/mês</span>
               </button>
             </div>
           )}
