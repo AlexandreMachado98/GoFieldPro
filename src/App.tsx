@@ -26,6 +26,7 @@ import { WoodpileCubageModal } from './components/Forestry/WoodpileCubageModal';
 import { LegalPoliciesModal } from './components/Legal/LegalPoliciesModal';
 import { AppUpdateBanner } from './components/Common/AppUpdateBanner';
 import { PlanUpgradeModal } from './components/Billing/PlanUpgradeModal';
+import { Sparkles, Clock, AlertTriangle, ArrowRight } from 'lucide-react';
 
 const MainAppContent: React.FC = () => {
   const {
@@ -36,6 +37,7 @@ const MainAppContent: React.FC = () => {
     setIsWoodpileModalOpen,
     isPoliciesModalOpen,
     setIsPoliciesModalOpen,
+    openUpgradeModal,
   } = useApp();
   const { user, profile, loading } = useAuth();
   const [showCelebration, setShowCelebration] = React.useState<boolean>(false);
@@ -76,6 +78,61 @@ const MainAppContent: React.FC = () => {
       <Sidebar />
       <div className="flex flex-col flex-1 overflow-hidden h-full">
         <Topbar />
+
+        {/* Trial Status Notification Banner */}
+        {(() => {
+          if (!profile || profile.role === 'super_admin' || profile.email?.toLowerCase() === 'alexandre1604981@gmail.com') {
+            return null;
+          }
+
+          const isTrial = profile.status === 'trial' || profile.subscriptionPlan === 'free_trial' || (profile as any).subscriptionStatus === 'trial';
+          if (!isTrial || !profile.subscriptionExpiresAt) return null;
+
+          const expTime = new Date(profile.subscriptionExpiresAt).getTime();
+          const diffDays = Math.ceil((expTime - Date.now()) / (1000 * 60 * 60 * 24));
+
+          // Only notify when 4 days or less remain, or if expired
+          if (diffDays > 4) return null;
+
+          const isExpired = diffDays <= 0;
+
+          return (
+            <div className={`px-3 py-2 sm:px-4 text-xs font-bold flex flex-col sm:flex-row items-center justify-between gap-2 border-b shadow-md shrink-0 animate-in fade-in ${
+              isExpired
+                ? 'bg-rose-950/90 border-rose-800 text-rose-200'
+                : 'bg-gradient-to-r from-amber-950/90 via-slate-900 to-amber-950/90 border-amber-500/40 text-amber-200'
+            }`}>
+              <div className="flex items-center gap-2 text-center sm:text-left">
+                {isExpired ? (
+                  <AlertTriangle className="w-4 h-4 text-rose-400 shrink-0" />
+                ) : (
+                  <Clock className="w-4 h-4 text-amber-400 shrink-0" />
+                )}
+                <span>
+                  {isExpired ? (
+                    <><b>Seu período de teste de 14 dias expirou.</b> Renove sua assinatura para continuar usando todos os recursos Pro!</>
+                  ) : (
+                    <><b>Período de Teste Grátis:</b> Restam <span className="underline font-black text-amber-300">{diffDays} {diffDays === 1 ? 'dia' : 'dias'}</span> de acesso Pro ilimitado.</>
+                  )}
+                </span>
+              </div>
+
+              <button
+                onClick={() => openUpgradeModal(isExpired ? 'Renovação de Assinatura' : 'Assinatura Plano Pro')}
+                className={`px-3 py-1 rounded-xl font-black text-[11px] uppercase tracking-wider flex items-center gap-1.5 shadow-md active:scale-95 transition-all cursor-pointer shrink-0 ${
+                  isExpired
+                    ? 'bg-rose-600 hover:bg-rose-500 text-white shadow-rose-950/50'
+                    : 'bg-gradient-to-r from-amber-500 to-emerald-500 hover:from-amber-400 hover:to-emerald-400 text-slate-950'
+                }`}
+              >
+                <Sparkles className="w-3.5 h-3.5" />
+                <span>{isExpired ? 'Renovar Assinatura' : 'Garantir Plano Pro'}</span>
+                <ArrowRight className="w-3 h-3" />
+              </button>
+            </div>
+          );
+        })()}
+
         
         {/* Main View Area */}
         <main className="flex-1 relative overflow-hidden flex flex-col h-full pb-14 md:pb-0">

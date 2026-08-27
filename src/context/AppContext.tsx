@@ -264,14 +264,29 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     setIsUpgradeModalOpen(true);
   }, []);
 
-  // Is Pro User check
+  // Is Pro User check: Super Admin, Active Paid Plan, OR Active 14-Day Free Trial
   const isProUser = useMemo(() => {
-    // Super admin, owner and paying subscribers have 100% unrestricted access
-    if (!profile) return true; // Default to full access during loading to prevent lock flash
+    if (!profile) return true; // Default to full access during initial loading
     if (profile.role === 'super_admin') return true;
     if (profile.email?.toLowerCase() === 'alexandre1604981@gmail.com') return true;
     if (currentRole === 'super_admin') return true;
-    if (profile.subscriptionPlan && profile.subscriptionPlan !== 'free' && profile.subscriptionStatus === 'active') return true;
+
+    const expiryDate = profile.subscriptionExpiresAt ? new Date(profile.subscriptionExpiresAt).getTime() : null;
+    const isNotExpired = expiryDate ? expiryDate > Date.now() : true;
+
+    // 1. Users in Active 14-Day Trial have 100% full access to all Premium features
+    const isTrial = profile.status === 'trial' || profile.subscriptionPlan === 'free_trial' || (profile as any).subscriptionStatus === 'trial';
+    if (isTrial && isNotExpired) {
+      return true;
+    }
+
+    // 2. Active Paid Subscribers
+    const isActiveStatus = profile.status === 'active' || (profile as any).subscriptionStatus === 'active';
+    const isPaidPlan = profile.subscriptionPlan && profile.subscriptionPlan !== 'free';
+    if ((isActiveStatus || isPaidPlan) && isNotExpired) {
+      return true;
+    }
+
     return false;
   }, [profile, currentRole]);
 
