@@ -1595,7 +1595,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         setIsAiModalOpen,
         isAddWaypointModalOpen,
         setIsAddWaypointModalOpen,
-        isLayerModalOpen,
+                isLayerModalOpen,
         setIsLayerModalOpen,
         isReportModalOpen,
         setIsReportModalOpen,
@@ -1605,6 +1605,16 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         setIsWoodpileModalOpen,
         isPoliciesModalOpen,
         setIsPoliciesModalOpen,
+        isProUser,
+        isUpgradeModalOpen,
+        setIsUpgradeModalOpen,
+        openUpgradeModal,
+        upgradeModalFeature,
+        billingConfig,
+        setBillingConfig,
+        canAddPdfMap,
+        isSidebarCollapsed,
+        toggleSidebarCollapsed,
       }}
     >
       {children}
