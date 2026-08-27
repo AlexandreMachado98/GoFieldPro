@@ -1472,42 +1472,91 @@ export const AdminPanel: React.FC = () => {
       {adminTab === 'plans' && (
         <div className="space-y-5 animate-in fade-in duration-200">
           <div className="space-y-3">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-gradient-to-r from-slate-900 to-indigo-950/60 p-4 sm:p-5 rounded-3xl border border-indigo-500/40 shadow-xl">
               <div>
-                <h3 className="text-xs sm:text-sm font-extrabold text-white uppercase tracking-wider flex items-center gap-2">
+                <h3 className="text-sm sm:text-base font-black text-white uppercase tracking-wider flex items-center gap-2">
                   <Tag className="w-4 h-4 text-indigo-400" />
-                  Gerenciador de Planos, Preços & Descontos Personalizados
+                  Vitrine de Planos & Escolha de Opções do Usuário
                 </h3>
-                <p className="text-[11px] text-slate-400 mt-0.5">
-                  Configure o valor inteiro de tabela, o valor com desconto e os serviços incluídos em cada plano.
+                <p className="text-[11px] sm:text-xs text-slate-300 mt-1">
+                  Clique nas pílulas <b className="text-emerald-400">🟢 Visível na Vitrine</b> / <b className="text-slate-400">⚪ Oculto</b> abaixo para escolher quais planos aparecem na tela do usuário ao assinar.
                 </p>
               </div>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setEditingPlan({
+                    id: `custom_plan_${Date.now()}`,
+                    name: 'Novo Plano de Campo',
+                    tag: 'Profissional',
+                    originalPrice: 149.90,
+                    price: 69.90,
+                    billingPeriod: '/mês',
+                    discountBadge: '53% OFF',
+                    highlight: false,
+                    activeInShowcase: true,
+                    features: ['Acesso a Mapas Ilimitados', 'Medição de Pilha de Madeira', 'Offline Total'],
+                  });
+                  setPlanModalName('Novo Plano de Campo');
+                  setPlanModalTag('Profissional');
+                  setPlanModalOriginalPrice(149.90);
+                  setPlanModalPrice(69.90);
+                  setPlanModalBadge('53% OFF');
+                  setPlanModalFeaturesText('Acesso a Mapas Ilimitados\nMedição de Pilha de Madeira\nOffline Total');
+                }}
+                className="bg-indigo-600 hover:bg-indigo-500 text-white font-black px-4 py-2.5 rounded-2xl text-xs flex items-center justify-center gap-2 shadow-lg shadow-indigo-950/60 active:scale-95 transition-all shrink-0 cursor-pointer"
+              >
+                <Plus className="w-4 h-4" />
+                <span>+ Adicionar Novo Plano</span>
+              </button>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
               {plans.map((plan) => {
                 const discountAmount = plan.originalPrice > plan.price ? plan.originalPrice - plan.price : 0;
+                const isVisible = plan.activeInShowcase !== false;
 
                 return (
                   <div
                     key={plan.id}
-                    className={`bg-slate-900 border rounded-3xl p-4 sm:p-5 shadow-xl flex flex-col justify-between space-y-4 relative ${
-                      plan.highlight
-                        ? 'border-emerald-500/60 ring-1 ring-emerald-500/40 bg-gradient-to-b from-emerald-950/20 to-slate-900'
-                        : 'border-slate-800'
+                    className={`bg-slate-900 border rounded-3xl p-4 sm:p-5 shadow-xl flex flex-col justify-between space-y-4 relative transition-all ${
+                      isVisible
+                        ? plan.highlight
+                          ? 'border-amber-500/80 ring-2 ring-amber-500/40 bg-gradient-to-b from-amber-950/20 to-slate-900'
+                          : 'border-emerald-500/60 ring-1 ring-emerald-500/30'
+                        : 'border-slate-800 opacity-60 bg-slate-950/50'
                     }`}
                   >
                     <div>
-                      <div className="flex items-center justify-between gap-1.5 flex-wrap mb-2">
-                        <span className="text-[9px] uppercase font-black px-2 py-0.5 rounded-full bg-slate-800 text-slate-300 border border-slate-700">
-                          {plan.tag}
-                        </span>
-                        {plan.discountBadge && (
-                          <span className="text-[9px] uppercase font-black px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 flex items-center gap-1">
-                            <Percent className="w-2.5 h-2.5" />
-                            {plan.discountBadge}
-                          </span>
-                        )}
+                      {/* Top Action Bar with 1-Click Visibility Switch */}
+                      <div className="flex items-center justify-between gap-1.5 flex-wrap mb-3">
+                        <button
+                          type="button"
+                          onClick={() => handleTogglePlanShowcase(plan.id)}
+                          className={`px-3 py-1 rounded-full text-[10px] font-black uppercase flex items-center gap-1.5 transition-all shadow-md active:scale-95 cursor-pointer ${
+                            isVisible
+                              ? 'bg-emerald-500 text-slate-950 ring-2 ring-emerald-400 font-extrabold hover:bg-emerald-400'
+                              : 'bg-slate-800 text-slate-400 border border-slate-700 hover:bg-slate-700 hover:text-slate-200'
+                          }`}
+                          title="Clique para ativar ou desativar este plano na tela do cliente"
+                        >
+                          {isVisible ? '🟢 Visível na Vitrine' : '⚪ Oculto na Vitrine'}
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => handleToggleHighlight(plan.id)}
+                          className={`px-2.5 py-1 rounded-xl border text-[10px] font-bold flex items-center gap-1 transition-all active:scale-95 cursor-pointer ${
+                            plan.highlight
+                              ? 'bg-amber-500/20 border-amber-500 text-amber-300 font-black'
+                              : 'bg-slate-950 border-slate-800 text-slate-500 hover:text-slate-300'
+                          }`}
+                          title="Destacar este plano como o mais popular"
+                        >
+                          <Sparkles className="w-3 h-3 text-amber-400" />
+                          <span>{plan.highlight ? '★ Em Destaque' : 'Destacar'}</span>
+                        </button>
                       </div>
 
                       <h4 className="text-base sm:text-lg font-black text-white">{plan.name}</h4>
@@ -1560,7 +1609,7 @@ export const AdminPanel: React.FC = () => {
                           setPlanModalBadge(plan.discountBadge || '');
                           setPlanModalFeaturesText(plan.features.join('\n'));
                         }}
-                        className="w-full bg-slate-800 hover:bg-slate-700 text-white font-bold py-2 px-3 rounded-xl text-xs flex items-center justify-center gap-1.5 transition-all active:scale-95 border border-slate-700 shadow"
+                        className="w-full bg-slate-800 hover:bg-slate-700 text-white font-bold py-2 px-3 rounded-xl text-xs flex items-center justify-center gap-1.5 transition-all active:scale-95 border border-slate-700 shadow cursor-pointer"
                       >
                         <Edit3 className="w-3.5 h-3.5 text-sky-400" />
                         <span>Editar Valores & Serviços</span>
