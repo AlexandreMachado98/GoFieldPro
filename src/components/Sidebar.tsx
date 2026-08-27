@@ -47,7 +47,9 @@ export const Sidebar: React.FC = () => {
     billingConfig,
   } = useApp();
   const { profile, logout } = useAuth();
-  const isSuperAdmin = profile?.role === 'super_admin' || profile?.email?.toLowerCase() === 'alexandre1604981@gmail.com' || isProUser;
+  const isOwnerAdmin = profile?.role === 'super_admin' || profile?.email?.toLowerCase() === 'alexandre1604981@gmail.com';
+  const isSuperAdmin = isOwnerAdmin;
+  const hasFullProAccess = isOwnerAdmin || isProUser;
   const { isUpdateAvailable, latestVersion, applyUpdate } = useUpdate();
   const [pendingCount, setPendingCount] = useState(0);
 
@@ -169,7 +171,7 @@ export const Sidebar: React.FC = () => {
               <button
                 key={tab.id}
                 onClick={() => {
-                  if ((tab as any).isPremium && !isSuperAdmin) {
+                  if ((tab as any).isPremium && !hasFullProAccess) {
                     openUpgradeModal(tab.label);
                     return;
                   }
@@ -246,6 +248,29 @@ export const Sidebar: React.FC = () => {
                 }`}>
                   {!isSuperAdmin && <Lock className="w-2.5 h-2.5 text-amber-400" />}
                   {!isSuperAdmin ? 'PREMIUM' : 'm³'}
+                </span>
+              )}
+            </button>
+
+            {/* Planos & Assinatura Pro */}
+            <button
+              onClick={() => {
+                setIsMobileMenuOpen(false);
+                openUpgradeModal('Planos de Assinatura');
+              }}
+              title={isSidebarCollapsed && !isMobileMenuOpen ? 'Planos & Assinatura Pro' : undefined}
+              className={`w-full flex items-center ${
+                isSidebarCollapsed && !isMobileMenuOpen ? 'justify-center p-2.5' : 'justify-between px-3.5 py-2.5'
+              } rounded-xl text-xs font-black text-amber-300 bg-gradient-to-r from-amber-500/20 via-sky-500/20 to-amber-500/20 border border-amber-500/40 hover:from-amber-500/30 hover:to-sky-500/30 transition-all active:scale-98 cursor-pointer shadow-sm`}
+            >
+              <div className="flex items-center gap-3">
+                <Crown className="w-5 h-5 text-amber-400 shrink-0" />
+                {(!isSidebarCollapsed || isMobileMenuOpen) && <span>Planos & Assinaturas</span>}
+              </div>
+              {(!isSidebarCollapsed || isMobileMenuOpen) && (
+                <span className="text-[9px] uppercase font-black px-1.5 py-0.5 rounded-md bg-amber-500 text-slate-950 flex items-center gap-0.5 shadow">
+                  <Zap className="w-2.5 h-2.5 fill-current" />
+                  PRO
                 </span>
               )}
             </button>

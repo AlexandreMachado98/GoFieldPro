@@ -22,7 +22,9 @@ import {
   Trash2,
   Sun,
   Moon,
-  Sparkles
+  Sparkles,
+  Crown,
+  Zap
 } from 'lucide-react';
 
 export const Topbar: React.FC = () => {
@@ -47,7 +49,8 @@ export const Topbar: React.FC = () => {
     setIsSettingsModalOpen,
     settings,
     toggleTheme,
-    showConfirm
+    showConfirm,
+    openUpgradeModal,
   } = useApp();
 
   const { profile, logout } = useAuth();
@@ -109,6 +112,16 @@ export const Topbar: React.FC = () => {
           <div className="flex flex-1 items-center justify-end gap-1.5 sm:gap-2">
             {/* 1. Instalar App */}
             <PwaInstallButton variant="topbar" />
+
+            {/* Botão de Planos & Assinatura Pro no Topbar */}
+            <button
+              onClick={() => openUpgradeModal('Adesão / Upgrade')}
+              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-gradient-to-r from-amber-500/20 to-sky-500/20 hover:from-amber-500/30 hover:to-sky-500/30 border border-amber-500/40 text-amber-300 text-xs font-black transition-all active:scale-95 cursor-pointer shadow-sm"
+              title="Ver Planos e Assinaturas"
+            >
+              <Crown className="w-4 h-4 text-amber-400" />
+              <span className="hidden sm:inline">Planos Pro</span>
+            </button>
 
             {/* 2. Modo Escuro / Claro Toggle */}
             <button
