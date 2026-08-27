@@ -33,7 +33,8 @@ import {
   Crosshair,
   LocateFixed,
   Sliders,
-  Ruler
+  Ruler,
+  Lock
 } from 'lucide-react';
 import L from 'leaflet';
 import * as pdfjsLib from 'pdfjs-dist';
