@@ -326,6 +326,57 @@ export const AdminPanel: React.FC = () => {
   }, [notifySuccess, notifyError]);
 
   // Save Billing Configuration
+
+  const [showAsaasKey, setShowAsaasKey] = useState<boolean>(false);
+  const [isTestingAsaas, setIsTestingAsaas] = useState<boolean>(false);
+  const [asaasTestStatus, setAsaasTestStatus] = useState<{ success: boolean; message: string } | null>(null);
+
+  const handleTestAsaasConnection = async () => {
+    const key = billingConfig.asaasApiKey?.trim();
+    if (!key) {
+      setAsaasTestStatus({ success: false, message: 'Por favor, insira a Chave de API antes de testar.' });
+      return;
+    }
+
+    setIsTestingAsaas(true);
+    setAsaasTestStatus(null);
+
+    const baseUrl = billingConfig.asaasEnvironment === 'sandbox'
+      ? 'https://sandbox.asaas.com/api/v3'
+      : 'https://api.asaas.com/api/v3';
+
+    try {
+      const res = await fetch(`${baseUrl}/customers?limit=1`, {
+        headers: {
+          'access_token': key,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (res.ok) {
+        setAsaasTestStatus({
+          success: true,
+          message: `Conexão Asaas Estabelecida com Sucesso! (Ambiente: ${billingConfig.asaasEnvironment === 'sandbox' ? 'Sandbox' : 'Produção'})`,
+        });
+        notifySuccess('Asaas Conectado!', 'Sua Chave de API está funcionando perfeitamente.');
+      } else {
+        const errData = await res.json();
+        setAsaasTestStatus({
+          success: false,
+          message: `Erro Asaas: ${errData.errors?.[0]?.description || 'Chave de API inválida ou sem permissão.'}`,
+        });
+        notifyError('Falha no Asaas', 'Verifique se a chave de API está correta.');
+      }
+    } catch (e: any) {
+      setAsaasTestStatus({
+        success: false,
+        message: `Erro de conexão: ${e.message || 'Falha ao conectar com o Asaas.'}`,
+      });
+    } finally {
+      setIsTestingAsaas(false);
+    }
+  };
+
   const handleSaveBillingConfig = async (e: React.FormEvent) => {
     e.preventDefault();
     setSavingBilling(true);
