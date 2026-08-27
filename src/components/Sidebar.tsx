@@ -47,6 +47,7 @@ export const Sidebar: React.FC = () => {
     billingConfig,
   } = useApp();
   const { profile, logout } = useAuth();
+  const isSuperAdmin = profile?.role === 'super_admin' || profile?.email?.toLowerCase() === 'alexandre1604981@gmail.com' || isProUser;
   const { isUpdateAvailable, latestVersion, applyUpdate } = useUpdate();
   const [pendingCount, setPendingCount] = useState(0);
 
@@ -168,7 +169,7 @@ export const Sidebar: React.FC = () => {
               <button
                 key={tab.id}
                 onClick={() => {
-                  if ((tab as any).isPremium && !isProUser) {
+                  if ((tab as any).isPremium && !isSuperAdmin) {
                     openUpgradeModal(tab.label);
                     return;
                   }
@@ -193,7 +194,7 @@ export const Sidebar: React.FC = () => {
                   {!isCollapsed && (
                     <div className="flex items-center gap-1.5 truncate">
                       <span className="truncate">{tab.label}</span>
-                      {(tab as any).isPremium && !isProUser && (
+                      {(tab as any).isPremium && !isSuperAdmin && (
                         <Lock className="w-3.5 h-3.5 text-amber-400 shrink-0" />
                       )}
                     </div>
@@ -219,7 +220,7 @@ export const Sidebar: React.FC = () => {
             <button
               onClick={() => {
                 setIsMobileMenuOpen(false);
-                if (!isProUser) {
+                if (!isSuperAdmin) {
                   openUpgradeModal('Cubagem Florestal (m³)');
                   return;
                 }
@@ -236,9 +237,9 @@ export const Sidebar: React.FC = () => {
               </div>
               {(!isSidebarCollapsed || isMobileMenuOpen) && (
                 <span className="text-[9px] uppercase font-black px-1.5 py-0.2 rounded-full ${
-                  !isProUser ? 'bg-amber-500 text-slate-950 flex items-center gap-0.5' : 'bg-emerald-500 text-slate-950'
+                  !isSuperAdmin ? 'bg-amber-500 text-slate-950 flex items-center gap-0.5' : 'bg-emerald-500 text-slate-950'
                 }">
-                  {!isProUser && <Lock className="w-2.5 h-2.5" />}
+                  {!isSuperAdmin && <Lock className="w-2.5 h-2.5" />}
                   m³
                 </span>
               )}
@@ -277,7 +278,7 @@ export const Sidebar: React.FC = () => {
             {(!isSidebarCollapsed || isMobileMenuOpen) && <PwaInstallButton variant="sidebar" />}
 
           {/* Pro Upgrade Banner for Free Users */}
-          {!isProUser && (!isSidebarCollapsed || isMobileMenuOpen) && (
+          {!isSuperAdmin && (!isSidebarCollapsed || isMobileMenuOpen) && (
             <div className="p-2.5 bg-gradient-to-br from-amber-500/10 via-sky-500/10 to-transparent border border-amber-500/30 rounded-2xl space-y-2 mt-2">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-1.5">

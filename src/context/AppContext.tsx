@@ -266,16 +266,18 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
   // Is Pro User check
   const isProUser = useMemo(() => {
-    if (!profile) return false;
+    // Super admin, owner and paying subscribers have 100% unrestricted access
+    if (!profile) return true; // Default to full access during loading to prevent lock flash
     if (profile.role === 'super_admin') return true;
     if (profile.email?.toLowerCase() === 'alexandre1604981@gmail.com') return true;
+    if (currentRole === 'super_admin') return true;
     if (profile.subscriptionPlan && profile.subscriptionPlan !== 'free' && profile.subscriptionStatus === 'active') return true;
     return false;
-  }, [profile]);
+  }, [profile, currentRole]);
 
   // Check if user can add a PDF map (Free plan: max 2 concurrent maps; block on 4th total map)
   const canAddPdfMap = useCallback((currentMapCount: number): { allowed: boolean; reason?: string; isFourthMapBlock?: boolean } => {
-    if (isProUser) {
+    if (isProUser || profile?.role === 'super_admin' || currentRole === 'super_admin' || profile?.email?.toLowerCase() === 'alexandre1604981@gmail.com') {
       return { allowed: true };
     }
 
