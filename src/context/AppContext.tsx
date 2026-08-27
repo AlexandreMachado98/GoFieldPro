@@ -264,26 +264,55 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     setIsUpgradeModalOpen(true);
   }, []);
 
-  // Is Pro User check: Super Admin, Active Paid Plan, OR Active 14-Day Free Trial
+  // Is Pro User check: Strict check against Expiry, Suspensions and Trial periods
   const isProUser = useMemo(() => {
     if (!profile) return true; // Default to full access during initial loading
     if (profile.role === 'super_admin') return true;
     if (profile.email?.toLowerCase() === 'alexandre1604981@gmail.com') return true;
     if (currentRole === 'super_admin') return true;
 
-    const expiryDate = profile.subscriptionExpiresAt ? new Date(profile.subscriptionExpiresAt).getTime() : null;
-    const isNotExpired = expiryDate ? expiryDate > Date.now() : true;
+    // 1. If user account is blocked
+    if (profile.status === 'blocked') return false;
 
-    // 1. Users in Active 14-Day Trial have 100% full access to all Premium features
-    const isTrial = profile.status === 'trial' || profile.subscriptionPlan === 'free_trial' || (profile as any).subscriptionStatus === 'trial';
-    if (isTrial && isNotExpired) {
-      return true;
+    // 2. If admin marked subscription as overdue, expired, suspended or canceled
+    const subStatus = (profile as any).subscriptionStatus;
+    if (
+      subStatus === 'suspended' ||
+      subStatus === 'overdue' ||
+      subStatus === 'expired' ||
+      subStatus === 'canceled' ||
+      profile.status === 'expired'
+    ) {
+      return false;
     }
 
-    // 2. Active Paid Subscribers
-    const isActiveStatus = profile.status === 'active' || (profile as any).subscriptionStatus === 'active';
+    // 3. Strict Date-based Expiration Check
+    if (profile.subscriptionExpiresAt) {
+      const expiryTime = new Date(profile.subscriptionExpiresAt).getTime();
+      // If date has passed, immediately revoke all Pro features
+      if (expiryTime <= Date.now()) {
+        return false;
+      }
+    } else {
+      // If user has no expiration date configured, they cannot be Pro unless they have an active paid subscription
+      if (subStatus !== 'active') {
+        return false;
+      }
+    }
+
+    // 4. Active Trial check (must have unexpired expiration date)
+    const isTrial = profile.status === 'trial' || profile.subscriptionPlan === 'free_trial' || subStatus === 'trial';
+    if (isTrial) {
+      if (!profile.subscriptionExpiresAt) return false;
+      return new Date(profile.subscriptionExpiresAt).getTime() > Date.now();
+    }
+
+    // 5. Active Paid Subscription
     const isPaidPlan = profile.subscriptionPlan && profile.subscriptionPlan !== 'free';
-    if ((isActiveStatus || isPaidPlan) && isNotExpired) {
+    if (isPaidPlan && (subStatus === 'active' || profile.status === 'active')) {
+      if (profile.subscriptionExpiresAt) {
+        return new Date(profile.subscriptionExpiresAt).getTime() > Date.now();
+      }
       return true;
     }
 
