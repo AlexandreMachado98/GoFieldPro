@@ -80,7 +80,7 @@ export async function getOrCreateAsaasCustomer(
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        name: user.name || user.email.split('@')[0],
+        name: user.name || user.email.split('@')[0] || 'Cliente GoField Pro',
         email: user.email,
         phone: cleanPhone.length >= 10 ? cleanPhone : undefined,
         cpfCnpj: cleanCpf.length >= 11 ? cleanCpf : undefined,
@@ -91,6 +91,26 @@ export async function getOrCreateAsaasCustomer(
     if (createRes.ok) {
       const created = await createRes.json();
       return created.id;
+    } else {
+      const errText = await createRes.text();
+      console.warn('Asaas create customer warning:', errText);
+      // Fallback: If CPF/CNPJ was invalid or rejected, retry with minimal fields
+      const retryRes = await fetch(`${baseUrl}/customers`, {
+        method: 'POST',
+        headers: {
+          'access_token': apiKey,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          name: user.name || user.email.split('@')[0] || 'Cliente GoField',
+          email: user.email,
+          notificationDisabled: true,
+        }),
+      });
+      if (retryRes.ok) {
+        const retryData = await retryRes.json();
+        return retryData.id;
+      }
     }
   } catch (err) {
     console.warn('Asaas getOrCreateCustomer notice:', err);

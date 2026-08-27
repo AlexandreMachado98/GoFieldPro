@@ -108,10 +108,10 @@ export const DEFAULT_PLANS: PlanItemConfig[] = [
 ];
 
 const DEFAULT_BILLING_CONFIG: SystemBillingConfig = {
-  pixKey: '48.123.456/0001-90',
+  pixKey: '',
   pixKeyType: 'cnpj',
-  beneficiaryName: 'AM TST SAÚDE E SEGURANÇA DO TRABALHO',
-  bankName: 'Banco Inter PJ / Nubank PJ',
+  beneficiaryName: '',
+  bankName: '',
   defaultTrialDays: 14,
   whatsappSupportNumber: '5511999999999',
   customMessageTemplate:
@@ -1718,7 +1718,7 @@ export const AdminPanel: React.FC = () => {
                   required
                   value={billingConfig.pixKey}
                   onChange={(e) => setBillingConfig((p) => ({ ...p, pixKey: e.target.value }))}
-                  placeholder="Ex: 48.123.456/0001-90"
+                  placeholder="Ex: seuemail@dominio.com ou CNPJ ou Telefone"
                   className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white font-mono focus:outline-none focus:border-amber-500"
                 />
               </div>
@@ -1732,7 +1732,7 @@ export const AdminPanel: React.FC = () => {
                   required
                   value={billingConfig.beneficiaryName}
                   onChange={(e) => setBillingConfig((p) => ({ ...p, beneficiaryName: e.target.value }))}
-                  placeholder="Ex: AM TST SAÚDE E SEGURANÇA"
+                  placeholder="Ex: Nome Completo ou Razão Social"
                   className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-amber-500"
                 />
               </div>

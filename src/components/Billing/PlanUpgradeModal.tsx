@@ -94,6 +94,7 @@ export const PlanUpgradeModal: React.FC = () => {
     isProUser,
     notifySuccess,
     notifyInfo,
+    notifyWarning,
     notifyError,
   } = useApp();
   const { profile, refreshProfile } = useAuth();
@@ -196,28 +197,40 @@ export const PlanUpgradeModal: React.FC = () => {
     setIsGeneratingPix(true);
 
     try {
-      // 1. Try Asaas API
+      // 1. If Asaas API Key is configured, generate dynamic PIX charge via Asaas API
       if (billingConfig?.asaasApiKey?.trim()) {
         const asaasRes = await createAsaasPixPayment(profile, priceToCharge, billingConfig);
-        if (asaasRes) {
+        if (asaasRes && asaasRes.pixPayload) {
           setPaymentId(asaasRes.paymentId);
           setPixPayload(asaasRes.pixPayload);
           setPixQrCodeBase64(asaasRes.pixQrCodeBase64);
           setPaymentStep('pix_checkout');
           setIsGeneratingPix(false);
           return;
+        } else {
+          console.warn('Asaas API did not return pixPayload, checking direct pix key fallback');
         }
       }
 
-      // 2. Fallback to System Static PIX Key if Asaas key is not yet set
-      const pixKey = billingConfig?.pixKey || '48.123.456/0001-90';
-      setPixPayload(pixKey);
-      setPixQrCodeBase64('');
-      setPaymentStep('pix_checkout');
+      // 2. Fallback to Admin Direct PIX Key
+      const directPixKey = billingConfig?.pixKey?.trim() || '';
+      if (directPixKey) {
+        setPaymentId('');
+        setPixPayload(directPixKey);
+        setPixQrCodeBase64('');
+        setPaymentStep('pix_checkout');
+      } else {
+        notifyWarning('Chave Pix em Configuração', 'O administrador está configurando a chave Pix. Por favor, contate o suporte via WhatsApp.');
+        setPaymentId('');
+        setPixPayload('Chave Pix pendente de cadastro no Painel Admin');
+        setPixQrCodeBase64('');
+        setPaymentStep('pix_checkout');
+      }
     } catch (err) {
-      console.warn('Checkout error:', err);
-      const pixKey = billingConfig?.pixKey || '48.123.456/0001-90';
-      setPixPayload(pixKey);
+      console.error('Checkout error:', err);
+      const directPixKey = billingConfig?.pixKey?.trim() || '';
+      setPixPayload(directPixKey || 'Contate o suporte para obter a chave Pix');
+      setPixQrCodeBase64('');
       setPaymentStep('pix_checkout');
     } finally {
       setIsGeneratingPix(false);
@@ -434,10 +447,10 @@ export const PlanUpgradeModal: React.FC = () => {
                   />
                 </div>
               ) : (
-                <div className="p-4 bg-slate-900 border border-slate-800 rounded-2xl space-y-2 text-left">
+                <div className="p-4 bg-slate-900 border border-amber-500/30 rounded-2xl space-y-2 text-left shadow-lg">
                   <p className="text-xs text-slate-400">Chave PIX Oficial ({billingConfig?.pixKeyType?.toUpperCase() || 'CNPJ'}):</p>
                   <p className="text-sm font-mono font-bold text-amber-300 break-all">{pixPayload}</p>
-                  <p className="text-[11px] text-slate-500 font-medium">Titular: {billingConfig?.beneficiaryName || 'GoField Pro'}</p>
+                  <p className="text-[11px] text-slate-500 font-medium">Titular: {billingConfig?.beneficiaryName || 'Administração GoField Pro'}</p>
                 </div>
               )}
 

@@ -233,10 +233,10 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
   // System Billing Config
   const [billingConfig, setBillingConfig] = useState<SystemBillingConfig>({
-    pixKey: '48.123.456/0001-90',
+    pixKey: '',
     pixKeyType: 'cnpj',
-    beneficiaryName: 'AM TST SAÚDE E SEGURANÇA DO TRABALHO',
-    bankName: 'Banco Inter PJ / Nubank PJ',
+    beneficiaryName: '',
+    bankName: '',
     defaultTrialDays: 14,
     whatsappSupportNumber: '5511999999999',
     customMessageTemplate: 'Olá {nome}, sua assinatura GoField Pro está disponível.',
