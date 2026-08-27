@@ -137,13 +137,18 @@ export const MapViewer: React.FC = () => {
 
   // Initialize Leaflet Map
   useEffect(() => {
-    if (!mapContainerRef.current) return;
+    const container = mapContainerRef.current;
+    if (!container) return;
     if (mapInstanceRef.current) return;
 
-    const initialLat = hasGpsLock ? currentGps.lat : activeProject.centerCoordinate.lat;
-    const initialLng = hasGpsLock ? currentGps.lng : activeProject.centerCoordinate.lng;
+    if ((container as any)._leaflet_id) {
+      delete (container as any)._leaflet_id;
+    }
 
-    const map = L.map(mapContainerRef.current, {
+    const initialLat = hasGpsLock && currentGps?.lat ? currentGps.lat : (activeProject?.centerCoordinate?.lat ?? -23.5505);
+    const initialLng = hasGpsLock && currentGps?.lng ? currentGps.lng : (activeProject?.centerCoordinate?.lng ?? -46.6333);
+
+    const map = L.map(container, {
       center: [initialLat, initialLng],
       zoom: hasGpsLock ? 16 : (activeProject?.zoomLevel || 13),
       minZoom: 2,
@@ -156,6 +161,7 @@ export const MapViewer: React.FC = () => {
       doubleClickZoom: true,
       boxZoom: true,
     });
+
 
     // Basemap tile with high maxNativeZoom and maxZoom
     const tileLayer = L.tileLayer(basemapTileUrls[basemap], {

@@ -276,7 +276,7 @@ export async function generateAnnotatedPdf(
 
   // Create an offscreen canvas to render map image + overlay markers & tracks
   const canvas = document.createElement('canvas');
-  const img = new Image();
+  const img = typeof document !== 'undefined' ? document.createElement('img') : new (globalThis as any).Image();
 
   await new Promise<void>((resolve, reject) => {
     img.onload = () => resolve();

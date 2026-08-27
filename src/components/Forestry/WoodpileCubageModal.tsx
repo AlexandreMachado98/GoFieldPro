@@ -101,7 +101,7 @@ export const WoodpileCubageModal: React.FC<WoodpileCubageModalProps> = ({ isOpen
     const file = files[0];
     const reader = new FileReader();
     reader.onload = (event) => {
-      const img = new Image();
+      const img = typeof document !== 'undefined' ? document.createElement('img') : new (globalThis as any).Image();
       img.onload = () => {
         const canvas = document.createElement('canvas');
         const maxDim = 1000;

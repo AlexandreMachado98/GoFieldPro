@@ -1,4 +1,3 @@
-import { PlanUpgradeModal } from './components/Billing/PlanUpgradeModal';
 import React from 'react';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { AppProvider, useApp } from './context/AppContext';
@@ -26,6 +25,7 @@ import { SettingsModal } from './components/Settings/SettingsModal';
 import { WoodpileCubageModal } from './components/Forestry/WoodpileCubageModal';
 import { LegalPoliciesModal } from './components/Legal/LegalPoliciesModal';
 import { AppUpdateBanner } from './components/Common/AppUpdateBanner';
+import { PlanUpgradeModal } from './components/Billing/PlanUpgradeModal';
 
 const MainAppContent: React.FC = () => {
   const {
@@ -78,7 +78,7 @@ const MainAppContent: React.FC = () => {
         <Topbar />
         
         {/* Main View Area */}
-        <main className="flex-1 relative overflow-hidden flex flex-col h-full">
+        <main className="flex-1 relative overflow-hidden flex flex-col h-full pb-14 md:pb-0">
           {(activeTab === 'map' || activeTab === 'layers') && (
             <div className="relative flex-1 flex flex-col w-full h-full">
               <MapViewer />
@@ -109,6 +109,7 @@ const MainAppContent: React.FC = () => {
       <ConfirmModal />
       <PlanUpgradeModal />
       <ToastContainer />
+      <MobileBottomNav />
     </div>
   );
 };
@@ -126,4 +127,3 @@ export default function App() {
     </ErrorBoundary>
   );
 }
-

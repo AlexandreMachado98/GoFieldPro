@@ -142,7 +142,7 @@ export const FieldRoundsPanel: React.FC = () => {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
       reader.onload = (e) => {
-        const img = new Image();
+        const img = typeof document !== 'undefined' ? document.createElement('img') : new (globalThis as any).Image();
         img.onload = () => {
           const canvas = document.createElement('canvas');
           let width = img.width;

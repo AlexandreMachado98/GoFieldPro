@@ -521,10 +521,16 @@ export const PdfMapNavigator: React.FC = () => {
 
   // Initialize Map safely
   const initializeMap = useCallback(() => {
-    if (!mapContainerRef.current || mapInstanceRef.current) return;
+    const container = mapContainerRef.current;
+    if (!container) return;
+    if (mapInstanceRef.current) return;
 
     try {
-      const map = L.map(mapContainerRef.current, {
+      if ((container as any)._leaflet_id) {
+        delete (container as any)._leaflet_id;
+      }
+
+      const map = L.map(container, {
         crs: L.CRS.Simple,
         minZoom: -4,
         maxZoom: 5,
@@ -541,6 +547,7 @@ export const PdfMapNavigator: React.FC = () => {
       });
 
       mapInstanceRef.current = map;
+
 
       const tracksGroup = L.layerGroup().addTo(map);
       tracksLayerRef.current = tracksGroup;

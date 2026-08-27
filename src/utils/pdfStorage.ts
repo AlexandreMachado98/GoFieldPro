@@ -112,6 +112,16 @@ function sanitizeDocument(doc: any): PdfDocument {
       category: m.category || 'checkpoint',
       color: m.color || '#0284c7',
       photos: Array.isArray(m.photos) ? m.photos : [],
+      woodpileData: m.woodpileData ? {
+        woodType: m.woodpileData.woodType || 'Eucalipto',
+        lengthMeters: typeof m.woodpileData.lengthMeters === 'number' ? m.woodpileData.lengthMeters : Number(m.woodpileData.lengthMeters) || 0,
+        heightMeters: typeof m.woodpileData.heightMeters === 'number' ? m.woodpileData.heightMeters : Number(m.woodpileData.heightMeters) || 0,
+        widthMeters: typeof m.woodpileData.widthMeters === 'number' ? m.woodpileData.widthMeters : Number(m.woodpileData.widthMeters) || 1.0,
+        stackFactor: typeof m.woodpileData.stackFactor === 'number' ? m.woodpileData.stackFactor : Number(m.woodpileData.stackFactor) || 0.67,
+        estimatedStereoM3: typeof m.woodpileData.estimatedStereoM3 === 'number' ? m.woodpileData.estimatedStereoM3 : Number(m.woodpileData.estimatedStereoM3) || 0,
+        estimatedSolidM3: typeof m.woodpileData.estimatedSolidM3 === 'number' ? m.woodpileData.estimatedSolidM3 : Number(m.woodpileData.estimatedSolidM3) || 0,
+        status: m.woodpileData.status || 'empilhada',
+      } : undefined,
       createdAt: m.createdAt || new Date().toLocaleTimeString('pt-BR'),
     })) : [],
     tracks: Array.isArray(doc.tracks) ? doc.tracks.map((t: any) => ({
@@ -124,7 +134,12 @@ function sanitizeDocument(doc: any): PdfDocument {
       isRecorded: !!t.isRecorded,
       createdAt: t.createdAt || new Date().toLocaleTimeString('pt-BR'),
     })) : [],
-    calibration: doc.calibration,
+    calibration: doc.calibration && typeof doc.calibration.isCalibrated === 'boolean' ? doc.calibration : {
+      isCalibrated: false,
+      ref1: { x: (doc.height || 1200) * 0.9, y: (doc.width || 1600) * 0.1, lat: -23.5420, lng: -46.6380 },
+      ref2: { x: (doc.height || 1200) * 0.1, y: (doc.width || 1600) * 0.9, lat: -23.5540, lng: -46.6220 },
+      scaleMetersPerPixel: 1,
+    },
     uploadedAt: doc.uploadedAt || new Date().toLocaleDateString('pt-BR'),
   };
 }

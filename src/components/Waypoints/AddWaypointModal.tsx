@@ -98,7 +98,7 @@ export const AddWaypointModal: React.FC<AddWaypointModalProps> = ({
     const reader = new FileReader();
 
     reader.onload = (event) => {
-      const img = new Image();
+      const img = typeof document !== 'undefined' ? document.createElement('img') : new (globalThis as any).Image();
       img.onload = () => {
         const maxDim = 800;
         let { width, height } = img;

@@ -32,7 +32,7 @@ function projectMercator(lat: number, lng: number, zoom: number): { px: number; 
  */
 function loadImageAsync(url: string): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
-    const img = new Image();
+    const img = typeof document !== 'undefined' ? document.createElement('img') : new (globalThis as any).Image();
     img.crossOrigin = 'anonymous';
     img.onload = () => resolve(img);
     img.onerror = (err) => reject(err);
