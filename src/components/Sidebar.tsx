@@ -96,8 +96,8 @@ export const Sidebar: React.FC = () => {
     { id: 'home', label: t.tabHome || 'Início', icon: Home },
     { id: 'map', label: t.tabMap || 'Mapa de Navegação', icon: Map },
     { id: 'pdf_maps', label: t.tabPdfMaps || 'Mapas & Plantas PDF', icon: FileText },
-    { id: 'field_rounds', label: t.tabFieldRounds || 'Registrar Atividade', icon: Gauge },
-    { id: 'offline', label: t.tabOffline || 'Mapas Offline', icon: HardDrive, isPremium: true },
+    { id: 'field_rounds', label: t.tabFieldRounds || 'Registrar Atividade', icon: Gauge, isPremium: true },
+    { id: 'offline', label: t.tabOffline || 'Mapas Offline', icon: HardDrive },
   ];
 
   if (profile?.role === 'super_admin') {
@@ -192,10 +192,13 @@ export const Sidebar: React.FC = () => {
                     }`}
                   />
                   {!isCollapsed && (
-                    <div className="flex items-center gap-1.5 truncate">
+                    <div className="flex items-center justify-between gap-2 w-full truncate">
                       <span className="truncate">{tab.label}</span>
                       {(tab as any).isPremium && !isSuperAdmin && (
-                        <Lock className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                        <span className="text-[9px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded-md bg-amber-500/20 text-amber-300 border border-amber-500/40 flex items-center gap-1 shadow-sm shrink-0">
+                          <Lock className="w-2.5 h-2.5 text-amber-400" />
+                          PREMIUM
+                        </span>
                       )}
                     </div>
                   )}
@@ -236,11 +239,13 @@ export const Sidebar: React.FC = () => {
                 {(!isSidebarCollapsed || isMobileMenuOpen) && <span>Cubagem Florestal</span>}
               </div>
               {(!isSidebarCollapsed || isMobileMenuOpen) && (
-                <span className="text-[9px] uppercase font-black px-1.5 py-0.2 rounded-full ${
-                  !isSuperAdmin ? 'bg-amber-500 text-slate-950 flex items-center gap-0.5' : 'bg-emerald-500 text-slate-950'
-                }">
-                  {!isSuperAdmin && <Lock className="w-2.5 h-2.5" />}
-                  m³
+                <span className={`text-[9px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded-md border flex items-center gap-1 shadow-sm ${
+                  !isSuperAdmin 
+                    ? 'bg-amber-500/20 text-amber-300 border-amber-500/40' 
+                    : 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
+                }`}>
+                  {!isSuperAdmin && <Lock className="w-2.5 h-2.5 text-amber-400" />}
+                  {!isSuperAdmin ? 'PREMIUM' : 'm³'}
                 </span>
               )}
             </button>
