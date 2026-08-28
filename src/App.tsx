@@ -21,36 +21,37 @@ import { ApprovalCelebrationScreen } from './components/Auth/ApprovalCelebration
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { ConfirmModal } from './components/Common/ConfirmModal';
 import { ToastContainer } from './components/Common/ToastContainer';
-import { SubscriptionModal } from './components/Subscription/SubscriptionModal';
+import { FeatureLockModal } from './components/Common/FeatureLockModal';
 import { AddWaypointModal } from './components/Waypoints/AddWaypointModal';
 import { LayerManagerModal } from './components/Layers/LayerManagerModal';
 import { MobileBottomNav } from './components/Navigation/MobileBottomNav';
 import { AppUpdateBanner } from './components/Common/AppUpdateBanner';
 import { SpecialAccessModal } from './components/Modals/SpecialAccessModal';
-import { Sparkles, Clock, AlertTriangle, ArrowRight, Lock } from 'lucide-react';
+import { Sparkles, Clock, AlertTriangle, ArrowRight, Lock, ExternalLink } from 'lucide-react';
 import { getUserRawItem } from './utils/userStorage';
 
 const FeatureRestrictedView: React.FC<{ featureName: string }> = ({ featureName }) => {
-  const { openUpgradeModal } = useApp();
   return (
     <div className="h-full flex items-center justify-center p-4">
       <div className="bg-slate-900 border border-slate-800 p-8 rounded-3xl max-w-md text-center shadow-2xl space-y-4">
-        <div className="w-14 h-14 rounded-2xl bg-amber-500/20 text-amber-400 border border-amber-500/30 flex items-center justify-center mx-auto">
+        <div className="w-14 h-14 rounded-2xl bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 flex items-center justify-center mx-auto">
           <Lock className="w-7 h-7" />
         </div>
         <div className="space-y-1">
-          <h2 className="text-xl font-bold text-white">Funcionalidade Não Disponível</h2>
+          <h2 className="text-xl font-bold text-white">Recurso Exclusivo GoField Pro</h2>
           <p className="text-slate-400 text-xs leading-relaxed">
-            O recurso <strong className="text-white">"{featureName}"</strong> não está incluído no seu plano atual. Assine ou faça upgrade do seu plano para liberar o acesso imediatamente.
+            O recurso <strong className="text-white">"{featureName}"</strong> faz parte do plano profissional do GoField Pro.
           </p>
         </div>
-        <button
-          type="button"
-          onClick={() => openUpgradeModal(featureName)}
-          className="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-emerald-500 to-sky-500 hover:from-emerald-400 hover:to-sky-400 text-slate-950 font-black text-xs uppercase tracking-wider transition-all shadow-lg active:scale-95 cursor-pointer"
+        <a
+          href="https://am-tst.com.br/#apps"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex items-center justify-center gap-2 w-full px-5 py-3 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 font-black text-xs uppercase tracking-wider shadow-lg transition-all"
         >
-          Conhecer Planos & Fazer Upgrade
-        </button>
+          <span>Conhecer o GoField Pro na AM TST</span>
+          <ExternalLink className="w-4 h-4" />
+        </a>
       </div>
     </div>
   );
@@ -183,7 +184,7 @@ const MainAppContent: React.FC = () => {
       <WoodpileCubageModal isOpen={isWoodpileModalOpen} onClose={() => setIsWoodpileModalOpen(false)} />
       <LegalPoliciesModal isOpen={isPoliciesModalOpen} onClose={() => setIsPoliciesModalOpen(false)} />
       <ConfirmModal />
-      <SubscriptionModal />
+      <FeatureLockModal />
       <ToastContainer />
       <MobileBottomNav />
     </div>
