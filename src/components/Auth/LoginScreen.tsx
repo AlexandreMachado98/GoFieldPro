@@ -1,3 +1,9 @@
+import {
+  requestPasswordResetOTP,
+  verifyPasswordResetOTP,
+  finalizePasswordReset,
+  normalizeEmail,
+} from '../../utils/passwordRecovery';
 import React, { useState } from 'react';
 import {
   signInWithEmailAndPassword,
