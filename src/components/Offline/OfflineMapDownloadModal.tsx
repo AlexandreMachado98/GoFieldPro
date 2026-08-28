@@ -14,6 +14,7 @@ import {
 import { useApp } from '../../context/AppContext';
 import { useAuth } from '../../context/AuthContext';
 import { saveAppState } from '../../utils/stateStorage';
+import { downloadOfflineMapPack } from '../../utils/tileDownloader';
 
 interface OfflineMapDownloadModalProps {
   isOpen: boolean;
