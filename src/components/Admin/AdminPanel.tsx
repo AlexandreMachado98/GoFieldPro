@@ -107,7 +107,7 @@ const DEFAULT_BILLING_CONFIG: SystemBillingConfig = {
 
 export const AdminPanel: React.FC = () => {
   const { profile } = useAuth();
-  const { notifySuccess, notifyError, notifyInfo, notifyWarning, showConfirm } = useApp();
+  const { notifySuccess, notifyError, notifyInfo, notifyWarning, showConfirm, billingConfig, setBillingConfig } = useApp();
 
   // Navigation subtabs inside SuperAdmin
   const [adminTab, setAdminTab] = useState<
@@ -124,17 +124,12 @@ export const AdminPanel: React.FC = () => {
   const [subscriptionFilter, setSubscriptionFilter] = useState<'all' | 'active' | 'trial' | 'overdue' | 'suspended'>('all');
   const [searchQuery, setSearchQuery] = useState('');
 
-  // Billing & Plans Config State
-  const [billingConfig, setBillingConfig] = useState<SystemBillingConfig>(() => {
-    try {
-      const saved = localStorage.getItem('gofield_billing_config');
-      return saved ? JSON.parse(saved) : DEFAULT_BILLING_CONFIG;
-    } catch {
-      return DEFAULT_BILLING_CONFIG;
-    }
-  });
+  // Plans List State (Synced with global billingConfig.plans)
 
   const [plans, setPlans] = useState<PlanItemConfig[]>(() => {
+    if (billingConfig?.plans && Array.isArray(billingConfig.plans) && billingConfig.plans.length > 0) {
+      return normalizePlansList(billingConfig.plans);
+    }
     try {
       const saved = localStorage.getItem('gofield_custom_plans');
       const parsed = saved ? JSON.parse(saved) : DEFAULT_PLANS;
@@ -143,6 +138,12 @@ export const AdminPanel: React.FC = () => {
       return DEFAULT_PLANS;
     }
   });
+
+  useEffect(() => {
+    if (billingConfig?.plans && Array.isArray(billingConfig.plans)) {
+      setPlans(normalizePlansList(billingConfig.plans));
+    }
+  }, [billingConfig?.plans]);
 
   const [savingBilling, setSavingBilling] = useState(false);
 
