@@ -404,30 +404,17 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     };
   }, [isProUser, profile]);
 
-  // Check if user can add a PDF map (Free plan: max 2 concurrent maps; block on 4th total map)
-  const canAddPdfMap = useCallback((currentMapCount: number): { allowed: boolean; reason?: string; isFourthMapBlock?: boolean } => {
+  // Check if user can add a PDF map (Free plan: max 2 active/concurrent maps)
+  const canAddPdfMap = useCallback((currentMapCount: number): { allowed: boolean; reason?: string } => {
     const isOwner = profile?.role === 'super_admin' || profile?.email?.toLowerCase() === 'alexandre1604981@gmail.com';
     if (isProUser || isOwner) {
       return { allowed: true };
     }
 
-    const lifetimeCount = profile?.lifetimeMapsUploaded || 0;
-
-    // Block on 4th map upload in lifetime
-    if (lifetimeCount >= 3) {
-      return {
-        allowed: false,
-        isFourthMapBlock: true,
-        reason: 'Você atingiu o limite de teste do Plano Gratuito (4º mapa). Faça upgrade para o Plano Profissional para importar mapas ilimitados.',
-      };
-    }
-
-    // Limit to 2 concurrent maps
     if (currentMapCount >= 2) {
       return {
         allowed: false,
-        isFourthMapBlock: false,
-        reason: 'O Plano Gratuito permite usar até 2 mapas PDF ao mesmo tempo. Exclua um dos 2 mapas atuais para adicionar outro, ou faça upgrade para o Plano Profissional ilimitado.',
+        reason: 'O Plano Gratuito permite manter até 2 mapas PDF ativos simultaneamente. Exclua um dos mapas existentes para importar outro ou assine o Plano Profissional para mapas ilimitados.',
       };
     }
 
@@ -451,7 +438,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     setUserItem(currentUserId, 'fire_incidents', fireIncidents);
   }, [fireIncidents, currentUserId]);
 
-  // Translation helper
+  // Translation and PDF files helper
   const [pdfFiles, setPdfFiles] = useState<{ id: string, name: string, dataUrl: string, width?: number, height?: number }[]>([]);
   const addPdfFile = (pdf: { id: string, name: string, dataUrl: string, width?: number, height?: number }) => setPdfFiles(prev => [...prev, pdf]);
   const t = translations[language] || translations.pt;
