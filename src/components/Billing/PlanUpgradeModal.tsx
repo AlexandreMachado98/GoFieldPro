@@ -20,10 +20,11 @@ import {
   RefreshCw,
   Star,
   CheckCircle,
+  Tag,
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { useAuth } from '../../context/AuthContext';
-import { doc, updateDoc } from 'firebase/firestore';
+import { doc, updateDoc, getDoc } from 'firebase/firestore';
 import { db } from '../../lib/firebase';
 import {
   createAsaasPixPayment,
@@ -31,7 +32,7 @@ import {
   generatePixEmvPayload,
   getPixQrCodeImageUrl,
 } from '../../utils/asaasGateway';
-import { PlanItemConfig, DEFAULT_PLANS, DEFAULT_FREE_PLAN } from '../../types';
+import { PlanItemConfig, DEFAULT_PLANS, DEFAULT_FREE_PLAN, PromoCoupon } from '../../types';
 
 export const PlanUpgradeModal: React.FC = () => {
   const {
@@ -55,6 +56,10 @@ export const PlanUpgradeModal: React.FC = () => {
   const [copied, setCopied] = useState<boolean>(false);
   const [isCheckingPayment, setIsCheckingPayment] = useState<boolean>(false);
   const [selectedPlanId, setSelectedPlanId] = useState<string>('pro');
+  const [couponCodeInput, setCouponCodeInput] = useState<string>('');
+  const [appliedCoupon, setAppliedCoupon] = useState<PromoCoupon | null>(null);
+  const [couponLoading, setCouponLoading] = useState<boolean>(false);
+  const [couponMessage, setCouponMessage] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
 
   // Available showcase plans (always includes Free Plan and Pro Plan)
   const availablePlans = useMemo(() => {
@@ -112,6 +117,69 @@ export const PlanUpgradeModal: React.FC = () => {
     );
   };
 
+  // Apply and validate promo coupon
+  const handleApplyCoupon = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    const clean = couponCodeInput.trim().toUpperCase().replace(/[^A-Z0-9_-]/g, '');
+    if (!clean) return;
+
+    setCouponLoading(true);
+    setCouponMessage(null);
+
+    try {
+      const snap = await getDoc(doc(db, 'coupons', `coupon_${clean}`));
+      if (!snap.exists()) {
+        setCouponMessage({ text: `Cupom "${clean}" não encontrado.`, type: 'error' });
+        setAppliedCoupon(null);
+        setCouponLoading(false);
+        return;
+      }
+
+      const c = snap.data() as PromoCoupon;
+      if (!c.active) {
+        setCouponMessage({ text: 'Este cupom está pausado ou desativado.', type: 'error' });
+        setAppliedCoupon(null);
+        setCouponLoading(false);
+        return;
+      }
+
+      if (c.validUntil && new Date(c.validUntil) < new Date()) {
+        setCouponMessage({ text: 'Este cupom já expirou.', type: 'error' });
+        setAppliedCoupon(null);
+        setCouponLoading(false);
+        return;
+      }
+
+      if (c.maxUses && (c.usedCount || 0) >= c.maxUses) {
+        setCouponMessage({ text: 'Este cupom já atingiu o limite máximo de utilizações.', type: 'error' });
+        setAppliedCoupon(null);
+        setCouponLoading(false);
+        return;
+      }
+
+      setAppliedCoupon(c);
+      const discountLabel = c.discountType === 'fixed'
+        ? `R$ ${Number(c.discountFixed || 0).toFixed(2)} OFF`
+        : `${c.discountPercent || 0}% OFF`;
+      setCouponMessage({ text: `Cupom ${c.code} aplicado com sucesso (${discountLabel})!`, type: 'success' });
+      notifySuccess('Cupom Aplicado!', `Desconto de ${discountLabel} concedido na sua assinatura.`);
+    } catch (err) {
+      setCouponMessage({ text: 'Erro ao validar cupom.', type: 'error' });
+      setAppliedCoupon(null);
+    } finally {
+      setCouponLoading(false);
+    }
+  };
+
+  const calculateFinalPrice = (basePrice: number): number => {
+    if (!appliedCoupon || basePrice <= 0) return basePrice;
+    if (appliedCoupon.discountType === 'fixed') {
+      return Math.max(1, basePrice - (appliedCoupon.discountFixed || 0));
+    }
+    const percent = appliedCoupon.discountPercent || 0;
+    return Math.max(1, basePrice * (1 - percent / 100));
+  };
+
   const handleStartCheckout = async (planToBuy: PlanItemConfig) => {
     if (planToBuy.id === 'free' || planToBuy.price === 0) {
       await handleContinueAsFree();
@@ -127,7 +195,8 @@ export const PlanUpgradeModal: React.FC = () => {
       );
 
       if (isAsaasConfigured && profile) {
-        const asaasResult = await createAsaasPixPayment(profile, planToBuy.price, billingConfig);
+        const finalPrice = calculateFinalPrice(planToBuy.price);
+        const asaasResult = await createAsaasPixPayment(profile, finalPrice, billingConfig);
 
         if (asaasResult && asaasResult.pixPayload) {
           setPixPayload(asaasResult.pixPayload);
@@ -145,7 +214,7 @@ export const PlanUpgradeModal: React.FC = () => {
       const fallbackPayload = generatePixEmvPayload({
         pixKey,
         beneficiaryName: beneficiary,
-        amount: planToBuy.price,
+        amount: calculateFinalPrice(planToBuy.price),
         cityName: 'BRASILIA',
               });
 
@@ -197,6 +266,18 @@ export const PlanUpgradeModal: React.FC = () => {
           hasChosenPlan: true,
         });
         await refreshProfile();
+        if (appliedCoupon) {
+          try {
+            const coupRef = doc(db, 'coupons', appliedCoupon.id);
+            const coupSnap = await getDoc(coupRef);
+            if (coupSnap.exists()) {
+              const currentCount = coupSnap.data().usedCount || 0;
+              await updateDoc(coupRef, { usedCount: currentCount + 1 });
+            }
+          } catch (e) {
+            console.warn('Notice updating coupon usedCount:', e);
+          }
+        }
         setPaymentStep('success');
       } catch (err) {
         console.error('Error manually activating subscription:', err);
@@ -244,6 +325,54 @@ export const PlanUpgradeModal: React.FC = () => {
                 </p>
               </div>
 
+                            {/* Promo Coupon Input Box */}
+              <div className="bg-slate-900/80 border border-slate-800 p-3 rounded-2xl space-y-2">
+                <div className="flex items-center justify-between text-xs">
+                  <span className="text-slate-300 font-bold flex items-center gap-1.5 text-[11px] uppercase tracking-wider">
+                    <Tag className="w-3.5 h-3.5 text-pink-400" />
+                    Possui um cupom de desconto?
+                  </span>
+                  {appliedCoupon && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setAppliedCoupon(null);
+                        setCouponMessage(null);
+                        setCouponCodeInput('');
+                      }}
+                      className="text-[10px] text-slate-400 hover:text-rose-400 font-bold underline cursor-pointer"
+                    >
+                      Remover
+                    </button>
+                  )}
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <input
+                    type="text"
+                    value={couponCodeInput}
+                    onChange={(e) => setCouponCodeInput(e.target.value.toUpperCase())}
+                    placeholder="DIGITE SEU CUPOM (EX: PROMO20)"
+                    disabled={couponLoading || !!appliedCoupon}
+                    className="flex-1 bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-white font-mono text-xs focus:outline-none focus:border-pink-500 uppercase disabled:opacity-60"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => handleApplyCoupon()}
+                    disabled={couponLoading || !couponCodeInput.trim() || !!appliedCoupon}
+                    className="px-4 py-2 bg-pink-600 hover:bg-pink-500 disabled:bg-slate-800 text-white font-bold text-xs rounded-xl transition-all cursor-pointer disabled:opacity-50 active:scale-95"
+                  >
+                    {couponLoading ? 'Validando...' : appliedCoupon ? 'Aplicado ✓' : 'Aplicar'}
+                  </button>
+                </div>
+
+                {couponMessage && (
+                  <p className={`text-[11px] font-bold ${couponMessage.type === 'success' ? 'text-emerald-400' : 'text-rose-400'}`}>
+                    {couponMessage.text}
+                  </p>
+                )}
+              </div>
+
               {/* Plans Comparison Grid */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
                 {availablePlans.map((plan) => {
@@ -282,19 +411,37 @@ export const PlanUpgradeModal: React.FC = () => {
 
                         {/* Pricing Box */}
                         <div className="my-2.5 bg-slate-950/70 p-2.5 rounded-xl border border-slate-800/80">
-                          {plan.originalPrice > plan.price && (
-                            <div className="text-[10px] text-slate-400 line-through font-mono">
-                              R$ {plan.originalPrice.toFixed(2)}
+                          {appliedCoupon && !isFree ? (
+                            <div>
+                              <div className="text-[10px] text-slate-400 line-through font-mono">
+                                R$ {plan.price.toFixed(2).replace('.', ',')}
+                              </div>
+                              <div className="flex items-baseline gap-1">
+                                <span className="text-xl sm:text-2xl font-black font-mono text-emerald-400">
+                                  R$ {calculateFinalPrice(plan.price).toFixed(2).replace('.', ',')}
+                                </span>
+                                <span className="text-[10px] text-slate-400 font-medium">
+                                  {plan.billingPeriod || '/mês'}
+                                </span>
+                              </div>
+                            </div>
+                          ) : (
+                            <div>
+                              {plan.originalPrice > plan.price && (
+                                <div className="text-[10px] text-slate-400 line-through font-mono">
+                                  R$ {plan.originalPrice.toFixed(2)}
+                                </div>
+                              )}
+                              <div className="flex items-baseline gap-1">
+                                <span className={`text-xl sm:text-2xl font-black font-mono ${isFree ? 'text-sky-400' : 'text-emerald-400'}`}>
+                                  R$ {plan.price.toFixed(2).replace('.', ',')}
+                                </span>
+                                <span className="text-[10px] text-slate-400 font-medium">
+                                  {plan.billingPeriod || (isFree ? '/sempre' : '/mês')}
+                                </span>
+                              </div>
                             </div>
                           )}
-                          <div className="flex items-baseline gap-1">
-                            <span className={`text-xl sm:text-2xl font-black font-mono ${isFree ? 'text-sky-400' : 'text-emerald-400'}`}>
-                              R$ {plan.price.toFixed(2).replace('.', ',')}
-                            </span>
-                            <span className="text-[10px] text-slate-400 font-medium">
-                              {plan.billingPeriod || (isFree ? '/sempre' : '/mês')}
-                            </span>
-                          </div>
                         </div>
 
                         {/* Features List */}
