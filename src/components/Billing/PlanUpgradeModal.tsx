@@ -62,20 +62,20 @@ export const PlanUpgradeModal: React.FC = () => {
   const [couponLoading, setCouponLoading] = useState<boolean>(false);
   const [couponMessage, setCouponMessage] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
 
-  // Available showcase plans (always includes Free Plan and Pro Plan)
+  // Available showcase plans (Dynamic from Super Admin Firestore Catalog)
   const availablePlans = useMemo(() => {
     const rawPlans = (billingConfig?.plans && Array.isArray(billingConfig.plans) && billingConfig.plans.length > 0)
       ? billingConfig.plans
       : DEFAULT_PLANS;
 
+    // Filter plans marked active in showcase by Super Admin
     const visible = rawPlans.filter((p) => p.activeInShowcase !== false && (p as any).activeInShowcase !== 'false');
     
-    // Ensure Free Plan is always present in the list
-    if (!visible.some((p) => p.id === 'free' || p.price === 0)) {
-      return [DEFAULT_FREE_PLAN, ...visible];
+    if (visible.length === 0) {
+      return rawPlans;
     }
     return visible;
-  }, [billingConfig, billingConfig?.plans]);
+  }, [billingConfig?.plans]);
 
   const currentPaidPlan = useMemo(() => {
     return availablePlans.find((p) => p.id === selectedPlanId && p.id !== 'free')

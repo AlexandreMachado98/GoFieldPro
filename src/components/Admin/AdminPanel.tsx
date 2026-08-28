@@ -621,13 +621,15 @@ export const AdminPanel: React.FC = () => {
               originalPrice: cleanOrigPrice,
               price: cleanPrice,
               discountBadge: planModalBadge.trim(),
-              billingPeriod: planModalPeriod || p.billingPeriod || '/mês',
+              billingPeriod: planModalPeriod || (cleanPrice === 0 ? '/sempre' : p.billingPeriod || '/mês'),
               highlight: planModalHighlight,
               activeInShowcase: planModalActiveInShowcase,
               features: updatedFeatures.length > 0 ? updatedFeatures : p.features,
               promoPrice: cleanPromoPrice,
               promoStartsAt: cleanPromoStartsAt,
               promoExpiresAt: cleanPromoExpiresAt,
+              allFeaturesAccess: cleanPrice === 0 ? false : planModalAllFeatures,
+              allowedFeatureKeys: planModalAllowedKeys,
             };
           }
           return p;
@@ -2808,12 +2810,18 @@ export const AdminPanel: React.FC = () => {
                         setIsCreatingPlan(false);
                         setPlanModalName(p.name);
                         setPlanModalTag(p.tag);
-                        setPlanModalOriginalPrice(p.originalPrice || p.price);
+                        setPlanModalOriginalPrice(p.originalPrice !== undefined ? p.originalPrice : p.price);
                         setPlanModalPrice(p.price);
                         setPlanModalBadge(p.discountBadge || '');
-                        setPlanModalPeriod(p.billingPeriod || '/mês');
+                        setPlanModalPeriod(p.billingPeriod || (p.price === 0 ? '/sempre' : '/mês'));
                         setPlanModalActiveInShowcase(p.activeInShowcase !== false);
-                        setPlanModalFeaturesText(p.features.join('\n'));
+                        setPlanModalHighlight(Boolean(p.highlight));
+                        setPlanModalPromoPrice(p.promoPrice !== undefined ? String(p.promoPrice) : '');
+                        setPlanModalPromoStartsAt(p.promoStartsAt || '');
+                        setPlanModalPromoExpiresAt(p.promoExpiresAt || '');
+                        setPlanModalFeaturesText(Array.isArray(p.features) ? p.features.join('\n') : '');
+                        setPlanModalAllFeatures(p.allFeaturesAccess !== false);
+                        setPlanModalAllowedKeys(p.allowedFeatureKeys || ALL_FEATURE_KEYS);
                       }}
                       className="p-1.5 bg-purple-600 hover:bg-purple-500 text-white rounded-lg cursor-pointer"
                     >
