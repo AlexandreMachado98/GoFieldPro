@@ -54,6 +54,9 @@ import {
   AlertCircle,
   Edit3,
   Percent,
+  Eye,
+  EyeOff,
+  Zap,
 } from 'lucide-react';
 
 export const DEFAULT_PLANS: PlanItemConfig[] = [
@@ -1707,16 +1710,106 @@ export const AdminPanel: React.FC = () => {
       {/* TAB 4: CONFIGURAÇÕES DE COBRANÇA (PIX & WHATSAPP)                         */}
       {/* ========================================================================= */}
       {adminTab === 'billing_settings' && (
-        <div className="bg-slate-900 border border-slate-800 rounded-2xl sm:rounded-3xl p-4 sm:p-6 shadow-2xl space-y-4 animate-in fade-in duration-200">
-          <div className="border-b border-slate-800 pb-3">
-            <h3 className="text-sm sm:text-base font-extrabold text-white flex items-center gap-2">
-              <QrCode className="w-4 h-4 sm:w-5 sm:h-5 text-amber-400" />
-              Configuração de Recebimento Pix & Cobrança Automática
-            </h3>
-            <p className="text-[11px] sm:text-xs text-slate-400 mt-1">
-              Cadastre sua Chave Pix e o modelo de mensagem para que o botão "Cobrar no WhatsApp" funcione com 1 clique.
-            </p>
+        <div className="space-y-4 animate-in fade-in duration-200">
+          {/* 1. ASAAS GATEWAY CARD */}
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl sm:rounded-3xl p-4 sm:p-6 shadow-2xl space-y-4">
+            <div className="border-b border-slate-800 pb-3 flex items-center justify-between gap-2 flex-wrap">
+              <div>
+                <h3 className="text-sm sm:text-base font-extrabold text-white flex items-center gap-2">
+                  <Zap className="w-4 h-4 sm:w-5 sm:h-5 text-indigo-400" />
+                  Gateway Asaas (PIX com Liberação Automática)
+                </h3>
+                <p className="text-[11px] sm:text-xs text-slate-400 mt-0.5">
+                  Gere cobranças PIX dinâmicas com QR Code e libere os clientes instantaneamente após o pagamento.
+                </p>
+              </div>
+              <a
+                href="https://www.asaas.com"
+                target="_blank"
+                rel="noreferrer"
+                className="text-[10px] sm:text-xs text-indigo-400 hover:text-indigo-300 font-bold underline flex items-center gap-1"
+              >
+                Abrir Painel Asaas
+              </a>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div>
+                <label className="block text-[10px] sm:text-[11px] font-bold text-slate-300 uppercase mb-1">
+                  Ambiente Asaas *
+                </label>
+                <select
+                  value={billingConfig.asaasEnvironment || 'production'}
+                  onChange={(e) => setBillingConfig((p) => ({ ...p, asaasEnvironment: e.target.value as any }))}
+                  className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-indigo-500 font-bold"
+                >
+                  <option value="production">🟢 Produção (api.asaas.com)</option>
+                  <option value="sandbox">🟡 Sandbox / Testes (sandbox.asaas.com)</option>
+                </select>
+              </div>
+
+              <div className="sm:col-span-2">
+                <label className="block text-[10px] sm:text-[11px] font-bold text-slate-300 uppercase mb-1">
+                  Chave de API do Asaas (API Key) *
+                </label>
+                <div className="relative">
+                  <input
+                    type={showAsaasKey ? 'text' : 'password'}
+                    value={billingConfig.asaasApiKey || ''}
+                    onChange={(e) => setBillingConfig((p) => ({ ...p, asaasApiKey: e.target.value }))}
+                    placeholder="$aact_YTU5YTE0M2M6N2I4MT..."
+                    className="w-full bg-slate-950 border border-slate-700 rounded-xl pl-3 pr-10 py-2 text-xs text-white font-mono focus:outline-none focus:border-indigo-500"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowAsaasKey(!showAsaasKey)}
+                    className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-white cursor-pointer"
+                  >
+                    {showAsaasKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
+                <p className="text-[9px] text-slate-500 mt-1">
+                  No Asaas vá em: <b>Configurações &gt; Integrações &gt; Gerar Chave de API</b>.
+                </p>
+              </div>
+            </div>
+
+            {/* Test Connection Button & Status */}
+            <div className="pt-1 flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-t border-slate-800/80">
+              <button
+                type="button"
+                onClick={handleTestAsaasConnection}
+                disabled={isTestingAsaas}
+                className="px-3.5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-black text-xs flex items-center justify-center gap-1.5 shadow transition-all active:scale-95 cursor-pointer disabled:opacity-50"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${isTestingAsaas ? 'animate-spin' : ''}`} />
+                <span>{isTestingAsaas ? 'Testando Conexão...' : 'Testar Conexão com o Asaas'}</span>
+              </button>
+
+              {asaasTestStatus && (
+                <div className={`text-xs px-3 py-1.5 rounded-xl border flex items-center gap-1.5 ${
+                  asaasTestStatus.success
+                    ? 'bg-emerald-950/60 border-emerald-500 text-emerald-300'
+                    : 'bg-rose-950/60 border-rose-500 text-rose-300'
+                }`}>
+                  {asaasTestStatus.success ? <CheckCircle2 className="w-4 h-4 shrink-0" /> : <AlertCircle className="w-4 h-4 shrink-0" />}
+                  <span>{asaasTestStatus.message}</span>
+                </div>
+              )}
+            </div>
           </div>
+
+          {/* 2. MANUAL PIX & WHATSAPP CONFIGURATION CARD */}
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl sm:rounded-3xl p-4 sm:p-6 shadow-2xl space-y-4">
+            <div className="border-b border-slate-800 pb-3">
+              <h3 className="text-sm sm:text-base font-extrabold text-white flex items-center gap-2">
+                <QrCode className="w-4 h-4 sm:w-5 sm:h-5 text-amber-400" />
+                Chave Pix Direta & Suporte WhatsApp (Contingência)
+              </h3>
+              <p className="text-[11px] sm:text-xs text-slate-400 mt-1">
+                Utilizado para transferências manuais ou como contingência quando o cliente preferir falar diretamente no WhatsApp.
+              </p>
+            </div>
 
           <form onSubmit={handleSaveBillingConfig} className="space-y-3.5">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -1789,9 +1882,9 @@ export const AdminPanel: React.FC = () => {
                 className="w-full bg-slate-950 border border-slate-700 rounded-xl p-2.5 text-xs text-white focus:outline-none focus:border-amber-500 font-sans leading-relaxed"
               />
               <p className="text-[9px] text-slate-500 mt-1">
-                Tags automáticas: <b className="text-slate-400">{'{nome}'}</b>,{' '}
-                <b className="text-slate-400">{'{empresa}'}</b>, <b className="text-slate-400">{'{valor}'}</b>,{' '}
-                <b className="text-slate-400">{'{vencimento}'}</b>, <b className="text-slate-400">{'{chave_pix}'}</b>.
+                Tags automáticas: <b className="text-slate-400">&#123;nome&#125;</b>,{' '}
+                <b className="text-slate-400">&#123;empresa&#125;</b>, <b className="text-slate-400">&#123;valor&#125;</b>,{' '}
+                <b className="text-slate-400">&#123;vencimento&#125;</b>, <b className="text-slate-400">&#123;chave_pix&#125;</b>.
               </p>
             </div>
 
@@ -1806,6 +1899,7 @@ export const AdminPanel: React.FC = () => {
               </button>
             </div>
           </form>
+          </div>
         </div>
       )}
 
