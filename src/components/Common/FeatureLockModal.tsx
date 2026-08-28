@@ -8,7 +8,7 @@ export const FeatureLockModal: React.FC = () => {
   if (!isUpgradeModalOpen) return null;
 
   const handleOpenAmtstPortal = () => {
-    window.open('https://am-tst.com.br/#apps', '_blank');
+    window.open('https://amtst.vercel.app/#apps', '_blank');
     setIsUpgradeModalOpen(false);
   };
 

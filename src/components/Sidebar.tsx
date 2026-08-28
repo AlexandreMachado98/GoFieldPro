@@ -361,7 +361,7 @@ export const Sidebar: React.FC = () => {
                 Recursos profissionais de geoprocessamento, cubagem e SST de campo.
               </p>
               <a
-                href="https://am-tst.com.br/#apps"
+                href="https://amtst.vercel.app/#apps"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="w-full py-2 px-3 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 font-black text-xs rounded-xl shadow-md transition-all flex items-center justify-center gap-1.5 active:scale-95"

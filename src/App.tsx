@@ -44,7 +44,7 @@ const FeatureRestrictedView: React.FC<{ featureName: string }> = ({ featureName 
           </p>
         </div>
         <a
-          href="https://am-tst.com.br/#apps"
+          href="https://amtst.vercel.app/#apps"
           target="_blank"
           rel="noopener noreferrer"
           className="inline-flex items-center justify-center gap-2 w-full px-5 py-3 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 font-black text-xs uppercase tracking-wider shadow-lg transition-all"
