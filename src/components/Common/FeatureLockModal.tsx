@@ -1,4 +1,4 @@
-﻿import React from 'react';
+import React from 'react';
 import { X, Lock, Sparkles, ExternalLink, ArrowRight, Check, Shield } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 
@@ -74,7 +74,7 @@ export const FeatureLockModal: React.FC = () => {
             </div>
             <div className="flex items-center gap-1.5">
               <Check className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-              <span>Laudos Técnicos em PDF</span>
+              <span>Relatórios Técnicos em PDF</span>
             </div>
           </div>
         </div>
