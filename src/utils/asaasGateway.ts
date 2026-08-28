@@ -38,7 +38,7 @@ export function getAsaasBaseUrl(config?: SystemBillingConfig): string {
   const env = config?.asaasEnvironment || 'production';
   return env === 'sandbox'
     ? 'https://sandbox.asaas.com/api/v3'
-    : 'https://api.asaas.com/api/v3';
+    : 'https://api.asaas.com/v3';
 }
 
 /**
@@ -82,12 +82,12 @@ export async function asaasApiRequest(
     // 2. Fallback: Secure CORS Bridge Relay
     console.warn('[Asaas] Direct browser CORS blocked, using HTTPS bridge relay...');
     try {
-      const relayUrl = `https://corsproxy.io/?url=${encodeURIComponent(targetUrl)}`;
+      const relayUrl = `https://corsproxy.io/?${encodeURIComponent(targetUrl)}`;
       const relayRes = await fetch(relayUrl, fetchOptions);
       return relayRes;
     } catch (relayErr) {
       try {
-        const altRelayUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(targetUrl)}`;
+        const altRelayUrl = `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(targetUrl)}`;
         const altRelayRes = await fetch(altRelayUrl, fetchOptions);
         return altRelayRes;
       } catch (finalErr) {
