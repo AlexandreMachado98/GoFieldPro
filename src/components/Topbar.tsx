@@ -118,12 +118,9 @@ export const Topbar: React.FC = () => {
             </div>
           </div>
 
-          {/* Right Side: Essential Actions (PWA, Theme, Sync, Notifications & Profile Menu) */}
+          {/* Right Side: Clean Topbar (1. Coroa Pro, 2. Modo Escuro/Claro, 3. Notificações, 4. Perfil) */}
           <div className="flex flex-1 items-center justify-end gap-1.5 sm:gap-2">
-            {/* 1. Instalar App */}
-            <PwaInstallButton variant="topbar" />
-
-            {/* Botão de Planos & Assinatura Pro no Topbar */}
+            {/* 1. Botão de Planos & Assinatura Pro no Topbar */}
             <button
               onClick={() => openUpgradeModal('Adesão / Upgrade')}
               className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-gradient-to-r from-amber-500/20 to-emerald-500/20 hover:from-amber-500/30 hover:to-emerald-500/30 border border-amber-500/40 text-amber-300 text-xs font-black transition-all active:scale-95 cursor-pointer shadow-sm"
@@ -148,21 +145,7 @@ export const Topbar: React.FC = () => {
               )}
             </button>
 
-            {/* 3. Sincronização */}
-            <button
-              id="btn-navbar-sync"
-              onClick={triggerManualSync}
-              disabled={isSyncing}
-              title={offlineQueue.length > 0 ? `${offlineQueue.length} ${t.pendingSync}` : t.allSynced}
-              className="flex items-center gap-1.5 px-2.5 py-2 rounded-xl bg-[#0D121D] hover:bg-slate-850 border border-slate-800/80 text-xs font-semibold text-slate-200 transition-colors active:scale-95 cursor-pointer shadow-sm"
-            >
-              <RefreshCw className={`w-3.5 h-3.5 text-emerald-400 ${isSyncing ? 'animate-spin' : ''}`} />
-              {offlineQueue.length > 0 && (
-                <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse"></span>
-              )}
-            </button>
-
-            {/* 4. Central de Notificações */}
+            {/* 3. Central de Notificações */}
             <div className="relative">
               <button
                 id="btn-notifications-bell"
@@ -260,7 +243,35 @@ export const Topbar: React.FC = () => {
                     <div className="text-[10px] text-sky-400 uppercase mt-1 font-semibold">{profile?.role.replace('_', ' ')}</div>
                   </div>
 
-                  {/* Online / Offline Toggle within user menu */}
+                  {/* 1. Botão de Instalar App (PWA) no menu do perfil */}
+                  <div className="pb-1">
+                    <PwaInstallButton variant="sidebar" />
+                  </div>
+
+                  {/* 2. Botão de Sincronização de Dados no menu do perfil */}
+                  <button
+                    onClick={() => {
+                      triggerManualSync();
+                    }}
+                    disabled={isSyncing}
+                    className="w-full text-left p-2.5 rounded-xl text-xs font-semibold flex items-center justify-between bg-slate-950/40 hover:bg-slate-850 border border-slate-800 text-slate-200 transition-all cursor-pointer mb-1"
+                  >
+                    <div className="flex items-center gap-2">
+                      <RefreshCw className={`w-4 h-4 text-emerald-400 ${isSyncing ? 'animate-spin' : ''}`} />
+                      <span>Sincronizar Nuvem</span>
+                    </div>
+                    {offlineQueue.length > 0 ? (
+                      <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                        {offlineQueue.length} pendentes
+                      </span>
+                    ) : (
+                      <span className="text-[10px] font-bold text-emerald-400 flex items-center gap-1">
+                        <CheckCircle2 className="w-3 h-3" /> Atualizado
+                      </span>
+                    )}
+                  </button>
+
+                  {/* 3. Online / Offline Toggle within user menu */}
                   <button
                     onClick={() => {
                       setIsOffline(!isOffline);

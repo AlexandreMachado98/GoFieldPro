@@ -54,15 +54,18 @@ export const PlanUpgradeModal: React.FC = () => {
   const [copied, setCopied] = useState<boolean>(false);
   const [isCheckingPayment, setIsCheckingPayment] = useState<boolean>(false);
 
-  // Active showcase plans strictly filtered by Admin configuration
+  // Active showcase plan - STRICTLY EXACTLY 1 SINGLE PLAN VISIBLE
   const availablePlans = useMemo(() => {
     const rawPlans = (billingConfig?.plans && Array.isArray(billingConfig.plans) && billingConfig.plans.length > 0)
       ? billingConfig.plans
       : DEFAULT_PLANS;
 
-    // Filter STRICTLY by activeInShowcase !== false
-    const filtered = rawPlans.filter((p) => p.activeInShowcase !== false && (p as any).activeInShowcase !== 'false');
-    return filtered.length > 0 ? filtered : [rawPlans[0]];
+    // Strictly pick ONLY the single Pro plan
+    const singlePlan = rawPlans.find((p) => (p.id === 'pro' || p.highlight) && p.activeInShowcase !== false)
+      || rawPlans.find((p) => p.activeInShowcase !== false && (p as any).activeInShowcase !== 'false')
+      || DEFAULT_PLANS[0];
+
+    return [singlePlan];
   }, [billingConfig, billingConfig?.plans]);
 
   // Selected plan state
