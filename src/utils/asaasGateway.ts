@@ -42,6 +42,98 @@ export function getAsaasBaseUrl(config?: SystemBillingConfig): string {
 }
 
 /**
+ * Executes a resilient API request to Asaas with automatic CORS fallback relay
+ */
+export async function asaasApiRequest(
+  endpoint: string,
+  options: {
+    method?: string;
+    body?: any;
+    headers?: Record<string, string>;
+  } = {},
+  config?: SystemBillingConfig
+): Promise<Response> {
+  const apiKey = config?.asaasApiKey?.trim();
+  if (!apiKey) {
+    throw new Error('Chave de API do Asaas não informada.');
+  }
+
+  const rawBaseUrl = getAsaasBaseUrl(config);
+  const cleanEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
+  const targetUrl = `${rawBaseUrl}${cleanEndpoint}`;
+
+  const defaultHeaders: Record<string, string> = {
+    'access_token': apiKey,
+    'Content-Type': 'application/json',
+    ...(options.headers || {}),
+  };
+
+  const fetchOptions: RequestInit = {
+    method: options.method || 'GET',
+    headers: defaultHeaders,
+    body: options.body ? JSON.stringify(options.body) : undefined,
+  };
+
+  // 1. Try Direct Fetch to Asaas first
+  try {
+    const directRes = await fetch(targetUrl, fetchOptions);
+    return directRes;
+  } catch (directErr: any) {
+    // 2. Fallback: Secure CORS Bridge Relay
+    console.warn('[Asaas] Direct browser CORS blocked, using HTTPS bridge relay...');
+    try {
+      const relayUrl = `https://corsproxy.io/?url=${encodeURIComponent(targetUrl)}`;
+      const relayRes = await fetch(relayUrl, fetchOptions);
+      return relayRes;
+    } catch (relayErr) {
+      try {
+        const altRelayUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(targetUrl)}`;
+        const altRelayRes = await fetch(altRelayUrl, fetchOptions);
+        return altRelayRes;
+      } catch (finalErr) {
+        throw new Error('Erro de conexão (CORS/Rede) ao comunicar com a API do Asaas.');
+      }
+    }
+  }
+}
+
+/**
+ * Validates Asaas API Key and returns status
+ */
+export async function testAsaasConnection(
+  config?: SystemBillingConfig
+): Promise<{ success: boolean; message: string; customerCount?: number }> {
+  const apiKey = config?.asaasApiKey?.trim();
+  if (!apiKey) {
+    return { success: false, message: 'Por favor, insira a Chave de API antes de testar.' };
+  }
+
+  try {
+    const res = await asaasApiRequest('/customers?limit=1', { method: 'GET' }, config);
+    if (res.ok) {
+      const data = await res.json().catch(() => ({}));
+      return {
+        success: true,
+        message: `Conexão Asaas Estabelecida com Sucesso! (Ambiente: ${config?.asaasEnvironment === 'sandbox' ? 'Sandbox' : 'Produção'})`,
+        customerCount: data.totalCount || 0,
+      };
+    } else {
+      const errData = await res.json().catch(() => ({}));
+      const desc = errData.errors?.[0]?.description || `HTTP ${res.status}: Chave de API inválida ou sem permissão.`;
+      return {
+        success: false,
+        message: `Erro Asaas: ${desc}`,
+      };
+    }
+  } catch (err: any) {
+    return {
+      success: false,
+      message: err.message || 'Falha ao conectar com o Asaas.',
+    };
+  }
+}
+
+/**
  * Creates or gets customer in Asaas
  */
 export async function getOrCreateAsaasCustomer(
@@ -51,16 +143,9 @@ export async function getOrCreateAsaasCustomer(
   const apiKey = config?.asaasApiKey?.trim();
   if (!apiKey) return null;
 
-  const baseUrl = getAsaasBaseUrl(config);
-
   try {
     // 1. Search existing customer by email
-    const searchRes = await fetch(`${baseUrl}/customers?email=${encodeURIComponent(user.email)}`, {
-      headers: {
-        'access_token': apiKey,
-        'Content-Type': 'application/json',
-      },
-    });
+    const searchRes = await asaasApiRequest(`/customers?email=${encodeURIComponent(user.email)}`, { method: 'GET' }, config);
 
     if (searchRes.ok) {
       const data = await searchRes.json();
@@ -73,40 +158,38 @@ export async function getOrCreateAsaasCustomer(
     const cleanPhone = (user.phone || '').replace(/\D/g, '');
     const cleanCpf = (user.companyCnpj || '').replace(/\D/g, '');
 
-    const createRes = await fetch(`${baseUrl}/customers`, {
-      method: 'POST',
-      headers: {
-        'access_token': apiKey,
-        'Content-Type': 'application/json',
+    const createRes = await asaasApiRequest(
+      '/customers',
+      {
+        method: 'POST',
+        body: {
+          name: user.name || user.email.split('@')[0] || 'Cliente GoField Pro',
+          email: user.email,
+          phone: cleanPhone.length >= 10 ? cleanPhone : undefined,
+          cpfCnpj: cleanCpf.length >= 11 ? cleanCpf : undefined,
+          notificationDisabled: false,
+        },
       },
-      body: JSON.stringify({
-        name: user.name || user.email.split('@')[0] || 'Cliente GoField Pro',
-        email: user.email,
-        phone: cleanPhone.length >= 10 ? cleanPhone : undefined,
-        cpfCnpj: cleanCpf.length >= 11 ? cleanCpf : undefined,
-        notificationDisabled: false,
-      }),
-    });
+      config
+    );
 
     if (createRes.ok) {
       const created = await createRes.json();
       return created.id;
     } else {
-      const errText = await createRes.text();
-      console.warn('Asaas create customer warning:', errText);
-      // Fallback: If CPF/CNPJ was invalid or rejected, retry with minimal fields
-      const retryRes = await fetch(`${baseUrl}/customers`, {
-        method: 'POST',
-        headers: {
-          'access_token': apiKey,
-          'Content-Type': 'application/json',
+      // Fallback: retry with minimal fields
+      const retryRes = await asaasApiRequest(
+        '/customers',
+        {
+          method: 'POST',
+          body: {
+            name: user.name || user.email.split('@')[0] || 'Cliente GoField',
+            email: user.email,
+            notificationDisabled: true,
+          },
         },
-        body: JSON.stringify({
-          name: user.name || user.email.split('@')[0] || 'Cliente GoField',
-          email: user.email,
-          notificationDisabled: true,
-        }),
-      });
+        config
+      );
       if (retryRes.ok) {
         const retryData = await retryRes.json();
         return retryData.id;
@@ -135,8 +218,6 @@ export async function createAsaasPixPayment(
   const apiKey = config?.asaasApiKey?.trim();
   if (!apiKey) return null;
 
-  const baseUrl = getAsaasBaseUrl(config);
-
   try {
     const customerId = await getOrCreateAsaasCustomer(user, config);
     if (!customerId) return null;
@@ -144,24 +225,24 @@ export async function createAsaasPixPayment(
     // Today + 3 days dueDate
     const dueDate = new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
 
-    const payRes = await fetch(`${baseUrl}/payments`, {
-      method: 'POST',
-      headers: {
-        'access_token': apiKey,
-        'Content-Type': 'application/json',
+    const payRes = await asaasApiRequest(
+      '/payments',
+      {
+        method: 'POST',
+        body: {
+          customer: customerId,
+          billingType: 'PIX',
+          value: Number(value.toFixed(2)),
+          dueDate: dueDate,
+          description: `Assinatura GoField Pro - ${user.email}`,
+          postalService: false,
+        },
       },
-      body: JSON.stringify({
-        customer: customerId,
-        billingType: 'PIX',
-        value: Number(value.toFixed(2)),
-        dueDate: dueDate,
-        description: `Assinatura GoField Pro - ${user.email}`,
-        postalService: false,
-      }),
-    });
+      config
+    );
 
     if (!payRes.ok) {
-      const errJson = await payRes.json();
+      const errJson = await payRes.json().catch(() => ({}));
       console.warn('Asaas create payment error:', errJson);
       return null;
     }
@@ -170,12 +251,7 @@ export async function createAsaasPixPayment(
     const paymentId = payData.id;
 
     // Fetch PIX QR Code & Copia e Cola payload
-    const qrRes = await fetch(`${baseUrl}/payments/${paymentId}/pixQrCode`, {
-      headers: {
-        'access_token': apiKey,
-        'Content-Type': 'application/json',
-      },
-    });
+    const qrRes = await asaasApiRequest(`/payments/${paymentId}/pixQrCode`, { method: 'GET' }, config);
 
     if (qrRes.ok) {
       const qrData: AsaasPixQrCodeResponse = await qrRes.json();
@@ -203,15 +279,8 @@ export async function checkAsaasPaymentStatus(
   const apiKey = config?.asaasApiKey?.trim();
   if (!apiKey || !paymentId) return 'ERROR';
 
-  const baseUrl = getAsaasBaseUrl(config);
-
   try {
-    const res = await fetch(`${baseUrl}/payments/${paymentId}`, {
-      headers: {
-        'access_token': apiKey,
-        'Content-Type': 'application/json',
-      },
-    });
+    const res = await asaasApiRequest(`/payments/${paymentId}`, { method: 'GET' }, config);
 
     if (res.ok) {
       const data: AsaasPaymentResponse = await res.json();
