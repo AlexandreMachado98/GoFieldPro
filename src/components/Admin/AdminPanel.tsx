@@ -317,6 +317,7 @@ export const AdminPanel: React.FC = () => {
       const planVal = typeof data.subscriptionValue === 'number' ? data.subscriptionValue : isOwner ? 0 : 44.99;
 
       return {
+        ...data,
         uid: docSnap.id || data.uid,
         email: data.email || '',
         name: data.name || data.email?.split('@')[0] || 'Usuário',
@@ -344,6 +345,8 @@ export const AdminPanel: React.FC = () => {
         blockType: data.blockType,
         blockedAt: data.blockedAt,
         blockedBy: data.blockedBy,
+        specialAccess: data.specialAccess || undefined,
+        hasChosenPlan: data.hasChosenPlan ?? false,
       } as UserProfile;
     });
 
