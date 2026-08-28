@@ -4,6 +4,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useUpdate } from '../../context/UpdateContext';
 import { APP_VERSION, APP_BUILD_DATE, APP_BUILD_NUMBER, APP_CHANGELOG } from '../../config/version';
 import { AppSettings } from '../../types';
+import { getUserRawItem, setUserItem, removeUserItem } from '../../utils/userStorage';
 import {
   X,
   Settings,
@@ -49,6 +50,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
     showConfirm
   } = useApp();
   const { profile, logout } = useAuth();
+  const currentUserId = profile?.uid || '';
   const {
     isUpdateAvailable,
     latestVersion,
@@ -65,15 +67,15 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
   const [isCleaning, setIsCleaning] = useState(false);
   const [showChangelog, setShowChangelog] = useState(false);
 
-  // Custom Company Logo & Information for PDF Reports
+  // Custom Company Logo & Information for PDF Reports (user-scoped)
   const [companyLogo, setCompanyLogo] = useState<string>(() => {
-    return localStorage.getItem('gofield_custom_company_logo') || '';
+    return getUserRawItem(currentUserId, 'custom_company_logo', '');
   });
   const [companyName, setCompanyName] = useState<string>(() => {
-    return localStorage.getItem('gofield_custom_company_name') || profile?.company || 'AM TST SAÚDE E SEGURANÇA DO TRABALHO';
+    return getUserRawItem(currentUserId, 'custom_company_name', profile?.company || 'AM TST SAÚDE E SEGURANÇA DO TRABALHO');
   });
   const [companyCnpj, setCompanyCnpj] = useState<string>(() => {
-    return localStorage.getItem('gofield_custom_company_cnpj') || '';
+    return getUserRawItem(currentUserId, 'custom_company_cnpj', '');
   });
   const logoInputRef = useRef<HTMLInputElement>(null);
 
@@ -670,7 +672,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
                           reader.onload = (event) => {
                             const result = event.target?.result as string;
                             setCompanyLogo(result);
-                            localStorage.setItem('gofield_custom_company_logo', result);
+                            setUserItem(currentUserId, 'custom_company_logo', result);
                             notifySuccess('Logotipo Carregado!', 'A imagem será usada no cabeçalho dos laudos PDF.');
                           };
                           reader.readAsDataURL(file);
@@ -687,7 +689,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
                             type="button"
                             onClick={() => {
                               setCompanyLogo('');
-                              localStorage.removeItem('gofield_custom_company_logo');
+                              removeUserItem(currentUserId, 'custom_company_logo');
                               notifyWarning('Logotipo Removido', 'Os laudos usarão o brasão padrão do sistema.');
                             }}
                             className="absolute top-1 right-1 bg-red-600/80 hover:bg-red-600 text-white p-1 rounded-lg"
@@ -729,7 +731,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
                         value={companyName}
                         onChange={(e) => {
                           setCompanyName(e.target.value);
-                          localStorage.setItem('gofield_custom_company_name', e.target.value);
+                          setUserItem(currentUserId, 'custom_company_name', e.target.value);
                         }}
                         placeholder="Ex: Madeireira & Silvicultura Vale Verde"
                         className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-white font-bold"
@@ -745,7 +747,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
                         value={companyCnpj}
                         onChange={(e) => {
                           setCompanyCnpj(e.target.value);
-                          localStorage.setItem('gofield_custom_company_cnpj', e.target.value);
+                          setUserItem(currentUserId, 'custom_company_cnpj', e.target.value);
                         }}
                         placeholder="00.000.000/0000-00"
                         className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-white font-mono"

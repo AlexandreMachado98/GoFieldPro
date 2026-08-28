@@ -1,3 +1,5 @@
+import { getUserItem, setUserItem } from './userStorage';
+
 // IndexedDB wrapper for large PDF documents, images and waypoints with photos
 const DB_NAME = 'geofield_pdf_db';
 const DB_VERSION = 1;
@@ -57,6 +59,7 @@ export interface PdfTrack {
 
 export interface PdfDocument {
   id: string;
+  userId?: string;
   name: string;
   fileName: string;
   fileSize: string;
@@ -89,10 +92,11 @@ function openDB(): Promise<IDBDatabase> {
   });
 }
 
-function sanitizeDocument(doc: any): PdfDocument {
+function sanitizeDocument(doc: any, fallbackUserId?: string): PdfDocument {
   if (!doc) throw new Error('Document is empty');
   return {
     id: doc.id || `doc-${Date.now()}`,
+    userId: doc.userId || fallbackUserId || undefined,
     name: doc.name || 'Mapa sem Título',
     fileName: doc.fileName || 'documento.pdf',
     fileSize: doc.fileSize || '1 MB',
@@ -144,7 +148,7 @@ function sanitizeDocument(doc: any): PdfDocument {
   };
 }
 
-export async function getAllPdfDocuments(): Promise<PdfDocument[]> {
+export async function getAllPdfDocuments(userId?: string): Promise<PdfDocument[]> {
   try {
     const db = await openDB();
     return new Promise((resolve, reject) => {
@@ -152,22 +156,21 @@ export async function getAllPdfDocuments(): Promise<PdfDocument[]> {
       const store = tx.objectStore(STORE_NAME);
       const request = store.getAll();
       request.onsuccess = () => {
-        const rawDocs = request.result || [];
-        const sanitized = rawDocs.map(sanitizeDocument);
+        const rawDocs: any[] = request.result || [];
+        const sanitized = rawDocs
+          .map((d) => sanitizeDocument(d, userId))
+          .filter((d) => !userId || d.userId === userId);
         resolve(sanitized.reverse());
       };
       request.onerror = () => reject(request.error);
     });
   } catch (e) {
     console.warn('IndexedDB read fallback:', e);
-    // Fallback to localStorage
+    // Fallback to user-scoped localStorage
     try {
-      const saved = localStorage.getItem('geofield_pdf_maps_v2');
-      if (saved) {
-        const raw = JSON.parse(saved);
-        if (Array.isArray(raw)) {
-          return raw.map(sanitizeDocument);
-        }
+      const saved = getUserItem<any[]>(userId, 'pdf_maps', []);
+      if (Array.isArray(saved)) {
+        return saved.map((d) => sanitizeDocument(d, userId)).filter((d) => !userId || d.userId === userId);
       }
     } catch {
       // ignore
@@ -176,8 +179,12 @@ export async function getAllPdfDocuments(): Promise<PdfDocument[]> {
   }
 }
 
-export async function savePdfDocument(doc: PdfDocument): Promise<void> {
-  const sanitized = sanitizeDocument(doc);
+export async function savePdfDocument(doc: PdfDocument, userId?: string): Promise<void> {
+  const sanitized = sanitizeDocument({
+    ...doc,
+    userId: doc.userId || userId,
+  }, userId);
+
   try {
     const db = await openDB();
     return new Promise((resolve, reject) => {
@@ -190,16 +197,16 @@ export async function savePdfDocument(doc: PdfDocument): Promise<void> {
   } catch (e) {
     console.warn('IndexedDB save fallback:', e);
     try {
-      const existing = await getAllPdfDocuments();
+      const existing = await getAllPdfDocuments(userId);
       const next = [sanitized, ...existing.filter((d) => d.id !== sanitized.id)];
-      localStorage.setItem('geofield_pdf_maps_v2', JSON.stringify(next));
+      setUserItem(userId, 'pdf_maps', next);
     } catch {
       // ignore
     }
   }
 }
 
-export async function deletePdfDocument(id: string): Promise<void> {
+export async function deletePdfDocument(id: string, userId?: string): Promise<void> {
   try {
     const db = await openDB();
     return new Promise((resolve, reject) => {
@@ -212,11 +219,39 @@ export async function deletePdfDocument(id: string): Promise<void> {
   } catch (e) {
     console.warn('IndexedDB delete fallback:', e);
     try {
-      const existing = await getAllPdfDocuments();
+      const existing = await getAllPdfDocuments(userId);
       const next = existing.filter((d) => d.id !== id);
-      localStorage.setItem('geofield_pdf_maps_v2', JSON.stringify(next));
+      setUserItem(userId, 'pdf_maps', next);
     } catch {
       // ignore
     }
+  }
+}
+
+export async function clearUserPdfDocuments(userId: string): Promise<void> {
+  if (!userId) return;
+  try {
+    const db = await openDB();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(STORE_NAME, 'readwrite');
+      const store = tx.objectStore(STORE_NAME);
+      const request = store.openCursor();
+
+      request.onsuccess = (event) => {
+        const cursor = (event.target as IDBRequest<IDBCursorWithValue>).result;
+        if (cursor) {
+          const doc = cursor.value;
+          if (doc && doc.userId === userId) {
+            cursor.delete();
+          }
+          cursor.continue();
+        } else {
+          resolve();
+        }
+      };
+      request.onerror = () => reject(request.error);
+    });
+  } catch (e) {
+    console.warn('Failed to clear user PDF documents', e);
   }
 }

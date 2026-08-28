@@ -1,13 +1,15 @@
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { ProjectFolder, Waypoint, Track, TeamMember } from '../types';
+import { getUserRawItem } from './userStorage';
 
 export function generateFieldDossierPDF(
   project: ProjectFolder,
   waypoints: Waypoint[],
   tracks: Track[],
   teamMembers: TeamMember[],
-  responsibleName: string
+  responsibleName: string,
+  userId?: string
 ): void {
   const doc = new jsPDF({
     orientation: 'portrait',
@@ -18,9 +20,9 @@ export function generateFieldDossierPDF(
   const pageWidth = doc.internal.pageSize.getWidth();
   const pageHeight = doc.internal.pageSize.getHeight();
 
-  const customLogo = localStorage.getItem('gofield_custom_company_logo');
-  const customCompanyName = localStorage.getItem('gofield_custom_company_name') || 'AM TST SAÚDE E SEGURANÇA DO TRABALHO';
-  const customCnpj = localStorage.getItem('gofield_custom_company_cnpj');
+  const customLogo = getUserRawItem(userId, 'custom_company_logo', '');
+  const customCompanyName = getUserRawItem(userId, 'custom_company_name', '') || 'AM TST SAÚDE E SEGURANÇA DO TRABALHO';
+  const customCnpj = getUserRawItem(userId, 'custom_company_cnpj', '');
   
   // Header Navy Banner
   doc.setFillColor(15, 23, 42); // slate-900

@@ -513,20 +513,42 @@ export const AdminPanel: React.FC = () => {
       const cleanOrigPrice = Number(planModalOriginalPrice) || 0;
       const cleanPrice = Number(planModalPrice) || 0;
 
-      const updatedPlans = plans.map((p) => {
-        if (p.id === editingPlan.id) {
-          return {
-            ...p,
-            name: planModalName.trim() || p.name,
-            tag: planModalTag.trim() || p.tag,
-            originalPrice: cleanOrigPrice,
-            price: cleanPrice,
-            discountBadge: planModalBadge.trim(),
-            features: updatedFeatures.length > 0 ? updatedFeatures : p.features,
-          };
-        }
-        return p;
-      });
+      const planExists = plans.some((p) => p.id === editingPlan.id);
+      let updatedPlans: PlanItemConfig[];
+
+      if (planExists) {
+        updatedPlans = plans.map((p) => {
+          if (p.id === editingPlan.id) {
+            return {
+              ...p,
+              name: planModalName.trim() || p.name,
+              tag: planModalTag.trim() || p.tag,
+              originalPrice: cleanOrigPrice,
+              price: cleanPrice,
+              discountBadge: planModalBadge.trim(),
+              billingPeriod: planModalPeriod || p.billingPeriod || '/mês',
+              highlight: planModalHighlight,
+              activeInShowcase: planModalActiveInShowcase,
+              features: updatedFeatures.length > 0 ? updatedFeatures : p.features,
+            };
+          }
+          return p;
+        });
+      } else {
+        const newPlanItem: PlanItemConfig = {
+          id: editingPlan.id,
+          name: planModalName.trim() || 'Novo Plano',
+          tag: planModalTag.trim() || 'Profissional',
+          originalPrice: cleanOrigPrice,
+          price: cleanPrice,
+          discountBadge: planModalBadge.trim(),
+          billingPeriod: planModalPeriod || '/mês',
+          highlight: planModalHighlight,
+          activeInShowcase: planModalActiveInShowcase,
+          features: updatedFeatures.length > 0 ? updatedFeatures : ['Mapas PDF Ilimitados', 'Medição de Madeira (m³)', 'GPS e Apontamentos'],
+        };
+        updatedPlans = [...plans, newPlanItem];
+      }
 
       // 1. Update State immediately
       setPlans(updatedPlans);
@@ -534,6 +556,7 @@ export const AdminPanel: React.FC = () => {
       // 2. Persist to localStorage immediately
       localStorage.setItem('gofield_custom_plans', JSON.stringify(updatedPlans));
       const updatedConfig = { ...billingConfig, plans: updatedPlans };
+      setBillingConfig(updatedConfig);
       localStorage.setItem('gofield_billing_config', JSON.stringify(updatedConfig));
 
       // 3. Persist to Firestore asynchronously
@@ -543,7 +566,7 @@ export const AdminPanel: React.FC = () => {
         console.warn('Saved plans locally (cloud notice):', cloudErr);
       }
 
-      notifySuccess('Plano Atualizado com Sucesso!', `O ${planModalName} agora está com o valor de R$ ${cleanPrice.toFixed(2)}/mês.`);
+      notifySuccess('Plano Salvo com Sucesso!', `O plano "${planModalName}" foi salvo.`);
       setEditingPlan(null);
     } catch (err: any) {
       console.error('Error saving plan changes:', err);
@@ -1601,12 +1624,16 @@ export const AdminPanel: React.FC = () => {
                       <button
                         type="button"
                         onClick={() => {
+                          setIsCreatingPlan(false);
                           setEditingPlan(plan);
                           setPlanModalName(plan.name);
                           setPlanModalTag(plan.tag);
                           setPlanModalOriginalPrice(plan.originalPrice);
                           setPlanModalPrice(plan.price);
                           setPlanModalBadge(plan.discountBadge || '');
+                          setPlanModalPeriod(plan.billingPeriod || '/mês');
+                          setPlanModalActiveInShowcase(plan.activeInShowcase !== false);
+                          setPlanModalHighlight(plan.highlight || false);
                           setPlanModalFeaturesText(plan.features.join('\n'));
                         }}
                         className="w-full bg-slate-800 hover:bg-slate-700 text-white font-bold py-2 px-3 rounded-xl text-xs flex items-center justify-center gap-1.5 transition-all active:scale-95 border border-slate-700 shadow cursor-pointer"
@@ -1865,6 +1892,34 @@ export const AdminPanel: React.FC = () => {
                     placeholder="Ex: 35% OFF ou Economize R$ 101/mês"
                     className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-white font-semibold"
                   />
+                </div>
+
+                <div className="sm:col-span-2 flex flex-col sm:flex-row gap-2 pt-1">
+                  <label className="flex items-center gap-2 p-2.5 rounded-xl bg-slate-950 border border-slate-800 cursor-pointer flex-1">
+                    <input
+                      type="checkbox"
+                      checked={planModalActiveInShowcase}
+                      onChange={(e) => setPlanModalActiveInShowcase(e.target.checked)}
+                      className="w-4 h-4 rounded text-emerald-500 bg-slate-900 border-slate-700 focus:ring-0 cursor-pointer"
+                    />
+                    <div className="text-left">
+                      <span className="text-[11px] font-black text-emerald-400 block">🟢 Visível na Vitrine</span>
+                      <span className="text-[9px] text-slate-400">Exibir este plano para os usuários</span>
+                    </div>
+                  </label>
+
+                  <label className="flex items-center gap-2 p-2.5 rounded-xl bg-slate-950 border border-slate-800 cursor-pointer flex-1">
+                    <input
+                      type="checkbox"
+                      checked={planModalHighlight}
+                      onChange={(e) => setPlanModalHighlight(e.target.checked)}
+                      className="w-4 h-4 rounded text-amber-500 bg-slate-900 border-slate-700 focus:ring-0 cursor-pointer"
+                    />
+                    <div className="text-left">
+                      <span className="text-[11px] font-black text-amber-400 block">★ Plano em Destaque</span>
+                      <span className="text-[9px] text-slate-400">Marcar como Mais Popular</span>
+                    </div>
+                  </label>
                 </div>
               </div>
 

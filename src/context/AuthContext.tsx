@@ -3,6 +3,8 @@ import { User, onAuthStateChanged, signOut } from 'firebase/auth';
 import { doc, getDoc, setDoc, onSnapshot } from 'firebase/firestore';
 import { auth, db } from '../lib/firebase';
 import { UserProfile, UserRole, UserStatus } from '../types';
+import { purgeLegacyUnscopedData } from '../utils/userStorage';
+import { purgeLegacyAppState } from '../utils/stateStorage';
 
 interface AuthContextType {
   user: User | null;
@@ -21,6 +23,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    // Purge any orphan legacy un-scoped data from older versions
+    purgeLegacyUnscopedData();
+    purgeLegacyAppState();
+
     let profileUnsubscribe: (() => void) | null = null;
 
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
@@ -102,6 +108,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const logout = async () => {
     setLoading(true);
     try {
+      purgeLegacyUnscopedData();
       await signOut(auth);
     } catch (err) {
       console.warn("Error signing out from Firebase Auth:", err);
@@ -158,4 +165,3 @@ export const useAuth = () => {
   }
   return context;
 };
-

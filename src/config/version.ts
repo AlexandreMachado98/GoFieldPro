@@ -1,8 +1,8 @@
 // Centralized App Version and Build Metadata
-export const APP_VERSION = 'v2.5.0';
-export const APP_BUILD_NUMBER = 250;
-export const APP_BUILD_DATE = '26/08/2026';
-export const APP_RELEASE_NAME = 'GoField Pro Tactical 2.5';
+export const APP_VERSION = 'v2.6.0';
+export const APP_BUILD_NUMBER = 260;
+export const APP_BUILD_DATE = '27/08/2026';
+export const APP_RELEASE_NAME = 'GoField Pro Tactical 2.6.0';
 
 export interface ChangelogItem {
   version: string;
@@ -12,6 +12,17 @@ export interface ChangelogItem {
 }
 
 export const APP_CHANGELOG: ChangelogItem[] = [
+  {
+    version: 'v2.6.0',
+    date: '27/08/2026',
+    title: 'Controle Dinâmico de Planos na Vitrine & Isolamento Multiusuário',
+    highlights: [
+      'Controle rigoroso e sincronizado de visibilidade de planos (ocultação/ativação instantânea).',
+      'Isolamento estrito de armazenamento local e memória RAM por usuário (UID).',
+      'Botão de Verificação de Atualizações e Limpeza Segura de Cache no menu lateral e barra superior.',
+      'Liberação de regras do Firestore para sincronização em tempo real de configurações de cobrança.',
+    ],
+  },
   {
     version: 'v2.5.0',
     date: '26/08/2026',

@@ -1,6 +1,8 @@
 import React, { createContext, useContext, useEffect, useState, useCallback, useRef } from 'react';
 import { APP_VERSION, APP_BUILD_NUMBER, APP_BUILD_DATE } from '../config/version';
 
+const THREE_DAYS_MS = 3 * 24 * 60 * 60 * 1000; // 72 hours grace period
+
 interface UpdateContextType {
   currentVersion: string;
   buildDate: string;
@@ -9,6 +11,8 @@ interface UpdateContextType {
   latestVersion: string;
   isCheckingUpdate: boolean;
   isApplyingUpdate: boolean;
+  isEnforcedMandatory: boolean;
+  daysRemaining: number;
   lastCheckedTime: Date | null;
   checkForUpdates: (manual?: boolean) => Promise<boolean>;
   applyUpdate: () => Promise<void>;
@@ -24,6 +28,8 @@ export const UpdateProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const [latestVersion, setLatestVersion] = useState(APP_VERSION);
   const [isCheckingUpdate, setIsCheckingUpdate] = useState(false);
   const [isApplyingUpdate, setIsApplyingUpdate] = useState(false);
+  const [isEnforcedMandatory, setIsEnforcedMandatory] = useState(false);
+  const [daysRemaining, setDaysRemaining] = useState(3);
   const [lastCheckedTime, setLastCheckedTime] = useState<Date | null>(null);
   const [isBannerDismissed, setIsBannerDismissed] = useState(false);
 
@@ -33,7 +39,6 @@ export const UpdateProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const isServerVersionNewer = (serverVer: string, serverBuild?: number): boolean => {
     if (serverBuild && serverBuild > APP_BUILD_NUMBER) return true;
     if (serverVer && serverVer !== APP_VERSION) {
-      // Compare e.g. "v2.4.1" vs "v2.4.0"
       const cleanServer = serverVer.replace(/[^\d.]/g, '').split('.').map(Number);
       const cleanLocal = APP_VERSION.replace(/[^\d.]/g, '').split('.').map(Number);
       for (let i = 0; i < Math.max(cleanServer.length, cleanLocal.length); i++) {
@@ -46,6 +51,44 @@ export const UpdateProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }
     return false;
   };
+
+  // Calculate 3-day deadline and dispatch in-app notification event
+  const processVersionTimeline = useCallback((ver: string, serverTimestamp?: number) => {
+    try {
+      const storageKey = `gofield_update_first_seen_${ver}`;
+      let firstSeen = localStorage.getItem(storageKey);
+      if (!firstSeen) {
+        firstSeen = Date.now().toString();
+        localStorage.setItem(storageKey, firstSeen);
+      }
+
+      const releaseTime = serverTimestamp ? Math.min(serverTimestamp, Number(firstSeen)) : Number(firstSeen);
+      const elapsedMs = Math.max(0, Date.now() - releaseTime);
+      const remainingMs = Math.max(0, THREE_DAYS_MS - elapsedMs);
+      const remDays = Math.max(0, Math.ceil(remainingMs / (24 * 60 * 60 * 1000)));
+      const isMandatory = elapsedMs >= THREE_DAYS_MS;
+
+      setDaysRemaining(remDays);
+      setIsEnforcedMandatory(isMandatory);
+
+      if (isMandatory) {
+        setIsBannerDismissed(false);
+      }
+
+      // Dispatch event for in-app notification center
+      window.dispatchEvent(
+        new CustomEvent('gofield:new_version_available', {
+          detail: {
+            version: ver,
+            daysRemaining: remDays,
+            isMandatory,
+          },
+        })
+      );
+    } catch (e) {
+      console.warn('Error processing version timeline:', e);
+    }
+  }, []);
 
   // Check for updates against server version.json and Service Worker
   const checkForUpdates = useCallback(async (manual = false): Promise<boolean> => {
@@ -77,6 +120,7 @@ export const UpdateProvider: React.FC<{ children: React.ReactNode }> = ({ childr
           setLatestVersion(data.version);
           setIsUpdateAvailable(true);
           setIsBannerDismissed(false);
+          processVersionTimeline(data.version, data.releaseTimestamp);
           setIsCheckingUpdate(false);
           return true;
         }
@@ -89,6 +133,7 @@ export const UpdateProvider: React.FC<{ children: React.ReactNode }> = ({ childr
           if (swRegistrationRef.current.waiting) {
             setIsUpdateAvailable(true);
             setIsBannerDismissed(false);
+            processVersionTimeline(latestVersion);
             setIsCheckingUpdate(false);
             return true;
           }
@@ -105,7 +150,7 @@ export const UpdateProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       setIsCheckingUpdate(false);
       return false;
     }
-  }, []);
+  }, [processVersionTimeline, latestVersion]);
 
   // Apply update immediately
   const applyUpdate = useCallback(async () => {
@@ -130,32 +175,44 @@ export const UpdateProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
       // 3. Force reload page with cache bypass
       setTimeout(() => {
-        window.location.reload();
-      }, 300);
+        window.location.href = window.location.origin + '?_update=' + Date.now();
+      }, 400);
     } catch (err) {
       console.error('[Update] Erro ao aplicar atualização:', err);
       window.location.reload();
     }
   }, [latestVersion]);
 
-  // Force clean update (nuclear option for stuck mobile caches)
+  // Force clean update (nuclear option for clean cache purge)
   const forceCleanUpdate = useCallback(async () => {
     setIsApplyingUpdate(true);
     try {
+      if (swRegistrationRef.current) {
+        if (swRegistrationRef.current.waiting) {
+          swRegistrationRef.current.waiting.postMessage({ type: 'SKIP_WAITING' });
+        }
+        if (swRegistrationRef.current.active) {
+          swRegistrationRef.current.active.postMessage({ type: 'SKIP_WAITING' });
+        }
+      }
+
       if ('serviceWorker' in navigator) {
         const registrations = await navigator.serviceWorker.getRegistrations();
         for (const reg of registrations) {
           await reg.unregister();
         }
       }
+
       if ('caches' in window) {
         const cacheKeys = await caches.keys();
         await Promise.all(cacheKeys.map((key) => caches.delete(key)));
       }
+
       localStorage.setItem('geofield_last_force_update', Date.now().toString());
+
       setTimeout(() => {
-        window.location.href = window.location.origin + '?_update=' + Date.now();
-      }, 400);
+        window.location.href = window.location.origin + '?_force_update=' + Date.now();
+      }, 500);
     } catch (err) {
       console.error('[Update] Erro na limpeza forçada:', err);
       window.location.reload();

@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
+import { setUserItem } from '../../utils/userStorage';
 import {
   CheckCircle2,
   Sparkles,
@@ -55,7 +56,7 @@ export const ApprovalCelebrationScreen: React.FC<ApprovalCelebrationScreenProps>
 
   const handleProceed = () => {
     if (profile?.uid) {
-      localStorage.setItem(`gofield_approved_acknowledged_${profile.uid}`, 'true');
+      setUserItem(profile.uid, 'approved_acknowledged', 'true');
     }
     onContinue();
   };

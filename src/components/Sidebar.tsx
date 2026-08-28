@@ -27,6 +27,7 @@ import {
   PanelLeft,
   ChevronLeft,
   ChevronRight,
+  RefreshCw,
 } from 'lucide-react';
 
 export const Sidebar: React.FC = () => {
@@ -45,15 +46,51 @@ export const Sidebar: React.FC = () => {
     isProUser,
     openUpgradeModal,
     billingConfig,
+    notifyInfo,
+    notifySuccess,
+    showConfirm,
   } = useApp();
   const { profile, logout } = useAuth();
   const isOwnerAdmin = profile?.role === 'super_admin' || profile?.email?.toLowerCase() === 'alexandre1604981@gmail.com';
   const isSuperAdmin = isOwnerAdmin;
   const hasFullProAccess = isOwnerAdmin || isProUser;
-  const { isUpdateAvailable, latestVersion, applyUpdate } = useUpdate();
+  const { 
+    isUpdateAvailable, 
+    latestVersion, 
+    isCheckingUpdate, 
+    isApplyingUpdate, 
+    checkForUpdates, 
+    applyUpdate, 
+    forceCleanUpdate 
+  } = useUpdate();
   const [pendingCount, setPendingCount] = useState(0);
 
   const activeFireCount = (fireIncidents || []).filter((i) => i && i.status === 'em_combate').length;
+
+  const handleCheckUpdates = async () => {
+    if (isCheckingUpdate || isApplyingUpdate) return;
+    notifyInfo('Verificando Atualizações', 'Conectando ao servidor para checar novas versões...');
+    const hasUpdate = await checkForUpdates(true);
+    if (hasUpdate) {
+      notifySuccess('Nova Versão Disponível!', `A versão ${latestVersion} está disponível.`);
+      showConfirm({
+        title: `Instalar Atualização (${latestVersion})?`,
+        message: 'O aplicativo será atualizado e o cache antigo será eliminado para evitar conflitos de versão. Todos os seus pontos, mapas e dados locais serão preservados.',
+        type: 'info',
+        confirmText: 'Atualizar Agora',
+        onConfirm: applyUpdate,
+      });
+    } else {
+      notifySuccess('Aplicativo Atualizado', `Você já está executando a versão mais recente (${APP_VERSION}).`);
+      showConfirm({
+        title: 'Limpar Cache & Sincronizar?',
+        message: 'Deseja forçar a eliminação de arquivos antigos em cache e recarregar o sistema? Todos os seus pontos, mapas e configurações de usuário permanecerão 100% intactos.',
+        type: 'info',
+        confirmText: 'Limpar Cache & Recarregar',
+        onConfirm: forceCleanUpdate,
+      });
+    }
+  };
 
   useEffect(() => {
     if (profile?.role !== 'super_admin') return;
@@ -119,21 +156,21 @@ export const Sidebar: React.FC = () => {
       {/* Main Sidebar: Responsive Drawer on Mobile, Collapsible Permanent Bar on Desktop */}
       <aside
         className={`
-          fixed md:relative inset-y-0 left-0 bg-slate-950 border-r border-slate-800 flex flex-col h-[100dvh] z-[99999] md:z-30 shadow-2xl transition-all duration-300 ease-in-out select-none
+          fixed md:relative inset-y-0 left-0 bg-[#070A10] border-r border-slate-800/80 flex flex-col h-[100dvh] z-[99999] md:z-30 shadow-2xl transition-all duration-300 ease-in-out select-none
           ${isMobileMenuOpen ? 'translate-x-0 w-72' : '-translate-x-full md:translate-x-0'}
           ${isSidebarCollapsed ? 'md:w-20' : 'md:w-64 lg:w-72'}
         `}
       >
         {/* Header */}
-        <div className="p-3 sm:p-4 border-b border-slate-800 flex items-center justify-between bg-slate-950 shrink-0">
+        <div className="p-3.5 sm:p-4 border-b border-slate-800/80 flex items-center justify-between bg-[#070A10] shrink-0">
           <div className="flex items-center gap-3 overflow-hidden">
-            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-sky-500 via-emerald-500 to-rose-500 flex items-center justify-center text-white shadow-lg shrink-0">
+            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-emerald-500 via-teal-500 to-sky-500 flex items-center justify-center text-slate-950 font-black shadow-lg shadow-emerald-950/50 shrink-0">
               <Map className="w-5 h-5" />
             </div>
             {(!isSidebarCollapsed || isMobileMenuOpen) && (
               <div className="truncate">
                 <h1 className="text-base font-extrabold text-white tracking-tight leading-none truncate">
-                  GoField <span className="text-sky-400">Pro</span>
+                  GoField <span className="text-emerald-400">Pro</span>
                 </h1>
                 <p className="text-[10px] text-slate-400 mt-0.5 truncate">Navegação & Campo</p>
               </div>
@@ -142,7 +179,7 @@ export const Sidebar: React.FC = () => {
 
           {/* Close button on Mobile */}
           <button
-            className="md:hidden p-2 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 transition-colors active:scale-95"
+            className="md:hidden p-2 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 transition-colors active:scale-95 cursor-pointer"
             onClick={() => setIsMobileMenuOpen(false)}
             aria-label="Fechar Menu"
           >
@@ -152,10 +189,10 @@ export const Sidebar: React.FC = () => {
           {/* Collapse/Expand Toggle on Desktop */}
           <button
             onClick={toggleSidebarCollapsed}
-            className="hidden md:flex p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 transition-colors active:scale-95"
+            className="hidden md:flex p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 transition-colors active:scale-95 cursor-pointer"
             title={isSidebarCollapsed ? 'Expandir Barra Lateral' : 'Minimizar Barra Lateral'}
           >
-            {isSidebarCollapsed ? <PanelLeft className="w-5 h-5 text-sky-400" /> : <PanelLeftClose className="w-5 h-5" />}
+            {isSidebarCollapsed ? <PanelLeft className="w-5 h-5 text-emerald-400" /> : <PanelLeftClose className="w-5 h-5" />}
           </button>
         </div>
 
@@ -181,16 +218,16 @@ export const Sidebar: React.FC = () => {
                 title={isCollapsed ? tab.label : undefined}
                 className={`w-full flex items-center ${
                   isCollapsed ? 'justify-center px-2 py-3' : 'justify-between px-3.5 py-3'
-                } rounded-xl text-sm font-extrabold transition-all active:scale-98 relative group ${
+                } rounded-xl text-sm font-extrabold transition-all active:scale-98 relative group cursor-pointer ${
                   isActive
-                    ? 'bg-sky-600 text-white shadow-lg shadow-sky-950/50'
-                    : 'text-slate-300 hover:text-white hover:bg-slate-900/80'
+                    ? 'bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-lg shadow-emerald-950/60 ring-1 ring-emerald-400/40'
+                    : 'text-slate-300 hover:text-white hover:bg-[#0D121D] border border-transparent hover:border-slate-800/60'
                 }`}
               >
                 <div className="flex items-center gap-3">
                   <Icon
                     className={`w-5 h-5 shrink-0 ${
-                      isActive ? 'text-white' : tab.iconColor || 'text-sky-400'
+                      isActive ? 'text-white' : tab.iconColor || 'text-emerald-400'
                     }`}
                   />
                   {!isCollapsed && (
@@ -290,6 +327,31 @@ export const Sidebar: React.FC = () => {
               {(!isSidebarCollapsed || isMobileMenuOpen) && <span>Configurações</span>}
             </button>
 
+            {/* Check for Updates & Cache Purge */}
+            <button
+              type="button"
+              onClick={handleCheckUpdates}
+              disabled={isCheckingUpdate || isApplyingUpdate}
+              title={isSidebarCollapsed && !isMobileMenuOpen ? 'Verificar Atualizações & Limpar Cache' : undefined}
+              className={`w-full flex items-center ${
+                isSidebarCollapsed && !isMobileMenuOpen ? 'justify-center p-2.5' : 'justify-between px-3.5 py-2.5'
+              } rounded-xl text-xs font-bold text-sky-400 bg-sky-950/20 hover:text-sky-300 hover:bg-sky-950/40 border border-sky-500/30 transition-all active:scale-98 cursor-pointer disabled:opacity-50`}
+            >
+              <div className="flex items-center gap-3">
+                <RefreshCw className={`w-5 h-5 text-sky-400 shrink-0 ${isCheckingUpdate || isApplyingUpdate ? 'animate-spin' : ''}`} />
+                {(!isSidebarCollapsed || isMobileMenuOpen) && <span>Verificar Atualizações</span>}
+              </div>
+              {(!isSidebarCollapsed || isMobileMenuOpen) && (
+                <span className={`text-[9px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded-md border flex items-center gap-1 shadow-sm ${
+                  isUpdateAvailable
+                    ? 'bg-amber-500 text-slate-950 border-amber-400 animate-bounce'
+                    : 'bg-sky-500/10 text-sky-400 border-sky-500/30'
+                }`}>
+                  {isCheckingUpdate ? 'Checando...' : isUpdateAvailable ? 'Nova Versão' : 'Checar'}
+                </span>
+              )}
+            </button>
+
             {/* Policies */}
             <button
               onClick={() => {
@@ -338,16 +400,41 @@ export const Sidebar: React.FC = () => {
 
         {/* Footer */}
         <div className="p-2.5 sm:p-3 border-t border-slate-800/80 bg-slate-950 shrink-0 space-y-2">
+          {/* Check Updates Button in Footer */}
+          <button
+            type="button"
+            onClick={handleCheckUpdates}
+            disabled={isCheckingUpdate || isApplyingUpdate}
+            title={isSidebarCollapsed && !isMobileMenuOpen ? 'Verificar Atualizações & Limpar Cache' : undefined}
+            className={`w-full flex items-center ${
+              isSidebarCollapsed && !isMobileMenuOpen ? 'justify-center p-2.5' : 'justify-between px-3 py-2'
+            } rounded-xl bg-gradient-to-r from-sky-950/80 to-slate-900 border border-sky-500/40 text-sky-300 hover:text-white hover:border-sky-400 text-xs font-bold transition-all active:scale-98 shadow-sm cursor-pointer disabled:opacity-50`}
+          >
+            <div className="flex items-center gap-2">
+              <RefreshCw className={`w-4 h-4 text-sky-400 shrink-0 ${isCheckingUpdate || isApplyingUpdate ? 'animate-spin' : ''}`} />
+              {(!isSidebarCollapsed || isMobileMenuOpen) && <span>Verificar Atualizações</span>}
+            </div>
+            {(!isSidebarCollapsed || isMobileMenuOpen) && (
+              <span className={`text-[9px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded-md border flex items-center gap-1 ${
+                isUpdateAvailable
+                  ? 'bg-amber-500 text-slate-950 border-amber-400 animate-bounce'
+                  : 'bg-sky-500/20 text-sky-300 border-sky-500/30'
+              }`}>
+                {isCheckingUpdate ? '...' : isUpdateAvailable ? 'Novo' : 'Checar'}
+              </span>
+            )}
+          </button>
+
           {/* Update Available Badge */}
           {isUpdateAvailable && (!isSidebarCollapsed || isMobileMenuOpen) && (
             <button
               type="button"
               onClick={applyUpdate}
-              className="w-full flex items-center justify-between px-3 py-2 rounded-xl bg-gradient-to-r from-sky-600/30 to-emerald-600/30 border border-sky-500/50 text-sky-300 text-xs font-bold transition-all hover:scale-[1.02] active:scale-95 animate-pulse"
+              className="w-full flex items-center justify-between px-3 py-2 rounded-xl bg-gradient-to-r from-sky-600/30 to-emerald-600/30 border border-sky-500/50 text-sky-300 text-xs font-bold transition-all hover:scale-[1.02] active:scale-95 animate-pulse cursor-pointer"
             >
               <div className="flex items-center gap-1.5">
                 <Sparkles className="w-3.5 h-3.5 text-amber-400" />
-                <span>Atualização {latestVersion}</span>
+                <span>Instalar {latestVersion}</span>
               </div>
               <span className="text-[10px] bg-sky-500 text-slate-950 px-2 py-0.5 rounded-full font-black">
                 Instalar
@@ -372,11 +459,9 @@ export const Sidebar: React.FC = () => {
           {(!isSidebarCollapsed || isMobileMenuOpen) && (
             <button
               type="button"
-              onClick={() => {
-                setIsMobileMenuOpen(false);
-                setIsSettingsModalOpen(true);
-              }}
-              className="w-full flex items-center justify-between text-[10px] text-slate-400 hover:text-slate-200 px-1 py-0.5 rounded transition-colors group"
+              onClick={handleCheckUpdates}
+              title="Clique para checar atualizações e limpar cache"
+              className="w-full flex items-center justify-between text-[10px] text-slate-400 hover:text-slate-200 px-1 py-0.5 rounded transition-colors group cursor-pointer"
             >
               <span className="font-semibold text-slate-500 group-hover:text-slate-400">GoField Pro</span>
               <span className="flex items-center gap-1.5 font-mono text-emerald-400 font-bold">

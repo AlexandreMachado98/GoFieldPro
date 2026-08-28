@@ -4,6 +4,7 @@ import { useAuth } from './AuthContext';
 import React, { createContext, useContext, useState, useEffect, useRef, ReactNode, useCallback, useMemo } from 'react';
 import { parseOdometerKm } from '../utils/geoUtils';
 import { saveAppState, loadAppState } from '../utils/stateStorage';
+import { getUserItem, setUserItem, removeUserItem } from '../utils/userStorage';
 import {
   ProjectFolder,
   LayerItem,
@@ -214,7 +215,9 @@ interface AppContextType {
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
 export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  const { profile } = useAuth();
+  const { user, profile } = useAuth();
+  const currentUserId = profile?.uid || user?.uid || 'default';
+
   // Localization & Role
   const [language, setLanguage] = useState<Language>('pt');
   const [currentRole, setCurrentRole] = useState<UserRole>('surveyor');
@@ -229,38 +232,72 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<'home' | 'map' | 'pdf_maps' | 'layers' | 'tracks' | 'field_rounds' | 'fire_incidents' | 'team' | 'reports' | 'analytics' | 'offline' | 'admin'>('home');
 
-  // Collapsible Sidebar State with LocalStorage memory
+  // Collapsible Sidebar State with user-scoped LocalStorage memory
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState<boolean>(() => {
-    try {
-      return localStorage.getItem('geofield_sidebar_collapsed') === 'true';
-    } catch {
-      return false;
-    }
+    return getUserItem<boolean>(currentUserId, 'sidebar_collapsed', false);
   });
 
 
   // System Billing Config
-  const [billingConfig, setBillingConfig] = useState<SystemBillingConfig>({
-    pixKey: '',
-    pixKeyType: 'cnpj',
-    beneficiaryName: '',
-    bankName: '',
-    defaultTrialDays: 14,
-    whatsappSupportNumber: '5511999999999',
-    customMessageTemplate: 'Olá {nome}, sua assinatura GoField Pro está disponível.',
-    proOriginalPrice: 97.99,
-    proLaunchPrice: 44.99,
-    proDiscountBadge: '54% OFF • LANÇAMENTO',
+  const [billingConfig, setBillingConfig] = useState<SystemBillingConfig>(() => {
+    try {
+      const saved = localStorage.getItem('gofield_billing_config');
+      if (saved) {
+        return JSON.parse(saved);
+      }
+    } catch {}
+    return {
+      pixKey: '',
+      pixKeyType: 'cnpj',
+      beneficiaryName: '',
+      bankName: '',
+      defaultTrialDays: 14,
+      whatsappSupportNumber: '5511999999999',
+      customMessageTemplate: 'Olá {nome}, sua assinatura GoField Pro está disponível.',
+      proOriginalPrice: 97.99,
+      proLaunchPrice: 44.99,
+      proDiscountBadge: '54% OFF • LANÇAMENTO',
+    };
   });
 
   useEffect(() => {
     const billDocRef = doc(db, 'system_config', 'billing');
     const unsub = onSnapshot(billDocRef, (snap) => {
       if (snap.exists()) {
-        setBillingConfig((prev) => ({ ...prev, ...snap.data() as SystemBillingConfig }));
+        const data = snap.data() as SystemBillingConfig;
+        setBillingConfig((prev) => ({ ...prev, ...data }));
+        localStorage.setItem('gofield_billing_config', JSON.stringify(data));
+        if (data.plans && Array.isArray(data.plans) && data.plans.length > 0) {
+          localStorage.setItem('gofield_custom_plans', JSON.stringify(data.plans));
+        }
       }
     }, (err) => console.warn('Billing config listener notice:', err.message));
     return () => unsub();
+  }, []);
+
+  useEffect(() => {
+    const handleNewVersion = (e: any) => {
+      const { version, daysRemaining, isMandatory } = e.detail || {};
+      if (!version) return;
+      const notifKey = `gofield_version_notified_${version}`;
+      const lastNotified = localStorage.getItem(notifKey);
+      const now = Date.now();
+      
+      // Notify if never notified, or if mandatory, or after 12 hours
+      if (!lastNotified || isMandatory || now - Number(lastNotified) > 12 * 60 * 60 * 1000) {
+        localStorage.setItem(notifKey, now.toString());
+        notify({
+          title: isMandatory ? `⚠️ Atualização Obrigatória (${version})` : `🚀 Nova Versão ${version} Disponível`,
+          message: isMandatory
+            ? `A versão ${version} foi lançada há mais de 3 dias e é obrigatória para manter a sincronização e segurança. Atualize agora.`
+            : `Uma nova atualização do GoField Pro está pronta para ser instalada. Aplicação automática em até ${daysRemaining} dia(s).`,
+          type: isMandatory ? 'error' : 'info',
+        });
+      }
+    };
+
+    window.addEventListener('gofield:new_version_available', handleNewVersion);
+    return () => window.removeEventListener('gofield:new_version_available', handleNewVersion);
   }, []);
 
   // Upgrade Modal State
@@ -373,33 +410,19 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const toggleSidebarCollapsed = useCallback(() => {
     setIsSidebarCollapsed((prev) => {
       const next = !prev;
-      try {
-        localStorage.setItem('geofield_sidebar_collapsed', String(next));
-      } catch {}
+      setUserItem(currentUserId, 'sidebar_collapsed', next);
       return next;
     });
-  }, []);
+  }, [currentUserId]);
 
-  // Fire Incidents State
+  // Fire Incidents State (user-scoped)
   const [fireIncidents, setFireIncidents] = useState<FireIncident[]>(() => {
-    try {
-      const saved = localStorage.getItem('geofield_fire_incidents');
-      if (saved) {
-        return JSON.parse(saved);
-      }
-    } catch (e) {
-      console.warn('Error reading saved fire incidents', e);
-    }
-    return initialFireIncidents;
+    return getUserItem<FireIncident[]>(currentUserId, 'fire_incidents', initialFireIncidents);
   });
 
   useEffect(() => {
-    try {
-      localStorage.setItem('geofield_fire_incidents', JSON.stringify(fireIncidents));
-    } catch (e) {
-      console.warn('Error persisting fire incidents', e);
-    }
-  }, [fireIncidents]);
+    setUserItem(currentUserId, 'fire_incidents', fireIncidents);
+  }, [fireIncidents, currentUserId]);
 
   // Translation helper
   const [pdfFiles, setPdfFiles] = useState<{ id: string, name: string, dataUrl: string, width?: number, height?: number }[]>([]);
@@ -423,27 +446,18 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const [savedTracks, setSavedTracks] = useState<Track[]>(initialTracks);
 
   const [isManualGpsLocked, setIsManualGpsLocked] = useState<boolean>(() => {
-    try {
-      return localStorage.getItem('geofield_manual_gps_locked') === 'true';
-    } catch {
-      return false;
-    }
+    return getUserItem<boolean>(currentUserId, 'manual_gps_locked', false);
   });
   const isManualGpsLockedRef = useRef<boolean>(isManualGpsLocked);
   isManualGpsLockedRef.current = isManualGpsLocked;
 
   // Live GPS Tracking & Simulation
   const [currentGps, setCurrentGps] = useState<GeoCoordinate>(() => {
-    try {
-      const isLocked = localStorage.getItem('geofield_manual_gps_locked') === 'true';
-      const savedCoord = localStorage.getItem('geofield_manual_gps_coord');
-      if (isLocked && savedCoord) {
-        const parsed = JSON.parse(savedCoord);
-        if (typeof parsed.lat === 'number' && typeof parsed.lng === 'number') {
-          return parsed;
-        }
-      }
-    } catch {}
+    const isLocked = getUserItem<boolean>(currentUserId, 'manual_gps_locked', false);
+    const savedCoord = getUserItem<GeoCoordinate | null>(currentUserId, 'manual_gps_coord', null);
+    if (isLocked && savedCoord && typeof savedCoord.lat === 'number' && typeof savedCoord.lng === 'number') {
+      return savedCoord;
+    }
     return {
       lat: -20.2541,
       lng: -46.5823,
@@ -454,11 +468,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   });
   const [isGpsSimulated, setIsGpsSimulated] = useState<boolean>(false);
   const [hasGpsLock, setHasGpsLock] = useState<boolean>(() => {
-    try {
-      return localStorage.getItem('geofield_manual_gps_locked') === 'true';
-    } catch {
-      return false;
-    }
+    return getUserItem<boolean>(currentUserId, 'manual_gps_locked', false);
   });
 
   // Track Recording
@@ -497,26 +507,14 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   // Security E2EE
   const [e2eeEnabled, setE2eeEnabled] = useState<boolean>(true);
 
-  // Field Trips / Rodadas de Campo (Quilometragem Diária)
+  // Field Trips / Rodadas de Campo (Quilometragem Diária - user scoped)
   const [fieldRounds, setFieldRounds] = useState<FieldRound[]>(() => {
-    try {
-      const saved = localStorage.getItem('geofield_field_rounds');
-      if (saved) {
-        return JSON.parse(saved);
-      }
-    } catch (e) {
-      console.warn('Error reading saved field rounds from storage', e);
-    }
-    return initialFieldRounds;
+    return getUserItem<FieldRound[]>(currentUserId, 'field_rounds', initialFieldRounds);
   });
 
   useEffect(() => {
-    try {
-      localStorage.setItem('geofield_field_rounds', JSON.stringify(fieldRounds));
-    } catch (e) {
-      console.warn('Error persisting field rounds', e);
-    }
-  }, [fieldRounds]);
+    setUserItem(currentUserId, 'field_rounds', fieldRounds);
+  }, [fieldRounds, currentUserId]);
 
   // Notifications & Styled Toasts
   const [notifications, setNotifications] = useState<FieldNotification[]>(initialNotifications);
@@ -635,12 +633,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       pdfRenderQuality: 'normal',
       photoQuality: 'medium',
     };
-    try {
-      const saved = localStorage.getItem('gofield_app_settings');
-      return saved ? { ...defaultSettings, ...JSON.parse(saved) } : defaultSettings;
-    } catch {
-      return defaultSettings;
-    }
+    return getUserItem<AppSettings>(currentUserId, 'app_settings', defaultSettings);
   });
 
   // Apply Theme to Document root (HTML and Body classes/data-theme)
@@ -676,69 +669,63 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     }
   }, [settings.theme]);
 
-  // IndexedDB Persistence for core collections
+  // IndexedDB Persistence for core collections (user-scoped)
   const [isStateLoaded, setIsStateLoaded] = useState(false);
 
   useEffect(() => {
     (async () => {
-      const savedLayers = await loadAppState<LayerItem[]>('geofield_layers');
+      const savedLayers = await loadAppState<LayerItem[]>('geofield_layers', currentUserId);
       if (savedLayers && savedLayers.length > 0) setLayers(savedLayers);
       
-      const savedProjects = await loadAppState<ProjectFolder[]>('geofield_projects');
+      const savedProjects = await loadAppState<ProjectFolder[]>('geofield_projects', currentUserId);
       if (savedProjects && savedProjects.length > 0) setProjects(savedProjects);
       
-      const savedWaypoints = await loadAppState<Waypoint[]>('geofield_waypoints');
+      const savedWaypoints = await loadAppState<Waypoint[]>('geofield_waypoints', currentUserId);
       if (savedWaypoints && savedWaypoints.length > 0) setWaypoints(savedWaypoints);
       
-      const savedTracks = await loadAppState<Track[]>('geofield_savedTracks');
+      const savedTracks = await loadAppState<Track[]>('geofield_savedTracks', currentUserId);
       if (savedTracks && savedTracks.length > 0) setSavedTracks(savedTracks);
 
       setIsStateLoaded(true);
     })();
-  }, []);
+  }, [currentUserId]);
 
   useEffect(() => {
     if (!isStateLoaded) return;
-    saveAppState('geofield_layers', layers);
-  }, [layers, isStateLoaded]);
+    saveAppState('geofield_layers', layers, currentUserId);
+  }, [layers, isStateLoaded, currentUserId]);
 
   useEffect(() => {
     if (!isStateLoaded) return;
-    saveAppState('geofield_projects', projects);
-  }, [projects, isStateLoaded]);
+    saveAppState('geofield_projects', projects, currentUserId);
+  }, [projects, isStateLoaded, currentUserId]);
 
   useEffect(() => {
     if (!isStateLoaded) return;
-    saveAppState('geofield_waypoints', waypoints);
-  }, [waypoints, isStateLoaded]);
+    saveAppState('geofield_waypoints', waypoints, currentUserId);
+  }, [waypoints, isStateLoaded, currentUserId]);
 
   useEffect(() => {
     if (!isStateLoaded) return;
-    saveAppState('geofield_savedTracks', savedTracks);
-  }, [savedTracks, isStateLoaded]);
+    saveAppState('geofield_savedTracks', savedTracks, currentUserId);
+  }, [savedTracks, isStateLoaded, currentUserId]);
 
   const updateSettings = useCallback((partial: Partial<AppSettings>) => {
     setSettings((prev) => {
       const updated = { ...prev, ...partial };
-      try {
-        localStorage.setItem('gofield_app_settings', JSON.stringify(updated));
-      } catch (e) {
-        console.warn('Error saving settings', e);
-      }
+      setUserItem(currentUserId, 'app_settings', updated);
       return updated;
     });
-  }, []);
+  }, [currentUserId]);
 
   const toggleTheme = useCallback(() => {
     setSettings((prev) => {
       const nextTheme = prev.theme === 'light' ? 'dark' : 'light';
       const updated = { ...prev, theme: nextTheme };
-      try {
-        localStorage.setItem('gofield_app_settings', JSON.stringify(updated));
-      } catch {}
+      setUserItem(currentUserId, 'app_settings', updated);
       return updated;
     });
-  }, []);
+  }, [currentUserId]);
 
   // Update map viewport when active project changes
   useEffect(() => {
@@ -760,18 +747,14 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       setHasGpsLock(true);
       setIsManualGpsLocked(true);
       isManualGpsLockedRef.current = true;
-      try {
-        localStorage.setItem('geofield_manual_gps_locked', 'true');
-        localStorage.setItem('geofield_manual_gps_coord', JSON.stringify(updatedCoord));
-      } catch (e) {
-        console.warn('Failed to save manual GPS to localStorage', e);
-      }
+      setUserItem(currentUserId, 'manual_gps_locked', true);
+      setUserItem(currentUserId, 'manual_gps_coord', updatedCoord);
       notifySuccess(
         'Posição Calibrada e Fixada',
         `GPS travado manualmente em Lat: ${coord.lat.toFixed(5)}°, Lng: ${coord.lng.toFixed(5)}°`
       );
     },
-    [notifySuccess]
+    [notifySuccess, currentUserId]
   );
 
   const requestCurrentLocation = useCallback(async (): Promise<GeoCoordinate | null> => {
@@ -857,13 +840,11 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const unlockDeviceGps = useCallback(() => {
     setIsManualGpsLocked(false);
     isManualGpsLockedRef.current = false;
-    try {
-      localStorage.removeItem('geofield_manual_gps_locked');
-      localStorage.removeItem('geofield_manual_gps_coord');
-    } catch {}
+    removeUserItem(currentUserId, 'manual_gps_locked');
+    removeUserItem(currentUserId, 'manual_gps_coord');
     notifyInfo('GPS em Tempo Real', 'Reconectando aos satélites do seu aparelho...');
     requestCurrentLocation();
-  }, [notifyInfo, requestCurrentLocation]);
+  }, [notifyInfo, requestCurrentLocation, currentUserId]);
 
   const isRecordingTrackRef = useRef(isRecordingTrack);
   isRecordingTrackRef.current = isRecordingTrack;

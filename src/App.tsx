@@ -27,6 +27,7 @@ import { LegalPoliciesModal } from './components/Legal/LegalPoliciesModal';
 import { AppUpdateBanner } from './components/Common/AppUpdateBanner';
 import { PlanUpgradeModal } from './components/Billing/PlanUpgradeModal';
 import { Sparkles, Clock, AlertTriangle, ArrowRight } from 'lucide-react';
+import { getUserRawItem } from './utils/userStorage';
 
 const MainAppContent: React.FC = () => {
   const {
@@ -39,39 +40,7 @@ const MainAppContent: React.FC = () => {
     setIsPoliciesModalOpen,
     openUpgradeModal,
   } = useApp();
-  const { user, profile, loading } = useAuth();
-  const [showCelebration, setShowCelebration] = React.useState<boolean>(false);
-
-  React.useEffect(() => {
-    if (profile && profile.role !== 'super_admin' && profile.status === 'active') {
-      const acknowledged = localStorage.getItem(`gofield_approved_acknowledged_${profile.uid}`);
-      if (acknowledged !== 'true') {
-        setShowCelebration(true);
-      }
-    }
-  }, [profile?.status, profile?.uid, profile?.role]);
-
-  if (loading) {
-    return (
-      <div className="h-[100dvh] w-full bg-slate-950 flex items-center justify-center">
-        <div className="w-8 h-8 border-4 border-sky-500 border-t-transparent rounded-full animate-spin"></div>
-      </div>
-    );
-  }
-
-  if (!user || !profile) {
-    return <LoginScreen />;
-  }
-
-  // If the user's account is pending approval or blocked (and not the owner super_admin)
-  if (profile.role !== 'super_admin' && profile.status === 'blocked') {
-    return <PendingApprovalScreen />;
-  }
-
-  // If newly approved, display the celebration transition screen
-  if (showCelebration && profile.status === 'active' && profile.role !== 'super_admin') {
-    return <ApprovalCelebrationScreen onContinue={() => setShowCelebration(false)} />;
-  }
+  const { profile } = useAuth();
 
   return (
     <div className="flex h-[100dvh] w-full max-w-full overflow-hidden bg-slate-950 text-slate-100 font-sans">
@@ -133,7 +102,6 @@ const MainAppContent: React.FC = () => {
           );
         })()}
 
-        
         {/* Main View Area */}
         <main className="flex-1 relative overflow-hidden flex flex-col h-full pb-14 md:pb-0">
           {(activeTab === 'map' || activeTab === 'layers') && (
@@ -171,15 +139,66 @@ const MainAppContent: React.FC = () => {
   );
 };
 
+const AuthenticatedApp: React.FC = () => {
+  const { user, profile } = useAuth();
+  const [showCelebration, setShowCelebration] = React.useState<boolean>(false);
+
+  React.useEffect(() => {
+    if (profile && profile.role !== 'super_admin' && profile.status === 'active') {
+      const acknowledged = getUserRawItem(profile.uid, 'approved_acknowledged', '');
+      if (acknowledged !== 'true') {
+        setShowCelebration(true);
+      }
+    }
+  }, [profile?.status, profile?.uid, profile?.role]);
+
+  // If the user's account is pending approval or blocked (and not the owner super_admin)
+  if (profile && profile.role !== 'super_admin' && profile.status === 'blocked') {
+    return <PendingApprovalScreen />;
+  }
+
+  // If newly approved, display the celebration transition screen
+  if (showCelebration && profile && profile.status === 'active' && profile.role !== 'super_admin') {
+    return <ApprovalCelebrationScreen onContinue={() => setShowCelebration(false)} />;
+  }
+
+  if (!user || !profile) {
+    return null;
+  }
+
+  // Strict session lifecycle boundary: key={user.uid} forces full mount/unmount and zero in-memory cross-talk
+  return (
+    <AppProvider key={user.uid}>
+      <UpdateProvider>
+        <MainAppContent />
+      </UpdateProvider>
+    </AppProvider>
+  );
+};
+
+const RootRouter: React.FC = () => {
+  const { user, profile, loading } = useAuth();
+
+  if (loading) {
+    return (
+      <div className="h-[100dvh] w-full bg-slate-950 flex items-center justify-center">
+        <div className="w-8 h-8 border-4 border-sky-500 border-t-transparent rounded-full animate-spin"></div>
+      </div>
+    );
+  }
+
+  if (!user || !profile) {
+    return <LoginScreen />;
+  }
+
+  return <AuthenticatedApp key={user.uid} />;
+};
+
 export default function App() {
   return (
     <ErrorBoundary>
       <AuthProvider>
-        <AppProvider>
-          <UpdateProvider>
-            <MainAppContent />
-          </UpdateProvider>
-        </AppProvider>
+        <RootRouter />
       </AuthProvider>
     </ErrorBoundary>
   );

@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
 import { useAuth } from '../../context/AuthContext';
 import { WoodpileItem, generateWoodpilePdfReport } from '../../utils/woodpilePdfReport';
+import { getUserItem, setUserItem, getUserRawItem } from '../../utils/userStorage';
 import {
   Trees,
   Calculator,
@@ -40,23 +41,19 @@ const DEFAULT_STACK_FACTORS = [
 
 export const WoodpileCubageModal: React.FC<WoodpileCubageModalProps> = ({ isOpen, onClose }) => {
   const { profile } = useAuth();
+  const currentUserId = profile?.uid || '';
   const { notifySuccess, notifyWarning } = useApp();
 
   const [activeTab, setActiveTab] = useState<'pile' | 'smalian' | 'history'>('pile');
 
-  // Stored Woodpiles list (saved in localStorage)
+  // Stored Woodpiles list (saved in user-scoped localStorage)
   const [woodpiles, setWoodpiles] = useState<WoodpileItem[]>(() => {
-    try {
-      const saved = localStorage.getItem('gofield_woodpiles');
-      return saved ? JSON.parse(saved) : [];
-    } catch {
-      return [];
-    }
+    return getUserItem<WoodpileItem[]>(currentUserId, 'woodpiles', []);
   });
 
   useEffect(() => {
-    localStorage.setItem('gofield_woodpiles', JSON.stringify(woodpiles));
-  }, [woodpiles]);
+    setUserItem(currentUserId, 'woodpiles', woodpiles);
+  }, [woodpiles, currentUserId]);
 
   // Form State: Pile Cubage
   const [pileCode, setPileCode] = useState(`PILHA-${(woodpiles.length + 1).toString().padStart(2, '0')}`);
@@ -172,8 +169,8 @@ export const WoodpileCubageModal: React.FC<WoodpileCubageModalProps> = ({ isOpen
       return;
     }
 
-    const companyLogo = localStorage.getItem('gofield_custom_company_logo') || undefined;
-    const companyName = localStorage.getItem('gofield_custom_company_name') || profile?.company || 'AM TST GESTÃO FLORESTAL';
+    const companyLogo = getUserRawItem(currentUserId, 'custom_company_logo', '') || undefined;
+    const companyName = getUserRawItem(currentUserId, 'custom_company_name', '') || profile?.company || 'AM TST GESTÃO FLORESTAL';
 
     generateWoodpilePdfReport(listToExport, profile?.name || 'Técnico Responsável', companyName, companyLogo);
     confetti({ particleCount: 40, spread: 70 });

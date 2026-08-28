@@ -51,10 +51,20 @@ export const Topbar: React.FC = () => {
     toggleTheme,
     showConfirm,
     openUpgradeModal,
+    notifyInfo,
+    notifySuccess,
   } = useApp();
 
   const { profile, logout } = useAuth();
-  const { isUpdateAvailable, latestVersion, applyUpdate } = useUpdate();
+  const { 
+    isUpdateAvailable, 
+    latestVersion, 
+    isCheckingUpdate, 
+    isApplyingUpdate, 
+    checkForUpdates, 
+    applyUpdate, 
+    forceCleanUpdate 
+  } = useUpdate();
   const [isProjectsDropdownOpen, setIsProjectsDropdownOpen] = useState(false);
   const [isLangDropdownOpen, setIsLangDropdownOpen] = useState(false);
   const [isNotifDropdownOpen, setIsNotifDropdownOpen] = useState(false);
@@ -92,19 +102,19 @@ export const Topbar: React.FC = () => {
         />
       )}
 
-      <header className="bg-slate-950 border-b border-slate-800 select-none z-[96000] sticky top-0 relative">
+      <header className="bg-[#070A10]/95 backdrop-blur-md border-b border-slate-800/80 select-none z-[96000] sticky top-0 relative shadow-lg shadow-black/40">
         <div className="px-3 sm:px-4 py-2 flex items-center justify-between gap-2 h-14">
           {/* Left Side: Menu Trigger & App Title */}
           <div className="flex items-center gap-2 sm:gap-3">
             <button 
-              className="p-2 -ml-1 text-slate-300 hover:text-white rounded-xl hover:bg-slate-800 transition-colors active:scale-95"
+              className="p-2 -ml-1 text-slate-300 hover:text-white rounded-xl hover:bg-[#0D121D] border border-transparent hover:border-slate-800 transition-colors active:scale-95 cursor-pointer"
               onClick={() => setIsMobileMenuOpen(true)}
               aria-label="Abrir Menu Lateral"
             >
               <Menu className="w-5 h-5" />
             </button>
-            <div className="hidden sm:block pl-2 border-l border-slate-800">
-               <h1 className="text-sm font-bold text-white tracking-tight">GoField <span className="text-sky-400">Pro</span></h1>
+            <div className="hidden sm:block pl-2 border-l border-slate-800/80">
+               <h1 className="text-sm font-bold text-white tracking-tight">GoField <span className="text-emerald-400">Pro</span></h1>
             </div>
           </div>
 
@@ -116,7 +126,7 @@ export const Topbar: React.FC = () => {
             {/* Botão de Planos & Assinatura Pro no Topbar */}
             <button
               onClick={() => openUpgradeModal('Adesão / Upgrade')}
-              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-gradient-to-r from-amber-500/20 to-sky-500/20 hover:from-amber-500/30 hover:to-sky-500/30 border border-amber-500/40 text-amber-300 text-xs font-black transition-all active:scale-95 cursor-pointer shadow-sm"
+              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-gradient-to-r from-amber-500/20 to-emerald-500/20 hover:from-amber-500/30 hover:to-emerald-500/30 border border-amber-500/40 text-amber-300 text-xs font-black transition-all active:scale-95 cursor-pointer shadow-sm"
               title="Ver Planos e Assinaturas"
             >
               <Crown className="w-4 h-4 text-amber-400" />
@@ -127,7 +137,7 @@ export const Topbar: React.FC = () => {
             <button
               id="btn-theme-toggle"
               onClick={toggleTheme}
-              className="p-2 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-300 hover:text-white transition-colors active:scale-95"
+              className="p-2 rounded-xl bg-[#0D121D] hover:bg-slate-850 border border-slate-800/80 text-slate-300 hover:text-white transition-colors active:scale-95 cursor-pointer shadow-sm"
               title={settings.theme === 'light' ? 'Mudar para Modo Escuro' : 'Mudar para Modo Claro (Alta Visibilidade)'}
               aria-label="Alternar Tema Claro e Escuro"
             >
@@ -144,9 +154,9 @@ export const Topbar: React.FC = () => {
               onClick={triggerManualSync}
               disabled={isSyncing}
               title={offlineQueue.length > 0 ? `${offlineQueue.length} ${t.pendingSync}` : t.allSynced}
-              className="flex items-center gap-1.5 px-2.5 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 text-xs font-semibold text-slate-200 transition-colors active:scale-95"
+              className="flex items-center gap-1.5 px-2.5 py-2 rounded-xl bg-[#0D121D] hover:bg-slate-850 border border-slate-800/80 text-xs font-semibold text-slate-200 transition-colors active:scale-95 cursor-pointer shadow-sm"
             >
-              <RefreshCw className={`w-3.5 h-3.5 text-sky-400 ${isSyncing ? 'animate-spin' : ''}`} />
+              <RefreshCw className={`w-3.5 h-3.5 text-emerald-400 ${isSyncing ? 'animate-spin' : ''}`} />
               {offlineQueue.length > 0 && (
                 <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse"></span>
               )}
@@ -157,12 +167,12 @@ export const Topbar: React.FC = () => {
               <button
                 id="btn-notifications-bell"
                 onClick={handleOpenNotifications}
-                className="p-2 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-200 transition-colors relative active:scale-95"
+                className="p-2 rounded-xl bg-[#0D121D] hover:bg-slate-850 border border-slate-800/80 text-slate-200 transition-colors relative active:scale-95 cursor-pointer shadow-sm"
                 title="Notificações"
               >
-                <Bell className="w-4 h-4" />
+                <Bell className="w-4 h-4 text-slate-300" />
                 {unreadNotificationsCount > 0 && (
-                  <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-red-500 text-white text-[9px] font-black flex items-center justify-center animate-pulse">
+                  <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-emerald-500 text-slate-950 text-[9px] font-black flex items-center justify-center animate-pulse shadow">
                     {unreadNotificationsCount}
                   </span>
                 )}
@@ -297,19 +307,42 @@ export const Topbar: React.FC = () => {
                       </span>
                     </button>
                   ) : (
-                    <div
-                      onClick={() => {
+                    <button
+                      onClick={async () => {
                         setIsUserDropdownOpen(false);
-                        setIsSettingsModalOpen(true);
+                        notifyInfo('Verificando Atualizações', 'Conectando ao servidor...');
+                        const hasNew = await checkForUpdates(true);
+                        if (hasNew) {
+                          notifySuccess('Nova Versão Encontrada!', `A versão ${latestVersion} está pronta.`);
+                          showConfirm({
+                            title: `Instalar Atualização (${latestVersion})?`,
+                            message: 'O aplicativo será atualizado e o cache antigo será eliminado para evitar conflitos. Todos os seus dados locais continuarão intactos.',
+                            type: 'info',
+                            confirmText: 'Atualizar Agora',
+                            onConfirm: applyUpdate,
+                          });
+                        } else {
+                          notifySuccess('Aplicativo Atualizado', `Você já está na versão mais recente (${APP_VERSION}).`);
+                          showConfirm({
+                            title: 'Limpar Cache & Sincronizar?',
+                            message: 'Deseja forçar a eliminação de arquivos antigos em cache e recarregar o sistema? Seus dados locais permanecem 100% seguros e intactos.',
+                            type: 'info',
+                            confirmText: 'Limpar Cache & Recarregar',
+                            onConfirm: forceCleanUpdate,
+                          });
+                        }
                       }}
-                      className="w-full text-left px-3 py-2 rounded-xl text-[11px] flex items-center justify-between text-slate-400 bg-slate-950/40 border border-slate-800/80 cursor-pointer hover:border-slate-700 transition-colors"
+                      className="w-full text-left px-3 py-2.5 rounded-xl text-xs font-bold flex items-center justify-between text-sky-300 bg-sky-950/40 border border-sky-500/40 hover:bg-sky-900/50 hover:border-sky-400 transition-colors cursor-pointer"
                     >
-                      <span>Versão Instalada</span>
-                      <span className="font-mono text-emerald-400 font-bold flex items-center gap-1">
-                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+                      <div className="flex items-center gap-2">
+                        <RefreshCw className={`w-4 h-4 text-sky-400 ${isCheckingUpdate ? 'animate-spin' : ''}`} />
+                        <span>Verificar Atualizações</span>
+                      </div>
+                      <span className="font-mono text-emerald-400 text-[10px] font-bold flex items-center gap-1">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
                         {APP_VERSION}
                       </span>
-                    </div>
+                    </button>
                   )}
 
                   <button

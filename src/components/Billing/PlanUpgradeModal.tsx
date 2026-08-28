@@ -115,10 +115,19 @@ export const PlanUpgradeModal: React.FC = () => {
       rawPlans = billingConfig.plans;
     } else {
       try {
-        const local = localStorage.getItem('gofield_custom_plans');
-        if (local) {
-          const parsed = JSON.parse(local);
-          if (Array.isArray(parsed) && parsed.length > 0) rawPlans = parsed;
+        const savedBilling = localStorage.getItem('gofield_billing_config');
+        if (savedBilling) {
+          const parsedBilling = JSON.parse(savedBilling);
+          if (parsedBilling.plans && Array.isArray(parsedBilling.plans) && parsedBilling.plans.length > 0) {
+            rawPlans = parsedBilling.plans;
+          }
+        }
+        if (rawPlans.length === 0) {
+          const local = localStorage.getItem('gofield_custom_plans');
+          if (local) {
+            const parsed = JSON.parse(local);
+            if (Array.isArray(parsed) && parsed.length > 0) rawPlans = parsed;
+          }
         }
       } catch {}
     }

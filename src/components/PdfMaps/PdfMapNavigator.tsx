@@ -50,6 +50,8 @@ import {
   savePdfDocument,
   deletePdfDocument
 } from '../../utils/pdfStorage';
+import { useAuth } from '../../context/AuthContext';
+import { getUserRawItem, setUserItem } from '../../utils/userStorage';
 import { 
   gpsToPdf, 
   pdfToGps, 
@@ -157,6 +159,9 @@ const compressImageFile = (file: File, maxDim = 800, quality = 0.7): Promise<str
 };
 
 export const PdfMapNavigator: React.FC = () => {
+  const { user, profile } = useAuth();
+  const currentUserId = profile?.uid || user?.uid || '';
+
   const {
     addPdfFile,
     currentGps,
@@ -510,15 +515,16 @@ export const PdfMapNavigator: React.FC = () => {
     try {
       const cleanDoc: PdfDocument = {
         ...updatedDoc,
+        userId: updatedDoc.userId || currentUserId,
         markers: Array.isArray(updatedDoc.markers) ? updatedDoc.markers : [],
         tracks: Array.isArray(updatedDoc.tracks) ? updatedDoc.tracks : [],
       };
       setDocuments((prev) => prev.map((d) => (d.id === cleanDoc.id ? cleanDoc : d)));
-      savePdfDocument(cleanDoc).catch((e) => console.warn('Failed to persist doc', e));
+      savePdfDocument(cleanDoc, currentUserId).catch((e) => console.warn('Failed to persist doc', e));
     } catch (err) {
       console.error('Error updating document in store:', err);
     }
-  }, []);
+  }, [currentUserId]);
 
   // Initialize Map safely
   const initializeMap = useCallback(() => {
@@ -738,22 +744,25 @@ export const PdfMapNavigator: React.FC = () => {
     };
   }, [initializeMap]);
 
-  // Load documents from IndexedDB on mount
+  // Load documents from IndexedDB on mount (user-scoped)
   useEffect(() => {
     let mounted = true;
     (async () => {
       try {
-        const docs = await getAllPdfDocuments();
+        const docs = await getAllPdfDocuments(currentUserId);
         if (mounted) {
           if (docs.length > 0) {
             setDocuments(docs);
-            const requested = localStorage.getItem('geofield_selected_pdf_id');
+            const requested = getUserRawItem(currentUserId, 'selected_pdf_id', '');
             const exists = docs.some((d) => d.id === requested);
             if (requested && exists) {
               setActiveDocId(requested);
             } else {
               setActiveDocId(docs[0].id);
             }
+          } else {
+            setDocuments([]);
+            setActiveDocId(null);
           }
         }
       } catch (e) {
@@ -765,7 +774,7 @@ export const PdfMapNavigator: React.FC = () => {
     return () => {
       mounted = false;
     };
-  }, []);
+  }, [currentUserId]);
 
   // Timer for live track recording
   useEffect(() => {
@@ -1728,6 +1737,7 @@ export const PdfMapNavigator: React.FC = () => {
           pageCount: renderedPages.length,
           currentPage: 0,
           width: baseWidth,
+          userId: currentUserId,
           height: baseHeight,
           calibration: createCenteredCalibration(
             null,
@@ -1740,7 +1750,8 @@ export const PdfMapNavigator: React.FC = () => {
           uploadedAt: new Date().toLocaleDateString('pt-BR'),
         };
 
-        await savePdfDocument(newDoc);
+        await savePdfDocument(newDoc, currentUserId);
+        setUserItem(currentUserId, 'selected_pdf_id', newDoc.id);
         setDocuments((prev) => [newDoc, ...prev]);
         setActiveDocId(newDoc.id);
         setIsDrawerOpen(false);
@@ -1763,6 +1774,7 @@ export const PdfMapNavigator: React.FC = () => {
           img.onload = async () => {
             const newDoc: PdfDocument = {
               id: `img-${Date.now()}`,
+              userId: currentUserId,
               name: file.name.replace(/\.[^/.]+$/, '').replace(/[_]/g, ' '),
               fileName: file.name,
               fileSize: `${(file.size / (1024 * 1024)).toFixed(1)} MB`,
@@ -1781,7 +1793,8 @@ export const PdfMapNavigator: React.FC = () => {
               tracks: [],
               uploadedAt: new Date().toLocaleDateString('pt-BR'),
             };
-            await savePdfDocument(newDoc);
+            await savePdfDocument(newDoc, currentUserId);
+            setUserItem(currentUserId, 'selected_pdf_id', newDoc.id);
             setDocuments((prev) => [newDoc, ...prev]);
             setActiveDocId(newDoc.id);
             setIsDrawerOpen(false);
@@ -2147,11 +2160,17 @@ export const PdfMapNavigator: React.FC = () => {
       confirmText: 'Excluir Planta',
       onConfirm: async () => {
         try {
-          await deletePdfDocument(docId);
+          await deletePdfDocument(docId, currentUserId);
           const remaining = documents.filter((d) => d.id !== docId);
           setDocuments(remaining);
           if (activeDocId === docId) {
-            setActiveDocId(remaining.length > 0 ? remaining[0].id : null);
+            const nextActiveId = remaining.length > 0 ? remaining[0].id : null;
+            setActiveDocId(nextActiveId);
+            if (nextActiveId) {
+              setUserItem(currentUserId, 'selected_pdf_id', nextActiveId);
+            } else {
+              setUserItem(currentUserId, 'selected_pdf_id', '');
+            }
           }
           notifySuccess('Planta Excluída', 'Documento removido do armazenamento local.');
         } catch (err) {
@@ -3675,6 +3694,7 @@ export const PdfMapNavigator: React.FC = () => {
                         key={doc.id}
                         onClick={() => {
                           setActiveDocId(doc.id);
+                          setUserItem(currentUserId, 'selected_pdf_id', doc.id);
                           setIsDrawerOpen(false);
                         }}
                         className={`p-3 rounded-xl cursor-pointer transition-all flex items-center justify-between border ${

@@ -12,6 +12,7 @@ import {
   ShieldCheck,
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
+import { useAuth } from '../../context/AuthContext';
 import { saveAppState } from '../../utils/stateStorage';
 
 interface OfflineMapDownloadModalProps {
@@ -24,6 +25,7 @@ export const OfflineMapDownloadModal: React.FC<OfflineMapDownloadModalProps> = (
   onClose,
 }) => {
   const { currentGps, activeProject, basemap, notifySuccess, notifyInfo, notifyError } = useApp();
+  const { profile } = useAuth();
   const [radiusKm, setRadiusKm] = useState<number>(3);
   const [zoomRange, setZoomRange] = useState<'standard' | 'high' | 'ultra'>('standard');
   const [isDownloading, setIsDownloading] = useState(false);
@@ -66,7 +68,7 @@ export const OfflineMapDownloadModal: React.FC<OfflineMapDownloadModalProps> = (
         basemapType: basemap,
       };
 
-      await saveAppState(`offline_map_${activeProject.id}`, offlinePack);
+      await saveAppState(`offline_map_${activeProject.id}`, offlinePack, profile?.uid);
 
       setProgress(100);
       await new Promise((res) => setTimeout(res, 300));
