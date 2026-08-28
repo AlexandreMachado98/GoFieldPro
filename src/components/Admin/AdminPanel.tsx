@@ -1586,14 +1586,15 @@ export const AdminPanel: React.FC = () => {
   const averageTicket = activePayingUsers.length > 0 ? totalMrr / activePayingUsers.length : 44.99;
   const churnRate = users.length > 0 ? (blockedUsers.length / users.length) * 100 : 0;
 
-  // Selected Active User Object
+    // Selected Active User Object
   const selectedActiveUser = useMemo(() => {
     if (!selectedActiveUserUid) return null;
     return users.find((u) => u.uid === selectedActiveUserUid) || null;
   }, [users, selectedActiveUserUid]);
 
   const activeClientsList = useMemo(() => {
-    return users.filter((u) => u.status === 'active' && u.subscriptionStatus !== 'suspended');
+    // Include all non-blocked users (active, pending, trial, free, pro)
+    return users.filter((u) => u.status !== 'blocked');
   }, [users]);
 
   // Filtered Users List
@@ -1863,6 +1864,363 @@ export const AdminPanel: React.FC = () => {
               <FileSpreadsheet className="w-4 h-4" />
               <span>Exportar Relatório Financeiro (CSV)</span>
             </button>
+          </div>
+        </div>
+      )}
+
+            {/* TAB: SPECIAL EXCLUSIVE & LIFETIME ACCESS */}
+      {adminTab === 'special_access' && (
+        <div className="space-y-6 animate-in fade-in">
+          {/* Header & KPI Summary */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="bg-gradient-to-br from-amber-950/40 via-slate-900 to-slate-950 border border-amber-500/40 p-5 rounded-2xl shadow-xl space-y-1">
+              <div className="flex items-center justify-between text-xs text-amber-400 font-bold">
+                <span>Total com Acesso Especial</span>
+                <KeyRound className="w-4 h-4" />
+              </div>
+              <div className="text-2xl font-black text-white">
+                {users.filter((u) => hasSpecialAccessActive(u)).length} <span className="text-xs text-slate-400 font-normal">VIPs ativos</span>
+              </div>
+              <p className="text-[11px] text-amber-300">100% dos recursos liberados sem limites</p>
+            </div>
+
+            <div className="bg-gradient-to-br from-yellow-950/30 via-slate-900 to-slate-950 border border-yellow-500/30 p-5 rounded-2xl shadow-xl space-y-1">
+              <div className="flex items-center justify-between text-xs text-yellow-400 font-bold">
+                <span>Acessos Vitalícios</span>
+                <Sparkles className="w-4 h-4" />
+              </div>
+              <div className="text-2xl font-black text-amber-300">
+                {users.filter((u) => hasSpecialAccessActive(u) && u.specialAccess?.accessType === 'lifetime').length} <span className="text-xs text-slate-400 font-normal">permanentes</span>
+              </div>
+              <p className="text-[11px] text-slate-400">Sem data de expiração</p>
+            </div>
+
+            <div className="bg-gradient-to-br from-sky-950/30 via-slate-900 to-slate-950 border border-sky-500/30 p-5 rounded-2xl shadow-xl space-y-1">
+              <div className="flex items-center justify-between text-xs text-sky-400 font-bold">
+                <span>Acessos Anuais</span>
+                <Calendar className="w-4 h-4" />
+              </div>
+              <div className="text-2xl font-black text-sky-300">
+                {users.filter((u) => hasSpecialAccessActive(u) && u.specialAccess?.accessType === 'annual').length} <span className="text-xs text-slate-400 font-normal">vigência 1 ano</span>
+              </div>
+              <p className="text-[11px] text-slate-400">365 dias de acesso total</p>
+            </div>
+
+            <div className="bg-gradient-to-br from-purple-950/30 via-slate-900 to-slate-950 border border-purple-500/30 p-5 rounded-2xl shadow-xl space-y-1">
+              <div className="flex items-center justify-between text-xs text-purple-400 font-bold">
+                <span>Base Total de Clientes</span>
+                <Users className="w-4 h-4" />
+              </div>
+              <div className="text-2xl font-black text-purple-300">
+                {users.length} <span className="text-xs text-slate-400 font-normal">cadastrados</span>
+              </div>
+              <p className="text-[11px] text-slate-400">Disponíveis para conceder acesso</p>
+            </div>
+          </div>
+
+          {/* MAIN TOOLBAR: ACTION BUTTON, SEARCH & STATUS FILTERS */}
+          <div className="bg-slate-900 border border-slate-800 rounded-3xl p-5 sm:p-6 shadow-xl space-y-5">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div>
+                <h3 className="text-base sm:text-lg font-black text-white flex items-center gap-2">
+                  <KeyRound className="w-5 h-5 text-amber-400" />
+                  <span>Painel de Concessão e Gestão de Acesso Especial</span>
+                </h3>
+                <p className="text-xs text-slate-400">
+                  Selecione clientes cadastrados ou cadastre novos clientes para liberar acesso vitalício ou anual
+                </p>
+              </div>
+
+              {/* MAIN PRIMARY BUTTON: + CONCEDER NOVO ACESSO */}
+              <button
+                type="button"
+                onClick={() => {
+                  setGrantModalClientMode('existing');
+                  setGrantSelectedUserUid('');
+                  setIsGrantSpecialModalOpen(true);
+                }}
+                className="px-5 py-3 rounded-2xl bg-gradient-to-r from-amber-500 via-yellow-500 to-amber-600 hover:from-amber-400 hover:to-yellow-400 text-slate-950 font-black text-xs sm:text-sm cursor-pointer shadow-lg shadow-amber-950/50 flex items-center justify-center gap-2 transition-all active:scale-95 shrink-0"
+              >
+                <Plus className="w-4 h-4 text-slate-950 stroke-[3]" />
+                <span>+ Conceder Novo Acesso</span>
+              </button>
+            </div>
+
+            {/* DIRECT ACTIVE CLIENT SELECTOR INLINE BOX */}
+            <div className="p-4 sm:p-5 rounded-2xl bg-slate-950 border border-amber-500/40 space-y-3 shadow-inner">
+              <div className="flex items-center justify-between">
+                <label className="text-amber-300 font-extrabold uppercase tracking-wider text-xs flex items-center gap-2">
+                  <UserCheck className="w-4 h-4 text-amber-400" />
+                  <span>🎯 Selecionar Cliente Cadastrado ({users.length} usuários na base):</span>
+                </label>
+                {saTabTargetUid && (
+                  <button
+                    type="button"
+                    onClick={() => setSaTabTargetUid('')}
+                    className="text-xs text-slate-400 hover:text-rose-400 font-bold underline cursor-pointer"
+                  >
+                    Limpar Seleção ✕
+                  </button>
+                )}
+              </div>
+
+              <div className="relative">
+                <select
+                  value={saTabTargetUid}
+                  onChange={(e) => setSaTabTargetUid(e.target.value)}
+                  className="w-full bg-slate-900 border border-slate-700 hover:border-amber-400 rounded-xl px-4 py-3 text-white text-xs sm:text-sm font-bold focus:outline-none focus:border-amber-500 transition-colors cursor-pointer appearance-none shadow-md"
+                >
+                  <option value="">-- Clique aqui e selecione um cliente da lista ({users.length} disponíveis) --</option>
+                  {users.map((client) => {
+                    const isVip = hasSpecialAccessActive(client);
+                    const vipText = isVip
+                      ? ` ★ [VIP: ${client.specialAccess?.accessType === 'lifetime' ? 'VITALÍCIO' : 'ANUAL'}]`
+                      : ' [Sem Acesso Especial]';
+                    return (
+                      <option key={client.uid} value={client.uid}>
+                        👤 {client.name} ({client.email}) | Empresa: {client.company || 'Particular'} | Plano: {(client.subscriptionPlan || 'Free').toUpperCase()}{vipText}
+                      </option>
+                    );
+                  })}
+                </select>
+                <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-amber-400">
+                  <ChevronDown className="w-5 h-5" />
+                </div>
+              </div>
+
+              {/* Selected Target Client Action Box */}
+              {(() => {
+                const targetUser = users.find((u) => u.uid === saTabTargetUid);
+                if (!targetUser) return null;
+                const isCurrentlyVip = hasSpecialAccessActive(targetUser);
+
+                return (
+                  <div className="p-4 rounded-xl bg-slate-900 border border-amber-500/50 space-y-3 animate-in fade-in mt-3">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-800 pb-3">
+                      <div className="flex items-center gap-3">
+                        <img
+                          src={targetUser.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(targetUser.name)}`}
+                          alt={targetUser.name}
+                          className="w-10 h-10 rounded-xl bg-slate-800 border border-amber-500/40 object-cover"
+                        />
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <h4 className="text-sm font-black text-white">{targetUser.name}</h4>
+                            {isCurrentlyVip ? (
+                              <span className="px-2 py-0.5 rounded-full text-[9px] font-black uppercase bg-amber-500/20 text-amber-300 border border-amber-500/40 flex items-center gap-1">
+                                <KeyRound className="w-2.5 h-2.5" />
+                                <span>VIP • {targetUser.specialAccess?.accessType === 'lifetime' ? 'Vitalício' : 'Anual'}</span>
+                              </span>
+                            ) : (
+                              <span className="px-2 py-0.5 rounded-full text-[9px] font-bold uppercase bg-slate-800 text-slate-400 border border-slate-700">
+                                Sem Acesso Especial
+                              </span>
+                            )}
+                          </div>
+                          <div className="text-xs text-slate-400 mt-0.5 flex items-center gap-3">
+                            <span>✉️ {targetUser.email}</span>
+                            <span>🏢 {targetUser.company || 'Particular'}</span>
+                            <span className="text-emerald-400 font-bold">Plano: {(targetUser.subscriptionPlan || 'Free').toUpperCase()}</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => handleOpenSpecialAccessModal(targetUser)}
+                          className="px-4 py-2 rounded-xl bg-gradient-to-r from-amber-500 to-yellow-500 hover:from-amber-400 hover:to-yellow-400 text-slate-950 font-black text-xs cursor-pointer shadow flex items-center gap-1.5 transition-all active:scale-95"
+                        >
+                          <KeyRound className="w-3.5 h-3.5" />
+                          <span>
+                            {isCurrentlyVip ? 'Editar Acesso Especial' : 'Conceder Acesso Especial Agora'}
+                          </span>
+                        </button>
+
+                        {isCurrentlyVip && (
+                          <button
+                            type="button"
+                            onClick={() => handleRevokeSpecialAccess(targetUser)}
+                            className="px-3.5 py-2 rounded-xl bg-rose-950/60 hover:bg-rose-900/60 border border-rose-800 text-rose-300 font-bold text-xs cursor-pointer transition-all flex items-center gap-1.5"
+                          >
+                            <X className="w-3.5 h-3.5 text-rose-400" />
+                            <span>Revogar Acesso</span>
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })()}
+            </div>
+
+            {/* Search and Filters Bar for VIP Table */}
+            <div className="flex flex-col sm:flex-row items-center gap-3 pt-3 border-t border-slate-800">
+              <div className="relative flex-1 w-full">
+                <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                <input
+                  type="text"
+                  value={saTabSearchQuery}
+                  onChange={(e) => setSaTabSearchQuery(e.target.value)}
+                  placeholder="Pesquisar cliente VIP por nome, e-mail, empresa ou motivo..."
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-10 pr-4 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-amber-500 transition-colors"
+                />
+              </div>
+
+              {/* Status Filter Pills */}
+              <div className="flex items-center gap-1.5 overflow-x-auto w-full sm:w-auto">
+                <button
+                  type="button"
+                  onClick={() => setSaTabFilter('all')}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
+                    saTabFilter === 'all' ? 'bg-amber-600 text-white shadow' : 'bg-slate-950 text-slate-400 hover:text-white'
+                  }`}
+                >
+                  Todos ({users.filter((u) => u.specialAccess).length})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSaTabFilter('lifetime')}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
+                    saTabFilter === 'lifetime' ? 'bg-yellow-600 text-slate-950 font-black shadow' : 'bg-slate-950 text-slate-400 hover:text-white'
+                  }`}
+                >
+                  👑 Vitalícios ({users.filter((u) => hasSpecialAccessActive(u) && u.specialAccess?.accessType === 'lifetime').length})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSaTabFilter('annual')}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
+                    saTabFilter === 'annual' ? 'bg-sky-600 text-white shadow' : 'bg-slate-950 text-slate-400 hover:text-white'
+                  }`}
+                >
+                  📅 Anuais ({users.filter((u) => hasSpecialAccessActive(u) && u.specialAccess?.accessType === 'annual').length})
+                </button>
+              </div>
+            </div>
+
+            {/* TABLE OF CLIENTS WITH SPECIAL ACCESS */}
+            <div className="overflow-x-auto rounded-2xl border border-slate-800">
+              <table className="w-full text-left text-xs">
+                <thead className="bg-slate-950 text-slate-400 border-b border-slate-800 font-extrabold uppercase tracking-wider text-[10px]">
+                  <tr>
+                    <th className="p-3.5">Cliente</th>
+                    <th className="p-3.5">Plano Comercial</th>
+                    <th className="p-3.5">Tipo de Acesso</th>
+                    <th className="p-3.5">Início</th>
+                    <th className="p-3.5">Expiração</th>
+                    <th className="p-3.5">Status</th>
+                    <th className="p-3.5">Concedido por / Motivo</th>
+                    <th className="p-3.5 text-right">Ações</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-800/60 bg-slate-950/40">
+                  {users
+                    .filter((u) => {
+                      if (!u.specialAccess) return false;
+                      if (saTabFilter === 'lifetime') return hasSpecialAccessActive(u) && u.specialAccess?.accessType === 'lifetime';
+                      if (saTabFilter === 'annual') return hasSpecialAccessActive(u) && u.specialAccess?.accessType === 'annual';
+                      return true;
+                    })
+                    .filter((u) => {
+                      if (!saTabSearchQuery.trim()) return true;
+                      const q = saTabSearchQuery.toLowerCase();
+                      return (
+                        u.name?.toLowerCase().includes(q) ||
+                        u.email?.toLowerCase().includes(q) ||
+                        u.company?.toLowerCase().includes(q) ||
+                        u.specialAccess?.reason?.toLowerCase().includes(q)
+                      );
+                    })
+                    .map((u) => {
+                      const isActive = hasSpecialAccessActive(u);
+                      const isLifetime = u.specialAccess?.accessType === 'lifetime';
+                      const isAnnual = u.specialAccess?.accessType === 'annual';
+
+                      return (
+                        <tr key={u.uid} className="hover:bg-slate-850/60 transition-colors">
+                          <td className="p-3.5">
+                            <div className="font-bold text-white text-xs">{u.name}</div>
+                            <div className="text-[11px] text-slate-400">{u.email}</div>
+                            {u.company && <div className="text-[10px] text-slate-500">🏢 {u.company}</div>}
+                          </td>
+                          <td className="p-3.5">
+                            <span className="font-bold text-slate-300 uppercase text-[11px]">
+                              {u.subscriptionPlan || 'Gratuito'}
+                            </span>
+                          </td>
+                          <td className="p-3.5">
+                            <span className={`inline-flex items-center gap-1 text-[10px] font-black uppercase px-2.5 py-1 rounded-full ${
+                              isLifetime
+                                ? 'bg-gradient-to-r from-amber-500/20 to-yellow-500/20 text-amber-300 border border-amber-500/40 shadow-sm'
+                                : isAnnual
+                                ? 'bg-sky-500/20 text-sky-300 border border-sky-500/40'
+                                : 'bg-purple-500/20 text-purple-300 border border-purple-500/40'
+                            }`}>
+                              <KeyRound className="w-3 h-3" />
+                              <span>{isLifetime ? '👑 Vitalício' : isAnnual ? '📅 Anual' : '⏱️ Personalizado'}</span>
+                            </span>
+                          </td>
+                          <td className="p-3.5 text-slate-300 font-mono text-[11px]">
+                            {u.specialAccess?.startsAt || '—'}
+                          </td>
+                          <td className="p-3.5 font-mono text-[11px]">
+                            {isLifetime ? (
+                              <span className="text-amber-400 font-black font-sans">Permanente</span>
+                            ) : (
+                              <span className="text-slate-300">
+                                {u.specialAccess?.expiresAt || '—'}
+                              </span>
+                            )}
+                          </td>
+                          <td className="p-3.5">
+                            <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase inline-flex items-center gap-1 ${
+                              isActive
+                                ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'
+                                : 'bg-rose-500/20 text-rose-300 border border-rose-500/40'
+                            }`}>
+                              <span>●</span>
+                              <span>{isActive ? 'Ativo' : 'Revogado/Expirado'}</span>
+                            </span>
+                          </td>
+                          <td className="p-3.5 text-slate-400 text-[11px] max-w-[200px] truncate">
+                            <div>{u.specialAccess?.reason || 'Cortesia/Parceria'}</div>
+                            <div className="text-[10px] text-slate-500 truncate">Por: {u.specialAccess?.grantedBy}</div>
+                          </td>
+                          <td className="p-3.5 text-right space-x-2 whitespace-nowrap">
+                            <button
+                              type="button"
+                              onClick={() => handleOpenSpecialAccessModal(u)}
+                              className="px-3 py-1.5 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/40 text-amber-300 font-bold text-xs transition-colors cursor-pointer"
+                            >
+                              Editar
+                            </button>
+                            {isActive && (
+                              <button
+                                type="button"
+                                onClick={() => handleRevokeSpecialAccess(u)}
+                                className="px-3 py-1.5 rounded-lg bg-rose-950/60 hover:bg-rose-900/60 border border-rose-800 text-rose-300 font-bold text-xs transition-colors cursor-pointer"
+                              >
+                                Revogar
+                              </button>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                </tbody>
+              </table>
+
+              {users.filter((u) => u.specialAccess).length === 0 && (
+                <div className="text-center py-12 text-slate-500 space-y-2">
+                  <KeyRound className="w-8 h-8 text-slate-600 mx-auto" />
+                  <p className="text-sm font-bold text-slate-400">Nenhum cliente com Acesso Especial cadastrado</p>
+                  <p className="text-xs text-slate-500">
+                    Clique no botão acima <span className="text-amber-400 font-bold">+ Conceder Novo Acesso</span> ou selecione um cliente no menu suspenso acima.
+                  </p>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       )}
@@ -3469,7 +3827,7 @@ export const AdminPanel: React.FC = () => {
                   {/* Client Select Dropdown List */}
                   <div className="space-y-1">
                     <label className="block text-slate-400 font-bold uppercase tracking-wider text-[10px]">
-                      Selecione um cliente ativo da lista ({activeClientsList.length}):
+                      Selecione um cliente cadastrado da lista ({users.filter(u => u.status !== 'blocked').length}):
                     </label>
                     <select
                       value={grantSelectedUserUid}
@@ -3478,7 +3836,8 @@ export const AdminPanel: React.FC = () => {
                       required
                     >
                       <option value="">-- Escolha o cliente na lista abaixo --</option>
-                      {activeClientsList
+                      {users
+                        .filter((u) => u.status !== 'blocked')
                         .filter((u) => {
                           if (!grantSearchQuery.trim()) return true;
                           const q = grantSearchQuery.toLowerCase();
