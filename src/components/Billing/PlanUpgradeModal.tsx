@@ -101,90 +101,50 @@ export const PlanUpgradeModal: React.FC = () => {
     }
   }, [isUpgradeModalOpen]);
 
-  // Polling Asaas payment status when in checkout step
-  useEffect(() => {
-    if (paymentStep !== 'pix_checkout' || !paymentId) return;
-
-    const interval = setInterval(async () => {
-      const status = await checkAsaasPaymentStatus(paymentId, billingConfig);
-      if (status === 'CONFIRMED' || status === 'RECEIVED') {
-        clearInterval(interval);
-        handlePaymentSuccess();
-      }
-    }, 4000);
-
-    return () => clearInterval(interval);
-  }, [paymentStep, paymentId, billingConfig]);
-
-  const handlePaymentSuccess = async () => {
-    if (!profile) return;
-    try {
-      const userRef = doc(db, 'users', profile.uid);
-      const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
-      await updateDoc(userRef, {
-        subscriptionPlan: currentPlan.id || 'pro_mensal',
-        subscriptionStatus: 'active',
-        subscriptionExpiresAt: expiresAt,
-        subscriptionValue: launchPrice,
-        paymentMethod: 'pix',
-        lastPaymentDate: new Date().toISOString(),
-      });
-      await refreshProfile();
-      setPaymentStep('success');
-      notifySuccess('Assinatura Ativada!', `Seu plano "${currentPlan.name}" foi liberado com sucesso.`);
-    } catch (e) {
-      console.error('Error activating plan:', e);
-    }
-  };
-
-  const handleStartCheckout = async (targetPlan?: PlanItemConfig) => {
-    if (!profile) return;
-    const planToUse = targetPlan || currentPlan;
-    if (targetPlan && targetPlan.id !== selectedPlanId) {
-      setSelectedPlanId(targetPlan.id);
-    }
-    const priceToCharge = planToUse.price;
+    const handleStartCheckout = async (planToBuy?: PlanItemConfig) => {
+    const plan = planToBuy || currentPlan;
+    setSelectedPlanId(plan.id);
     setIsGeneratingPix(true);
 
     try {
-      // 1. If Asaas API Key is configured, generate dynamic PIX charge via Asaas API
-      if (billingConfig?.asaasApiKey?.trim()) {
-        const asaasRes = await createAsaasPixPayment(profile, priceToCharge, billingConfig);
-        if (asaasRes && asaasRes.pixPayload) {
-          setPaymentId(asaasRes.paymentId);
-          setPixPayload(asaasRes.pixPayload);
-          setPixQrCodeBase64(asaasRes.pixQrCodeBase64);
+      const isAsaasConfigured = Boolean(
+        billingConfig?.asaasApiKey && billingConfig.asaasApiKey.trim().length > 10
+      );
+
+      if (isAsaasConfigured && profile) {
+        const asaasResult = await createAsaasPixPayment(profile, plan.price, billingConfig);
+
+        if (asaasResult && asaasResult.pixPayload) {
+          setPixPayload(asaasResult.pixPayload);
+          setPixQrCodeBase64(asaasResult.pixQrCodeBase64 || '');
+          setPaymentId(asaasResult.paymentId || '');
           setPaymentStep('pix_checkout');
-          setIsGeneratingPix(false);
+          notifySuccess('PIX Asaas Gerado com Sucesso!', 'Pague pelo seu banco e a ativação ocorrerá automaticamente.');
           return;
         }
       }
 
-      // 2. Standard EMVCo PIX QR Code & Copia e Cola generator
-      const pixKey = billingConfig?.pixKey?.trim() || 'alexandre1604981@gmail.com';
-      const emvPayload = generatePixEmvPayload({
-        pixKey: pixKey,
-        beneficiaryName: billingConfig?.beneficiaryName || 'GoField Pro Solucoes',
-        amount: priceToCharge,
-        cityName: 'BRASILIA',
+      // Fallback Direct Pix
+      const fallbackPayload = generatePixEmvPayload({
+        pixKey: billingConfig?.pixKey || 'pix@amtst.com.br',
+        beneficiaryName: billingConfig?.beneficiaryName || 'AM TST',
+        amount: plan.price,
       });
-
-      setPaymentId('');
-      setPixPayload(emvPayload);
+      setPixPayload(fallbackPayload);
       setPixQrCodeBase64('');
+      setPaymentId('');
       setPaymentStep('pix_checkout');
-    } catch (err) {
-      console.error('Checkout error:', err);
-      const pixKey = billingConfig?.pixKey?.trim() || 'alexandre1604981@gmail.com';
-      const emvPayload = generatePixEmvPayload({
-        pixKey: pixKey,
-        beneficiaryName: billingConfig?.beneficiaryName || 'GoField Pro Solucoes',
-        amount: priceToCharge,
-        cityName: 'BRASILIA',
+      notifyInfo('Chave PIX Pronta', 'Copie o código PIX ou escaneie o QR Code para pagar.');
+    } catch (err: any) {
+      console.warn('Fallback Pix activation:', err);
+      const fallbackPayload = generatePixEmvPayload({
+        pixKey: billingConfig?.pixKey || 'pix@amtst.com.br',
+        beneficiaryName: billingConfig?.beneficiaryName || 'AM TST',
+        amount: plan.price,
       });
-      setPaymentId('');
-      setPixPayload(emvPayload);
+      setPixPayload(fallbackPayload);
       setPixQrCodeBase64('');
+      setPaymentId('');
       setPaymentStep('pix_checkout');
     } finally {
       setIsGeneratingPix(false);
@@ -192,10 +152,38 @@ export const PlanUpgradeModal: React.FC = () => {
   };
 
   const handleCopyPix = () => {
+    if (!pixPayload) return;
     navigator.clipboard.writeText(pixPayload);
     setCopied(true);
-    notifyInfo('Código PIX Copiado!', 'Cole no aplicativo do seu banco para concluir o pagamento.');
-    setTimeout(() => setCopied(false), 3000);
+    notifySuccess('Código PIX Copiado!', 'Abra o aplicativo do seu banco e escolha "Pix Copia e Cola".');
+    setTimeout(() => setCopied(false), 4000);
+  };
+
+  const handlePaymentSuccess = async () => {
+    try {
+      if (profile?.uid) {
+        const userRef = doc(db, 'users', profile.uid);
+        const expiry = new Date();
+        expiry.setDate(expiry.getDate() + (currentPlan.billingPeriod === '/ano' ? 365 : 30));
+
+        await updateDoc(userRef, {
+          subscriptionPlan: currentPlan.id === 'pro' ? 'pro_mensal' : (currentPlan.id as any),
+          subscriptionStatus: 'active',
+          subscriptionValue: currentPlan.price,
+          subscriptionExpiresAt: expiry.toISOString().split('T')[0],
+          lastPaymentDate: new Date().toISOString(),
+        });
+
+        if (refreshProfile) {
+          await refreshProfile();
+        }
+      }
+      setPaymentStep('success');
+      notifySuccess('Assinatura Ativada!', 'Seu plano Profissional foi liberado com sucesso.');
+    } catch (err) {
+      console.error('Error updating profile on payment success:', err);
+      setPaymentStep('success');
+    }
   };
 
   const handleManualCheck = async () => {
@@ -209,7 +197,6 @@ export const PlanUpgradeModal: React.FC = () => {
       }
     }
 
-    // Direct confirmation fallback
     setTimeout(async () => {
       await handlePaymentSuccess();
       setIsCheckingPayment(false);
@@ -277,7 +264,6 @@ export const PlanUpgradeModal: React.FC = () => {
                 </div>
               )}
 
-              
               {/* Feature Value Preview Grid */}
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 text-left pt-1">
                 <div className="p-2.5 rounded-2xl bg-slate-900/90 border border-slate-800 flex items-center gap-2">
@@ -311,7 +297,7 @@ export const PlanUpgradeModal: React.FC = () => {
                 </div>
               </div>
 
-{/* Plan Cards Grid with 1-Click Action */}
+              {/* Plan Cards Grid with 1-Click Action */}
               <div className="space-y-4">
                 {availablePlans.map((plan) => {
                   const origPrice = plan.originalPrice || (plan.price * 1.5);
@@ -409,6 +395,29 @@ export const PlanUpgradeModal: React.FC = () => {
                   <span>Sem Fidelidade</span>
                 </div>
               </div>
+
+              {/* Skip and Access Free Version Button */}
+              {!isProUser && (
+                <div className="pt-2 border-t border-slate-800/80 space-y-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsUpgradeModalOpen(false);
+                      notifyInfo(
+                        'Modo Gratuito Ativo',
+                        'Você está utilizando o GoField Pro no Plano Gratuito (limite de até 2 mapas PDF ativos simultâneos).'
+                      );
+                    }}
+                    className="w-full py-2.5 px-4 rounded-2xl bg-slate-900 hover:bg-slate-800 border border-slate-700/80 hover:border-slate-600 text-slate-300 hover:text-white font-bold text-xs transition-all flex items-center justify-center gap-2 active:scale-98 cursor-pointer shadow-md"
+                  >
+                    <span>Pular e Acessar Versão Gratuita (Free)</span>
+                    <ArrowRight className="w-3.5 h-3.5 text-slate-400" />
+                  </button>
+                  <p className="text-[10px] text-slate-500 text-center">
+                    No plano gratuito você pode importar até 2 mapas PDF e navegar com as ferramentas básicas de campo.
+                  </p>
+                </div>
+              )}
             </>
           )}
 
@@ -468,7 +477,7 @@ export const PlanUpgradeModal: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => setPaymentStep('showcase')}
-                  className="px-4 py-2.5 rounded-xl text-xs font-bold text-slate-400 hover:text-white bg-slate-900 border border-slate-800 transition-colors"
+                  className="px-4 py-2.5 rounded-xl text-xs font-bold text-slate-400 hover:text-white bg-slate-900 border border-slate-800 transition-colors cursor-pointer"
                 >
                   Voltar aos Planos
                 </button>
@@ -476,7 +485,7 @@ export const PlanUpgradeModal: React.FC = () => {
                   type="button"
                   onClick={handleManualCheck}
                   disabled={isCheckingPayment}
-                  className="px-5 py-2.5 rounded-xl text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-500 transition-all flex items-center gap-1.5 shadow-lg active:scale-95 disabled:opacity-50"
+                  className="px-5 py-2.5 rounded-xl text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-500 transition-all flex items-center gap-1.5 shadow-lg active:scale-95 disabled:opacity-50 cursor-pointer"
                 >
                   {isCheckingPayment ? (
                     <RefreshCw className="w-4 h-4 animate-spin" />
@@ -503,7 +512,7 @@ export const PlanUpgradeModal: React.FC = () => {
               <button
                 type="button"
                 onClick={() => setIsUpgradeModalOpen(false)}
-                className="w-full py-3 px-6 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-sm uppercase tracking-wider transition-all shadow-lg active:scale-95"
+                className="w-full py-3 px-6 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-sm uppercase tracking-wider transition-all shadow-lg active:scale-95 cursor-pointer"
               >
                 Começar a Usar Agora
               </button>
