@@ -45,6 +45,7 @@ import {
   GeoCalibration, 
   PdfMarker, 
   PdfTrack, 
+  PdfPolygon,
   PdfTrackPoint,
   getAllPdfDocuments,
   savePdfDocument,
@@ -58,7 +59,7 @@ import {
   createCenteredCalibration, 
   calculateNavigationToMarker
 } from '../../utils/geoTransform';
-import { calculateDistanceMeters } from '../../utils/geoUtils';
+import { calculateDistanceMeters, calculatePolygonArea } from '../../utils/geoUtils';
 import { parseKMLString, parseKMZFile } from '../../utils/kmlParser';
 import { KMLFeature, GeoCoordinate } from '../../types';
 import { MeasurementPoint, MeasurementPointType } from '../../types';
@@ -270,23 +271,25 @@ export const PdfMapNavigator: React.FC = () => {
   const editPhotoInputRef = useRef<HTMLInputElement>(null);
   const importKmlInputRef = useRef<HTMLInputElement>(null);
 
-  // KML/KMZ Import Handler
+  // High-Precision KML/KMZ Import Handler
   const handleImportKml = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file || !activeDoc) return;
-    
-    setIsDrawerOpen(false); // Close drawer to show full screen loading
+
+    setIsDrawerOpen(false);
     setIsProcessing(true);
-    setProcessingProgress('Importando e decodificando KML/KMZ...');
-    
-    // Give React time to render the loading screen
-    await new Promise(resolve => setTimeout(resolve, 150));
-    
+    setProcessingProgress('Lendo e descompactando arquivo KML/KMZ...');
+
+    await new Promise((resolve) => setTimeout(resolve, 150));
+
     try {
       let features: KMLFeature[] = [];
+      let parseStats: any = null;
+
       if (file.name.toLowerCase().endsWith('.kmz')) {
         const res = await parseKMZFile(file);
         features = res.features;
+        parseStats = res.stats;
       } else {
         const text = await file.text();
         features = parseKMLString(text);
@@ -294,16 +297,16 @@ export const PdfMapNavigator: React.FC = () => {
 
       if (!features || features.length === 0) {
         notifyWarning(
-          'Nenhum Elemento Encontrado',
-          'O arquivo KML/KMZ não contém pontos ou coordenadas geográficas reconhecíveis.'
+          'Nenhum Elemento Geográfico',
+          'Não foi possível encontrar pontos, linhas ou polígonos válidos com coordenadas geográficas no arquivo.'
         );
         return;
       }
 
-      setProcessingProgress(`Projetando ${features.length} elementos na folha do PDF...`);
-      await new Promise(resolve => setTimeout(resolve, 80));
-      
-      // 1. Calculate Bounding Box of all imported coordinates
+      setProcessingProgress(`Projetando ${features.length} geometrias na folha do mapa...`);
+      await new Promise((resolve) => setTimeout(resolve, 80));
+
+      // 1. Calculate Geographical Bounding Box of all imported coordinates (WGS84)
       let minLat = 90, maxLat = -90, minLng = 180, maxLng = -180;
       let hasValidCoords = false;
 
@@ -317,7 +320,7 @@ export const PdfMapNavigator: React.FC = () => {
             maxLng = Math.max(maxLng, coord.lng);
             hasValidCoords = true;
           }
-        } else if (feat.type === 'LineString' && Array.isArray(feat.coordinates)) {
+        } else if ((feat.type === 'LineString' || feat.type === 'Polygon') && Array.isArray(feat.coordinates)) {
           (feat.coordinates as GeoCoordinate[]).forEach((coord) => {
             if (coord && typeof coord.lat === 'number' && typeof coord.lng === 'number' && !isNaN(coord.lat) && !isNaN(coord.lng)) {
               minLat = Math.min(minLat, coord.lat);
@@ -333,20 +336,24 @@ export const PdfMapNavigator: React.FC = () => {
       const h = activeDoc.height && !isNaN(activeDoc.height) ? activeDoc.height : 1200;
       const w = activeDoc.width && !isNaN(activeDoc.width) ? activeDoc.width : 1600;
 
-      // 2. ALWAYS Auto-Anchor the PDF calibration to the KML bounds so nothing is thrown outside the map
+      // 2. SMART CALIBRATION: Preserve existing calibration if calibrated, or auto-anchor if uncalibrated
       let effectiveCalibration: GeoCalibration;
-      
-      if (hasValidCoords) {
+      const isAlreadyCalibrated = !!(activeDoc.calibration && activeDoc.calibration.isCalibrated);
+
+      if (isAlreadyCalibrated) {
+        // PRESERVE the map's calibrated coordinate system
+        effectiveCalibration = activeDoc.calibration!;
+      } else if (hasValidCoords) {
+        // Auto-anchor uncalibrated sheet to KML bounds with 8% padding
         const latSpan = Math.abs(maxLat - minLat) || 0.005;
         const lngSpan = Math.abs(maxLng - minLng) || 0.005;
-        // 10% padding around the edges
-        const latPad = latSpan * 0.1;
-        const lngPad = lngSpan * 0.1;
+        const latPad = latSpan * 0.08;
+        const lngPad = lngSpan * 0.08;
 
         effectiveCalibration = {
           isCalibrated: true,
-          ref1: { x: h * 0.90, y: w * 0.10, lat: maxLat + latPad, lng: minLng - lngPad },
-          ref2: { x: h * 0.10, y: w * 0.90, lat: minLat - latPad, lng: maxLng + lngPad },
+          ref1: { x: h * 0.92, y: w * 0.08, lat: maxLat + latPad, lng: minLng - lngPad },
+          ref2: { x: h * 0.08, y: w * 0.92, lat: minLat - latPad, lng: maxLng + lngPad },
           scaleMetersPerPixel: 1,
         };
       } else {
@@ -357,37 +364,31 @@ export const PdfMapNavigator: React.FC = () => {
         };
       }
 
-      // Temporary document with effective calibration
       const tempDoc: PdfDocument = {
         ...activeDoc,
         calibration: effectiveCalibration,
       };
 
-      let newTracks: PdfTrack[] = [...(activeDoc.tracks || [])];
       let newMarkers: PdfMarker[] = [...(activeDoc.markers || [])];
+      let newTracks: PdfTrack[] = [...(activeDoc.tracks || [])];
+      let newPolygons: PdfPolygon[] = [...(activeDoc.polygons || [])];
 
       let markersAdded = 0;
       let tracksAdded = 0;
-      let wasTruncated = false;
+      let polygonsAdded = 0;
 
       features.forEach((feat) => {
+        // POINT
         if (feat.type === 'Point' && !Array.isArray(feat.coordinates)) {
-          if (markersAdded >= 500) {
-            wasTruncated = true;
-            return;
-          }
           const coord = feat.coordinates as GeoCoordinate;
           if (coord && typeof coord.lat === 'number' && typeof coord.lng === 'number' && !isNaN(coord.lat) && !isNaN(coord.lng)) {
             const pdfCoord = gpsToPdf(coord.lat, coord.lng, tempDoc);
-            // Strict Clamping inside PDF page canvas
-            const clampedX = Math.max(15, Math.min(h - 15, pdfCoord.x));
-            const clampedY = Math.max(15, Math.min(w - 15, pdfCoord.y));
 
-            if (!isNaN(clampedX) && !isNaN(clampedY)) {
+            if (!isNaN(pdfCoord.x) && !isNaN(pdfCoord.y)) {
               newMarkers.push({
-                id: `kmz-pt-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-                x: clampedX,
-                y: clampedY,
+                id: `kml-pt-${Date.now()}-${Math.random().toString(36).substr(2, 8)}`,
+                x: pdfCoord.x,
+                y: pdfCoord.y,
                 lat: coord.lat,
                 lng: coord.lng,
                 title: feat.name || 'Ponto Importado',
@@ -400,30 +401,21 @@ export const PdfMapNavigator: React.FC = () => {
               markersAdded++;
             }
           }
-        } else if (feat.type === 'LineString' && Array.isArray(feat.coordinates)) {
-          if (tracksAdded >= 150) {
-            wasTruncated = true;
-            return;
-          }
-          let pts = (feat.coordinates as GeoCoordinate[])
+        }
+        // LINESTRING
+        else if (feat.type === 'LineString' && Array.isArray(feat.coordinates)) {
+          const coords = feat.coordinates as GeoCoordinate[];
+          const pts = coords
             .filter((c) => c && typeof c.lat === 'number' && typeof c.lng === 'number' && !isNaN(c.lat) && !isNaN(c.lng))
             .map((c) => {
               const pc = gpsToPdf(c.lat, c.lng, tempDoc);
-              const clampedX = Math.max(10, Math.min(h - 10, pc.x));
-              const clampedY = Math.max(10, Math.min(w - 10, pc.y));
-              return { x: clampedX, y: clampedY, lat: c.lat, lng: c.lng };
+              return { x: pc.x, y: pc.y, lat: c.lat, lng: c.lng, altitude: c.altitude };
             })
             .filter((p) => !isNaN(p.x) && !isNaN(p.y));
 
-          // Downsample high-density tracks to keep Leaflet fast & responsive
-          if (pts.length > 500) {
-            const step = Math.ceil(pts.length / 500);
-            pts = pts.filter((_, idx) => idx % step === 0 || idx === pts.length - 1);
-          }
-
           if (pts.length > 1) {
             newTracks.push({
-              id: `kmz-trk-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+              id: `kml-trk-${Date.now()}-${Math.random().toString(36).substr(2, 8)}`,
               name: feat.name || 'Trilha Importada',
               points: pts,
               color: feat.color || '#0284c7',
@@ -433,6 +425,36 @@ export const PdfMapNavigator: React.FC = () => {
             tracksAdded++;
           }
         }
+        // POLYGON
+        else if (feat.type === 'Polygon' && Array.isArray(feat.coordinates)) {
+          const coords = feat.coordinates as GeoCoordinate[];
+          const pts = coords
+            .filter((c) => c && typeof c.lat === 'number' && typeof c.lng === 'number' && !isNaN(c.lat) && !isNaN(c.lng))
+            .map((c) => {
+              const pc = gpsToPdf(c.lat, c.lng, tempDoc);
+              return { x: pc.x, y: pc.y, lat: c.lat, lng: c.lng, altitude: c.altitude };
+            })
+            .filter((p) => !isNaN(p.x) && !isNaN(p.y));
+
+          if (pts.length >= 3) {
+            const areaResult = calculatePolygonArea(coords);
+
+            newPolygons.push({
+              id: `kml-poly-${Date.now()}-${Math.random().toString(36).substr(2, 8)}`,
+              name: feat.name || 'Polígono / Área Mapeada',
+              points: pts,
+              color: feat.color || '#10b981',
+              fillColor: feat.fillColor || feat.color || '#10b981',
+              fillOpacity: typeof feat.properties?.fillOpacity === 'number' ? feat.properties.fillOpacity : 0.25,
+              strokeWidth: typeof feat.strokeWidth === 'number' ? feat.strokeWidth : 2.5,
+              areaHa: areaResult.hectares,
+              notes: feat.description || '',
+              folder: feat.properties?.folder || '',
+              createdAt: new Date().toISOString(),
+            });
+            polygonsAdded++;
+          }
+        }
       });
 
       const updatedDoc: PdfDocument = {
@@ -440,31 +462,18 @@ export const PdfMapNavigator: React.FC = () => {
         calibration: effectiveCalibration,
         markers: newMarkers,
         tracks: newTracks,
+        polygons: newPolygons,
       };
 
       updateDocumentInStore(updatedDoc);
 
-      // Re-center camera directly on the PDF document canvas
-      if (mapInstanceRef.current) {
-        try {
-          mapInstanceRef.current.fitBounds([[0, 0], [h, w]], {
-            padding: [20, 20],
-            animate: true,
-          });
-        } catch (fitErr) {
-          console.warn('Could not fit bounds to PDF image:', fitErr);
-        }
-      }
-
       notifySuccess(
-        'KML/KMZ Projetado no Mapa',
-        wasTruncated
-          ? `${markersAdded} pontos e ${tracksAdded} trilhas foram ajustados e desenhados diretamente na sua folha PDF.`
-          : `${markersAdded} pontos e ${tracksAdded} trilhas foram ajustados e desenhados diretamente na sua folha PDF.`
+        'KML/KMZ Importado com Precisão',
+        `Sucesso! ${markersAdded} pontos, ${tracksAdded} linhas e ${polygonsAdded} polígonos/talhões foram projetados perfeitamente no seu mapa PDF.`
       );
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error importing KML/KMZ:', err);
-      notifyError('Falha na Importação', 'Não foi possível ler as coordenadas do arquivo KML/KMZ fornecido.');
+      notifyError('Falha na Importação', err.message || 'Não foi possível ler as coordenadas do arquivo KML/KMZ fornecido.');
     } finally {
       setIsProcessing(false);
       setProcessingProgress('');
@@ -472,11 +481,12 @@ export const PdfMapNavigator: React.FC = () => {
     }
   };
 
-  const mapContainerRef = useRef<HTMLDivElement>(null);
+    const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<L.Map | null>(null);
   const imageOverlayRef = useRef<L.ImageOverlay | null>(null);
   const markersLayerRef = useRef<L.LayerGroup | null>(null);
   const tracksLayerRef = useRef<L.LayerGroup | null>(null);
+  const polygonsLayerRef = useRef<L.LayerGroup | null>(null);
   const measureLayerRef = useRef<L.LayerGroup | null>(null);
   const activeDrawPolylineRef = useRef<L.Polyline | null>(null);
   const liveRecordPolylineRef = useRef<L.Polyline | null>(null);
@@ -739,6 +749,7 @@ export const PdfMapNavigator: React.FC = () => {
         imageOverlayRef.current = null;
         markersLayerRef.current = null;
         tracksLayerRef.current = null;
+        polygonsLayerRef.current = null;
         measureLayerRef.current = null;
       }
     };
@@ -825,6 +836,7 @@ export const PdfMapNavigator: React.FC = () => {
         imageOverlayRef.current = null;
       }
       if (markersLayerRef.current) markersLayerRef.current.clearLayers();
+      if (polygonsLayerRef.current) polygonsLayerRef.current.clearLayers();
       if (tracksLayerRef.current) tracksLayerRef.current.clearLayers();
       lastLoadedDocPageRef.current = '';
       return;
@@ -1020,6 +1032,53 @@ export const PdfMapNavigator: React.FC = () => {
       console.warn('Error rendering markers:', err);
     }
   }, [activeDoc?.markers, activeNavPoint, activeDoc]);
+
+  // Render Saved Polygons / Field Boundaries safely on Leaflet Map
+  useEffect(() => {
+    if (!polygonsLayerRef.current || !activeDoc) return;
+
+    try {
+      polygonsLayerRef.current.clearLayers();
+      const polygons = Array.isArray(activeDoc.polygons) ? activeDoc.polygons : [];
+
+      polygons.forEach((poly) => {
+        if (!poly || !Array.isArray(poly.points)) return;
+        const validPoints = poly.points.filter(
+          (p) => p && typeof p.x === 'number' && typeof p.y === 'number' && !isNaN(p.x) && !isNaN(p.y)
+        );
+
+        if (validPoints.length >= 3) {
+          const latLngs = validPoints.map((p) => [p.x, p.y] as [number, number]);
+          const polygonLayer = L.polygon(latLngs, {
+            color: poly.color || '#10b981',
+            fillColor: poly.fillColor || poly.color || '#10b981',
+            fillOpacity: typeof poly.fillOpacity === 'number' ? poly.fillOpacity : 0.25,
+            weight: typeof poly.strokeWidth === 'number' ? poly.strokeWidth : 2.5,
+            lineJoin: 'round',
+          });
+
+          polygonLayer.bindPopup(`
+            <div style="font-family: sans-serif; padding: 4px; min-width: 150px;">
+              <div style="display: flex; align-items: center; gap: 6px; margin-bottom: 4px;">
+                <span style="display: inline-block; width: 10px; height: 10px; border-radius: 2px; background-color: ${poly.fillColor || poly.color || '#10b981'};"></span>
+                <b style="color: #0f172a; font-size: 13px;">${poly.name || 'Polígono'}</b>
+              </div>
+              <div style="font-size: 11px; color: #475569; line-height: 1.4;">
+                ${poly.folder ? `<b>Camada:</b> ${poly.folder}<br/>` : ''}
+                ${poly.areaHa ? `<b>Área:</b> ${poly.areaHa} ha<br/>` : ''}
+                <b>Vértices:</b> ${validPoints.length} pontos<br/>
+                ${poly.notes ? `<div style="margin-top: 4px; padding-top: 4px; border-top: 1px solid #e2e8f0; color: #334155;">${poly.notes}</div>` : ''}
+              </div>
+            </div>
+          `);
+
+          polygonLayer.addTo(polygonsLayerRef.current!);
+        }
+      });
+    } catch (err) {
+      console.warn('Error rendering polygons:', err);
+    }
+  }, [activeDoc?.polygons, activeDoc]);
 
   // Render Saved Tracks safely on Map
   useEffect(() => {

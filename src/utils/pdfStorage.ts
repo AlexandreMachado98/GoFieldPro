@@ -57,6 +57,20 @@ export interface PdfTrack {
   createdAt: string;
 }
 
+export interface PdfPolygon {
+  id: string;
+  name: string;
+  points: PdfTrackPoint[];
+  color: string;
+  fillColor?: string;
+  fillOpacity?: number;
+  strokeWidth?: number;
+  areaHa?: number;
+  notes?: string;
+  folder?: string;
+  createdAt: string;
+}
+
 export interface PdfDocument {
   id: string;
   userId?: string;
@@ -70,6 +84,7 @@ export interface PdfDocument {
   height: number;
   markers: PdfMarker[];
   tracks?: PdfTrack[];
+  polygons?: PdfPolygon[];
   calibration?: GeoCalibration;
   uploadedAt: string;
 }
@@ -137,6 +152,19 @@ function sanitizeDocument(doc: any, fallbackUserId?: string): PdfDocument {
       duration: t.duration,
       isRecorded: !!t.isRecorded,
       createdAt: t.createdAt || new Date().toLocaleTimeString('pt-BR'),
+    })) : [],
+    polygons: Array.isArray(doc.polygons) ? doc.polygons.map((p: any) => ({
+      id: p.id || `poly-${Date.now()}`,
+      name: p.name || 'Polígono',
+      points: Array.isArray(p.points) ? p.points.filter((pt: any) => pt && typeof pt.x === 'number' && typeof pt.y === 'number' && !isNaN(pt.x) && !isNaN(pt.y)) : [],
+      color: p.color || '#10b981',
+      fillColor: p.fillColor || p.color || '#10b981',
+      fillOpacity: typeof p.fillOpacity === 'number' ? p.fillOpacity : 0.25,
+      strokeWidth: typeof p.strokeWidth === 'number' ? p.strokeWidth : 2.5,
+      areaHa: typeof p.areaHa === 'number' ? p.areaHa : undefined,
+      notes: p.notes || '',
+      folder: p.folder || '',
+      createdAt: p.createdAt || new Date().toLocaleTimeString('pt-BR'),
     })) : [],
     calibration: doc.calibration && typeof doc.calibration.isCalibrated === 'boolean' ? doc.calibration : {
       isCalibrated: false,

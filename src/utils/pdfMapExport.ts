@@ -1,6 +1,6 @@
 import jsPDF from 'jspdf';
 import JSZip from 'jszip';
-import { PdfDocument, PdfMarker, PdfTrack } from './pdfStorage';
+import { PdfDocument, PdfMarker, PdfTrack, PdfPolygon } from './pdfStorage';
 import { pdfToGps } from './geoTransform';
 
 /**
@@ -150,6 +150,45 @@ export function generateGeoJSON(doc: PdfDocument): string {
     });
   });
 
+  // Add Polygons
+  (doc.polygons || []).forEach((poly) => {
+    const ringCoords = poly.points.map((pt) => {
+      const c = pt.lat !== undefined && pt.lng !== undefined
+        ? { lat: pt.lat, lng: pt.lng }
+        : pdfToGps(pt.x, pt.y, doc);
+      return [c.lng, c.lat];
+    });
+
+    // Ensure closure
+    if (ringCoords.length >= 3) {
+      if (ringCoords[0][0] !== ringCoords[ringCoords.length - 1][0] || ringCoords[0][1] !== ringCoords[ringCoords.length - 1][1]) {
+        ringCoords.push([...ringCoords[0]]);
+      }
+    }
+
+    features.push({
+      type: 'Feature',
+      id: poly.id,
+      geometry: {
+        type: 'Polygon',
+        coordinates: [ringCoords],
+      },
+      properties: {
+        id: poly.id,
+        name: poly.name,
+        color: poly.color,
+        fillColor: poly.fillColor,
+        areaHa: poly.areaHa,
+        notes: poly.notes || '',
+        folder: poly.folder || '',
+        createdAt: poly.createdAt,
+        pointCount: poly.points.length,
+        mapSource: doc.name,
+        system: 'GoField Pro - Sistema de Campo',
+      },
+    });
+  });
+
   // Add Tracks / Routes
   (doc.tracks || []).forEach((track) => {
     const lineCoords = track.points.map((pt) => {
@@ -294,6 +333,37 @@ export async function generateAnnotatedPdf(
 
   // 1. Draw base map image
   ctx.drawImage(img, 0, 0, width, height);
+
+  // 1.5. Draw polygons and boundary areas
+  if (doc.polygons && doc.polygons.length > 0) {
+    doc.polygons.forEach((poly) => {
+      if (poly.points.length >= 3) {
+        ctx.save();
+        ctx.beginPath();
+        poly.points.forEach((pt, i) => {
+          const canvasX = pt.y;
+          const canvasY = height - pt.x;
+          if (i === 0) ctx.moveTo(canvasX, canvasY);
+          else ctx.lineTo(canvasX, canvasY);
+        });
+        ctx.closePath();
+
+        // Fill
+        ctx.fillStyle = poly.fillColor || poly.color || '#10b981';
+        ctx.globalAlpha = typeof poly.fillOpacity === 'number' ? poly.fillOpacity : 0.25;
+        ctx.fill();
+
+        // Stroke
+        ctx.globalAlpha = 1.0;
+        ctx.strokeStyle = poly.color || '#10b981';
+        ctx.lineWidth = poly.strokeWidth || 3;
+        ctx.lineJoin = 'round';
+        ctx.stroke();
+
+        ctx.restore();
+      }
+    });
+  }
 
   // 2. Draw tracks and routes
   if (doc.tracks && doc.tracks.length > 0) {
