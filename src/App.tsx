@@ -21,7 +21,7 @@ import { ApprovalCelebrationScreen } from './components/Auth/ApprovalCelebration
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { ConfirmModal } from './components/Common/ConfirmModal';
 import { ToastContainer } from './components/Common/ToastContainer';
-import { PlanUpgradeModal } from './components/Billing/PlanUpgradeModal';
+import { SubscriptionModal } from './components/Subscription/SubscriptionModal';
 import { AddWaypointModal } from './components/Waypoints/AddWaypointModal';
 import { LayerManagerModal } from './components/Layers/LayerManagerModal';
 import { MobileBottomNav } from './components/Navigation/MobileBottomNav';
@@ -183,7 +183,7 @@ const MainAppContent: React.FC = () => {
       <WoodpileCubageModal isOpen={isWoodpileModalOpen} onClose={() => setIsWoodpileModalOpen(false)} />
       <LegalPoliciesModal isOpen={isPoliciesModalOpen} onClose={() => setIsPoliciesModalOpen(false)} />
       <ConfirmModal />
-      <PlanUpgradeModal />
+      <SubscriptionModal />
       <ToastContainer />
       <MobileBottomNav />
     </div>
