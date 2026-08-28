@@ -2761,11 +2761,25 @@ export const AdminPanel: React.FC = () => {
                     </button>
                   </div>
 
-                  <h4 className="text-base font-black text-white">{p.name}</h4>
-                  <div className="mt-2 flex items-baseline gap-2">
-                    <span className="text-xs text-slate-500 line-through">R$ {p.originalPrice?.toFixed(2)}</span>
-                    <span className="text-xl font-black text-emerald-400">R$ {p.price?.toFixed(2)}</span>
-                    <span className="text-xs text-slate-400">{p.billingPeriod || '/mês'}</span>
+                  <div className="flex items-start justify-between gap-1">
+                    <h4 className="text-base font-black text-white">{p.name}</h4>
+                    {p.discountBadge && (
+                      <span className="text-[9px] font-black uppercase px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/40 shrink-0">
+                        {p.discountBadge}
+                      </span>
+                    )}
+                  </div>
+                  <div className="mt-2 flex items-baseline gap-2 flex-wrap">
+                    {p.originalPrice !== undefined && p.originalPrice > p.price && (
+                      <span className="text-xs text-slate-500 line-through">R$ {p.originalPrice.toFixed(2).replace('.', ',')}</span>
+                    )}
+                    <span className="text-xl font-black text-emerald-400">R$ {p.price?.toFixed(2).replace('.', ',')}</span>
+                    <span className="text-xs text-slate-400">{p.billingPeriod || (p.price === 0 ? '/sempre' : '/mês')}</span>
+                    {p.originalPrice !== undefined && p.originalPrice > p.price && p.originalPrice > 0 && (
+                      <span className="text-[9px] font-black text-emerald-400 bg-emerald-500/15 px-1.5 py-0.5 rounded border border-emerald-500/30">
+                        {Math.round((1 - p.price / p.originalPrice) * 100)}% OFF
+                      </span>
+                    )}
                   </div>
 
                   <ul className="mt-4 space-y-1.5 text-xs text-slate-300">
@@ -3336,23 +3350,41 @@ export const AdminPanel: React.FC = () => {
               </div>
 
               <div>
-                <label className="block text-slate-400 font-bold mb-1">Preço Original R$</label>
+                <label className="block text-slate-400 font-bold mb-1">Preço Original R$ (Riscado)</label>
                 <input
                   type="number"
                   step="0.01"
                   value={planModalOriginalPrice}
-                  onChange={(e) => setPlanModalOriginalPrice(Number(e.target.value))}
+                  onChange={(e) => {
+                    const orig = Number(e.target.value);
+                    setPlanModalOriginalPrice(orig);
+                    if (orig > planModalPrice && planModalPrice > 0) {
+                      const disc = Math.round((1 - planModalPrice / orig) * 100);
+                      if (!planModalBadge || planModalBadge.includes('% OFF')) {
+                        setPlanModalBadge(`${disc}% OFF • LANÇAMENTO`);
+                      }
+                    }
+                  }}
                   className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white font-bold"
                 />
               </div>
 
               <div>
-                <label className="block text-slate-400 font-bold mb-1">Preço Final R$ *</label>
+                <label className="block text-slate-400 font-bold mb-1">Preço Final R$ (Cobrado) *</label>
                 <input
                   type="number"
                   step="0.01"
                   value={planModalPrice}
-                  onChange={(e) => setPlanModalPrice(Number(e.target.value))}
+                  onChange={(e) => {
+                    const finalVal = Number(e.target.value);
+                    setPlanModalPrice(finalVal);
+                    if (planModalOriginalPrice > finalVal && finalVal > 0) {
+                      const disc = Math.round((1 - finalVal / planModalOriginalPrice) * 100);
+                      if (!planModalBadge || planModalBadge.includes('% OFF')) {
+                        setPlanModalBadge(`${disc}% OFF • LANÇAMENTO`);
+                      }
+                    }
+                  }}
                   className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-emerald-400 font-black"
                   required
                 />
