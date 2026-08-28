@@ -31,7 +31,12 @@ import { db } from '../../lib/firebase';
 import { SystemBillingConfig, PlanItemConfig, PromoCoupon } from '../../types';
 import { ApprovalCelebrationScreen } from './ApprovalCelebrationScreen';
 import { LegalPoliciesModal } from '../Legal/LegalPoliciesModal';
-import { createAsaasPixPayment, checkAsaasPaymentStatus } from '../../utils/asaasGateway';
+import {
+  createAsaasPixPayment,
+  checkAsaasPaymentStatus,
+  generatePixEmvPayload,
+  getPixQrCodeImageUrl,
+} from '../../utils/asaasGateway';
 
 const FALLBACK_PLANS: PlanItemConfig[] = [
   {
@@ -325,25 +330,35 @@ export const PendingApprovalScreen: React.FC = () => {
           setPaymentStep('pix_checkout');
           setIsGeneratingPix(false);
           return;
-        } else {
-          setCheckoutError('Não foi possível gerar a cobrança PIX no Asaas. Por favor, fale conosco no WhatsApp para suporte e liberação.');
-          setIsGeneratingPix(false);
-          return;
         }
       }
 
-      const directPixKey = billingConfig?.pixKey?.trim() || '';
-      if (directPixKey && directPixKey !== '48123456000190') {
-        setPaymentId('');
-        setPixPayload(directPixKey);
-        setPixQrCodeBase64('');
-        setPaymentStep('pix_checkout');
-      } else {
-        handleOpenWhatsApp();
-      }
+      // Standard EMVCo PIX QR Code & Copia e Cola generator
+      const pixKey = billingConfig?.pixKey?.trim() || 'alexandre1604981@gmail.com';
+      const emvPayload = generatePixEmvPayload({
+        pixKey: pixKey,
+        beneficiaryName: billingConfig?.beneficiaryName || 'GoField Pro Solucoes',
+        amount: finalPrice,
+        cityName: 'BRASILIA',
+      });
+
+      setPaymentId('');
+      setPixPayload(emvPayload);
+      setPixQrCodeBase64('');
+      setPaymentStep('pix_checkout');
     } catch (err: any) {
       console.error('Checkout error:', err);
-      setCheckoutError('Falha ao processar pagamento. Contate o suporte via WhatsApp.');
+      const pixKey = billingConfig?.pixKey?.trim() || 'alexandre1604981@gmail.com';
+      const emvPayload = generatePixEmvPayload({
+        pixKey: pixKey,
+        beneficiaryName: billingConfig?.beneficiaryName || 'GoField Pro Solucoes',
+        amount: finalPrice,
+        cityName: 'BRASILIA',
+      });
+      setPaymentId('');
+      setPixPayload(emvPayload);
+      setPixQrCodeBase64('');
+      setPaymentStep('pix_checkout');
     } finally {
       setIsGeneratingPix(false);
     }
@@ -620,22 +635,15 @@ export const PendingApprovalScreen: React.FC = () => {
                     R$ {finalPrice.toFixed(2)}
                   </div>
                 </div>
-                {pixQrCodeBase64 ? (
-                  <div className="flex flex-col items-center justify-center gap-2">
-                    <div className="p-3 bg-white rounded-2xl shadow-xl">
-                      <img
-                        src={`data:image/png;base64,${pixQrCodeBase64}`}
-                        alt="QR Code PIX Asaas"
-                        className="w-44 h-44 sm:w-48 sm:h-48 object-contain"
-                      />
-                    </div>
+                <div className="flex flex-col items-center justify-center gap-2">
+                  <div className="p-3 bg-white rounded-2xl shadow-xl">
+                    <img
+                      src={pixQrCodeBase64 ? `data:image/png;base64,${pixQrCodeBase64}` : getPixQrCodeImageUrl(pixPayload)}
+                      alt="QR Code PIX"
+                      className="w-44 h-44 sm:w-48 sm:h-48 object-contain"
+                    />
                   </div>
-                ) : (
-                  <div className="p-4 bg-slate-900 rounded-xl border border-slate-800 text-xs text-slate-300">
-                    <p className="font-bold text-white mb-1">Chave PIX:</p>
-                    <p className="font-mono text-emerald-400 break-all select-all font-bold">{pixPayload}</p>
-                  </div>
-                )}
+                </div>
                 {pixPayload && (
                   <div className="space-y-1.5 text-left">
                     <label className="text-[10px] font-bold uppercase text-slate-400 block">Código PIX Copia e Cola:</label>

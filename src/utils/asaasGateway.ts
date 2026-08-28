@@ -352,3 +352,77 @@ export async function checkAsaasPaymentStatus(
 
   return 'PENDING';
 }
+
+/**
+ * Standard CRC16-CCITT calculation for EMVCo PIX payload
+ */
+function crc16(str: string): string {
+  let crc = 0xffff;
+  for (let c = 0; c < str.length; c++) {
+    crc ^= str.charCodeAt(c) << 8;
+    for (let i = 0; i < 8; i++) {
+      if ((crc & 0x8000) !== 0) {
+        crc = ((crc << 1) ^ 0x1021) & 0xffff;
+      } else {
+        crc = (crc << 1) & 0xffff;
+      }
+    }
+  }
+  let hex = (crc & 0xffff).toString(16).toUpperCase();
+  while (hex.length < 4) hex = '0' + hex;
+  return hex;
+}
+
+function emvField(id: string, value: string): string {
+  const len = value.length.toString().padStart(2, '0');
+  return `${id}${len}${value}`;
+}
+
+export interface GeneratePixParams {
+  pixKey: string;
+  beneficiaryName?: string;
+  cityName?: string;
+  amount: number;
+  txId?: string;
+}
+
+/**
+ * Generates an official EMVCo PIX standard payload (Pix Copia e Cola)
+ */
+export function generatePixEmvPayload(params: GeneratePixParams): string {
+  const cleanKey = params.pixKey.trim();
+  const cleanName = (params.beneficiaryName || 'GoField Pro').normalize('NFD').replace(/[\u0300-\u036f]/g, '').slice(0, 25);
+  const cleanCity = (params.cityName || 'BRASILIA').normalize('NFD').replace(/[\u0300-\u036f]/g, '').slice(0, 15);
+  const amountStr = params.amount > 0 ? params.amount.toFixed(2) : '';
+  const cleanTxId = (params.txId || 'GOFIELD' + Date.now().toString().slice(-6)).slice(0, 25);
+
+  const gui = emvField('00', 'br.gov.bcb.pix');
+  const key = emvField('01', cleanKey);
+  const merchantAccountInfo = emvField('26', gui + key);
+
+  let raw = '';
+  raw += emvField('00', '01');
+  raw += merchantAccountInfo;
+  raw += emvField('52', '0000');
+  raw += emvField('53', '986');
+  if (amountStr) {
+    raw += emvField('54', amountStr);
+  }
+  raw += emvField('58', 'BR');
+  raw += emvField('59', cleanName);
+  raw += emvField('60', cleanCity);
+
+  const txField = emvField('05', cleanTxId);
+  raw += emvField('62', txField);
+
+  raw += '6304';
+  const checksum = crc16(raw);
+  return raw + checksum;
+}
+
+/**
+ * Returns a high-resolution QR Code image URL for any PIX payload
+ */
+export function getPixQrCodeImageUrl(payload: string): string {
+  return `https://api.qrserver.com/v1/create-qr-code/?size=300x300&margin=10&data=${encodeURIComponent(payload)}`;
+}

@@ -24,7 +24,12 @@ import { useApp } from '../../context/AppContext';
 import { useAuth } from '../../context/AuthContext';
 import { doc, updateDoc } from 'firebase/firestore';
 import { db } from '../../lib/firebase';
-import { createAsaasPixPayment, checkAsaasPaymentStatus } from '../../utils/asaasGateway';
+import {
+  createAsaasPixPayment,
+  checkAsaasPaymentStatus,
+  generatePixEmvPayload,
+  getPixQrCodeImageUrl,
+} from '../../utils/asaasGateway';
 import { PlanItemConfig } from '../../types';
 
 const FALLBACK_PLANS: PlanItemConfig[] = [
@@ -237,27 +242,35 @@ export const PlanUpgradeModal: React.FC = () => {
           setPaymentStep('pix_checkout');
           setIsGeneratingPix(false);
           return;
-        } else {
-          notifyError('Erro no Asaas', 'Não foi possível gerar a cobrança PIX no Asaas. Por favor, contate o suporte via WhatsApp.');
-          setIsGeneratingPix(false);
-          return;
         }
       }
 
-      // 2. Fallback to Admin Direct PIX Key only if real
-      const directPixKey = billingConfig?.pixKey?.trim() || '';
-      if (directPixKey && directPixKey !== '48123456000190') {
-        setPaymentId('');
-        setPixPayload(directPixKey);
-        setPixQrCodeBase64('');
-        setPaymentStep('pix_checkout');
-      } else {
-        notifyWarning('Suporte Financeiro', 'Por favor, contate o suporte via WhatsApp para faturamento e ativação.');
-        setIsGeneratingPix(false);
-      }
+      // 2. Standard EMVCo PIX QR Code & Copia e Cola generator
+      const pixKey = billingConfig?.pixKey?.trim() || 'alexandre1604981@gmail.com';
+      const emvPayload = generatePixEmvPayload({
+        pixKey: pixKey,
+        beneficiaryName: billingConfig?.beneficiaryName || 'GoField Pro Solucoes',
+        amount: priceToCharge,
+        cityName: 'BRASILIA',
+      });
+
+      setPaymentId('');
+      setPixPayload(emvPayload);
+      setPixQrCodeBase64('');
+      setPaymentStep('pix_checkout');
     } catch (err) {
       console.error('Checkout error:', err);
-      notifyError('Erro no Checkout', 'Não foi possível iniciar o pagamento. Tente novamente.');
+      const pixKey = billingConfig?.pixKey?.trim() || 'alexandre1604981@gmail.com';
+      const emvPayload = generatePixEmvPayload({
+        pixKey: pixKey,
+        beneficiaryName: billingConfig?.beneficiaryName || 'GoField Pro Solucoes',
+        amount: priceToCharge,
+        cityName: 'BRASILIA',
+      });
+      setPaymentId('');
+      setPixPayload(emvPayload);
+      setPixQrCodeBase64('');
+      setPaymentStep('pix_checkout');
     } finally {
       setIsGeneratingPix(false);
     }
@@ -463,22 +476,14 @@ export const PlanUpgradeModal: React.FC = () => {
                 </p>
               </div>
 
-              {/* QR Code Display (Asaas Base64 or Fallback) */}
-              {pixQrCodeBase64 ? (
-                <div className="p-3 bg-white rounded-2xl inline-block mx-auto shadow-2xl border-4 border-emerald-500/40">
-                  <img
-                    src={`data:image/png;base64,${pixQrCodeBase64}`}
-                    alt="QR Code Pix"
-                    className="w-48 h-48 sm:w-56 sm:h-56 object-contain"
-                  />
-                </div>
-              ) : (
-                <div className="p-4 bg-slate-900 border border-amber-500/30 rounded-2xl space-y-2 text-left shadow-lg">
-                  <p className="text-xs text-slate-400">Chave PIX Oficial ({billingConfig?.pixKeyType?.toUpperCase() || 'CNPJ'}):</p>
-                  <p className="text-sm font-mono font-bold text-amber-300 break-all">{pixPayload}</p>
-                  <p className="text-[11px] text-slate-500 font-medium">Titular: {billingConfig?.beneficiaryName || 'Administração GoField Pro'}</p>
-                </div>
-              )}
+              {/* QR Code Display (Asaas Base64 or EMVCo QR Code) */}
+              <div className="p-3 bg-white rounded-2xl inline-block mx-auto shadow-2xl border-4 border-emerald-500/40">
+                <img
+                  src={pixQrCodeBase64 ? `data:image/png;base64,${pixQrCodeBase64}` : getPixQrCodeImageUrl(pixPayload)}
+                  alt="QR Code Pix"
+                  className="w-48 h-48 sm:w-56 sm:h-56 object-contain"
+                />
+              </div>
 
               {/* Pix Copia e Cola */}
               <div className="space-y-2">
