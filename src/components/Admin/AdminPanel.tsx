@@ -24,6 +24,7 @@ import {
   SystemBillingConfig,
   PlanItemConfig,
   DEFAULT_PLANS,
+  normalizePlansList,
   AdminAuditLog,
   SystemFeature,
 } from '../../types';
@@ -136,7 +137,8 @@ export const AdminPanel: React.FC = () => {
   const [plans, setPlans] = useState<PlanItemConfig[]>(() => {
     try {
       const saved = localStorage.getItem('gofield_custom_plans');
-      return saved ? JSON.parse(saved) : DEFAULT_PLANS;
+      const parsed = saved ? JSON.parse(saved) : DEFAULT_PLANS;
+      return normalizePlansList(parsed);
     } catch {
       return DEFAULT_PLANS;
     }
@@ -375,9 +377,10 @@ export const AdminPanel: React.FC = () => {
           const data = configDoc.data() as SystemBillingConfig;
           setBillingConfig((prev) => ({ ...prev, ...data }));
           localStorage.setItem('gofield_billing_config', JSON.stringify(data));
-          if (data.plans && Array.isArray(data.plans) && data.plans.length > 0) {
-            setPlans(data.plans);
-            localStorage.setItem('gofield_custom_plans', JSON.stringify(data.plans));
+          if (data.plans && Array.isArray(data.plans)) {
+            const normalized = normalizePlansList(data.plans);
+            setPlans(normalized);
+            localStorage.setItem('gofield_custom_plans', JSON.stringify(normalized));
           }
         }
       },

@@ -584,3 +584,28 @@ export interface FireIncident {
 
 
 
+
+
+/**
+ * Ensures the plans array always contains a valid Plano Gratuito (id: 'free')
+ * while preserving any custom names, tags, features, and settings saved by the Super Admin.
+ */
+export function normalizePlansList(rawPlans?: PlanItemConfig[] | null): PlanItemConfig[] {
+  if (!rawPlans || !Array.isArray(rawPlans) || rawPlans.length === 0) {
+    return DEFAULT_PLANS;
+  }
+
+  const hasFree = rawPlans.some((p) => p.id === 'free' || p.price === 0);
+  if (!hasFree) {
+    return [DEFAULT_FREE_PLAN, ...rawPlans];
+  }
+
+  const freeIndex = rawPlans.findIndex((p) => p.id === 'free' || p.price === 0);
+  if (freeIndex > 0) {
+    const freePlan = rawPlans[freeIndex];
+    const rest = rawPlans.filter((_, idx) => idx !== freeIndex);
+    return [freePlan, ...rest];
+  }
+
+  return rawPlans;
+}

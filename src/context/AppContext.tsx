@@ -27,6 +27,7 @@ import {
   AppSettings,
   SystemBillingConfig,
   DEFAULT_PLANS,
+  normalizePlansList,
   UserEntitlements,
 } from '../types';
 import { checkFeatureAccess, getUserMaxPdfMaps, hasSpecialAccessActive } from '../utils/featureAccess';
@@ -283,7 +284,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
               const data = snap.data() as SystemBillingConfig;
               setBillingConfig((prev) => ({ ...prev, ...data }));
               localStorage.setItem('gofield_billing_config', JSON.stringify(data));
-              if (data.plans && Array.isArray(data.plans) && data.plans.length > 0) {
+              if (data.plans && Array.isArray(data.plans)) {
+                data.plans = normalizePlansList(data.plans);
                 localStorage.setItem('gofield_custom_plans', JSON.stringify(data.plans));
               }
               // Broadcast update event to all active UI components

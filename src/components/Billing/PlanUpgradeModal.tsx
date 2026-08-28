@@ -33,7 +33,7 @@ import {
   generatePixEmvPayload,
   getPixQrCodeImageUrl,
 } from '../../utils/asaasGateway';
-import { PlanItemConfig, DEFAULT_PLANS, DEFAULT_FREE_PLAN, PromoCoupon } from '../../types';
+import { PlanItemConfig, DEFAULT_PLANS, DEFAULT_FREE_PLAN, PromoCoupon, normalizePlansList } from '../../types';
 
 export const PlanUpgradeModal: React.FC = () => {
   const {
@@ -62,19 +62,11 @@ export const PlanUpgradeModal: React.FC = () => {
   const [couponLoading, setCouponLoading] = useState<boolean>(false);
   const [couponMessage, setCouponMessage] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
 
-  // Available showcase plans (Dynamic from Super Admin Firestore Catalog)
+  // Available showcase plans (Dynamic from Super Admin Firestore Catalog with Plano Gratuito Guaranteed)
   const availablePlans = useMemo(() => {
-    const rawPlans = (billingConfig?.plans && Array.isArray(billingConfig.plans) && billingConfig.plans.length > 0)
-      ? billingConfig.plans
-      : DEFAULT_PLANS;
-
-    // Filter plans marked active in showcase by Super Admin
-    const visible = rawPlans.filter((p) => p.activeInShowcase !== false && (p as any).activeInShowcase !== 'false');
-    
-    if (visible.length === 0) {
-      return rawPlans;
-    }
-    return visible;
+    const normalized = normalizePlansList(billingConfig?.plans);
+    const visible = normalized.filter((p) => p.activeInShowcase !== false && (p as any).activeInShowcase !== 'false');
+    return visible.length > 0 ? visible : normalized;
   }, [billingConfig?.plans]);
 
   const currentPaidPlan = useMemo(() => {
