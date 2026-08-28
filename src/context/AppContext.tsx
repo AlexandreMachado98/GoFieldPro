@@ -878,12 +878,26 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
           // If the user locked their position manually, do NOT overwrite it!
           if (isManualGpsLockedRef.current) return;
 
-          setCurrentGps({
-            lat: pos.coords.latitude,
-            lng: pos.coords.longitude,
-            altitude: pos.coords.altitude || 1250,
-            accuracy: +(pos.coords.accuracy || 2.0).toFixed(1),
-            timestamp: Date.now(),
+          const newLat = pos.coords.latitude;
+          const newLng = pos.coords.longitude;
+          const newAlt = pos.coords.altitude || 1250;
+          const newAcc = +(pos.coords.accuracy || 2.0).toFixed(1);
+
+          // Thermal & Battery Optimization: avoid state thrashing on sub-meter jitter when stationary
+          setCurrentGps((prev) => {
+            const dist = calculateDistanceMeters(prev.lat, prev.lng, newLat, newLng);
+            const timeDiff = Date.now() - prev.timestamp;
+            if (dist < 0.4 && Math.abs((prev.accuracy || 0) - newAcc) < 0.8 && timeDiff < 3000) {
+              return prev;
+            }
+            return {
+              lat: newLat,
+              lng: newLng,
+              altitude: newAlt,
+              accuracy: newAcc,
+              speed: pos.coords.speed || prev.speed || 0,
+              timestamp: Date.now(),
+            };
           });
           setHasGpsLock(true);
         },
@@ -988,8 +1002,9 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
           currentGps.lat,
           currentGps.lng
         );
-        // Append if moved at least 0.5 meter
-        if (distFromLastMeters < 0.5) return curr;
+        // Smart GIS deadband: append point only if moved >= 3.0m (filters stationary GPS drift)
+        const moveThreshold = Math.max(3.0, (currentGps.accuracy || 3) * 0.4);
+        if (distFromLastMeters < moveThreshold) return curr;
 
         const newPoint = {
           lat: currentGps.lat,

@@ -270,8 +270,9 @@ export const UpdateProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     };
     document.addEventListener('visibilitychange', handleVisibilityChange);
 
-    // Periodic check every 15 minutes
+    // Periodic check every 15 minutes (skipped when phone is locked/hidden)
     const intervalTimer = setInterval(() => {
+      if (document.visibilityState === 'hidden') return;
       checkForUpdates(false);
     }, 15 * 60 * 1000);
 

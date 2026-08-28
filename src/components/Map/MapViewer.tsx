@@ -594,7 +594,7 @@ export const MapViewer: React.FC = () => {
         userAccuracyCircleRef.current.setRadius(currentGps.accuracy || 5);
       }
     }
-  }, [currentGps, hasGpsLock, isGpsSimulated]);
+  }, [currentGps.lat, currentGps.lng, currentGps.accuracy, hasGpsLock, isGpsSimulated]);
 
   // Calculate Total Measurement Distance
   const totalDistanceMeters = useMemo(() => {

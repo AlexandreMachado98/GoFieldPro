@@ -1754,6 +1754,10 @@ export const PdfMapNavigator: React.FC = () => {
 
           const dataUrl = canvas.toDataURL('image/jpeg', 0.82);
           renderedPages.push(dataUrl);
+
+          // Instantly free GPU/RAM canvas backing store on mobile
+          canvas.width = 0;
+          canvas.height = 0;
         }
 
         const newDoc: PdfDocument = {
