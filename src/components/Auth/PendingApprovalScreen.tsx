@@ -26,7 +26,7 @@ import {
   ShieldCheck,
   ExternalLink,
 } from 'lucide-react';
-import { doc, getDoc, updateDoc, collection, getDocs } from 'firebase/firestore';
+import { doc, getDoc, updateDoc, collection, getDocs, onSnapshot } from 'firebase/firestore';
 import { db } from '../../lib/firebase';
 import { SystemBillingConfig, PlanItemConfig, PromoCoupon } from '../../types';
 import { ApprovalCelebrationScreen } from './ApprovalCelebrationScreen';
@@ -175,11 +175,12 @@ export const PendingApprovalScreen: React.FC = () => {
       setInputCompany(profile.company);
     }
 
-    const loadBillingAndPlans = async () => {
-      try {
-        const configDoc = await getDoc(doc(db, 'system_config', 'billing'));
-        if (configDoc.exists()) {
-          const data = configDoc.data() as SystemBillingConfig;
+    const billDocRef = doc(db, 'system_config', 'billing');
+    const unsub = onSnapshot(
+      billDocRef,
+      (snap) => {
+        if (snap.exists()) {
+          const data = snap.data() as SystemBillingConfig;
           setBillingConfig(data);
           if (data.whatsappSupportNumber) {
             setSupportPhone(data.whatsappSupportNumber.replace(/\D/g, ''));
@@ -190,12 +191,13 @@ export const PendingApprovalScreen: React.FC = () => {
             localStorage.setItem('gofield_billing_config', JSON.stringify(data));
           }
         }
-      } catch (e) {
-        console.warn('Could not fetch billing config, using fallback plans', e);
+      },
+      (e) => {
+        console.warn('Real-time billing listener notice:', e.message);
       }
-    };
+    );
 
-    loadBillingAndPlans();
+    return () => unsub();
   }, [profile?.phone, profile?.company]);
 
   const handleCheckStatus = async () => {

@@ -151,7 +151,7 @@ export const PlanUpgradeModal: React.FC = () => {
 
     // Safety fallback: only return the primary plan if all were hidden
     return [rawPlans[0] || FALLBACK_PLANS[0]];
-  }, [billingConfig?.plans]);
+  }, [billingConfig, billingConfig?.plans]);
 
   // Selected plan state
   const [selectedPlanId, setSelectedPlanId] = useState<string>(() => {
