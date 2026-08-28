@@ -229,6 +229,29 @@ export const AdminPanel: React.FC = () => {
   // Edit Subscription Modal State
     // Special Access Modal State
   const [selectedActiveUserUid, setSelectedActiveUserUid] = useState<string>('');
+  // Unified Grant Special Access Modal State
+  const [isGrantSpecialModalOpen, setIsGrantSpecialModalOpen] = useState(false);
+  const [grantModalClientMode, setGrantModalClientMode] = useState<'existing' | 'new'>('existing');
+  const [grantSelectedUserUid, setGrantSelectedUserUid] = useState<string>('');
+  const [grantSearchQuery, setGrantSearchQuery] = useState<string>('');
+  const [grantFilterStatus, setGrantFilterStatus] = useState<'active' | 'all' | 'without_special'>('active');
+  const [grantNewUserName, setGrantNewUserName] = useState('');
+  const [grantNewUserEmail, setGrantNewUserEmail] = useState('');
+  const [grantNewUserCompany, setGrantNewUserCompany] = useState('');
+  const [grantNewUserPhone, setGrantNewUserPhone] = useState('');
+  const [grantNewUserRole, setGrantNewUserRole] = useState<UserRole>('surveyor');
+  const [grantNewUserPlan, setGrantNewUserPlan] = useState<SubscriptionPlanType>('free');
+  const [grantNewUserSubValue, setGrantNewUserSubValue] = useState<number>(0);
+  const [grantSaType, setGrantSaType] = useState<'annual' | 'custom' | 'lifetime'>('lifetime');
+  const [grantSaStartsAt, setGrantSaStartsAt] = useState<string>(() => new Date().toISOString().split('T')[0]);
+  const [grantSaExpiresAt, setGrantSaExpiresAt] = useState<string>(() => {
+    const nextYear = new Date();
+    nextYear.setFullYear(nextYear.getFullYear() + 1);
+    return nextYear.toISOString().split('T')[0];
+  });
+  const [grantSaReason, setGrantSaReason] = useState<string>('Cliente Parceiro');
+  const [savingGrantSpecial, setSavingGrantSpecial] = useState(false);
+
   // Dedicated Special Access Tab States
   const [saTabTargetUid, setSaTabTargetUid] = useState<string>('');
   const [saTabSearchQuery, setSaTabSearchQuery] = useState<string>('');
@@ -911,7 +934,174 @@ export const AdminPanel: React.FC = () => {
     window.open(whatsappUrl, '_blank');
   };
 
-    // Atomic Add User Handler (With Commercial Plan + Optional Special Access)
+    // Handler: Unified Grant Special Access (Existing Client or Brand New Client)
+  const handleExecuteGrantSpecialAccess = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    let targetUid = '';
+    let targetName = '';
+    let targetEmail = '';
+    let targetCompany = '';
+    let targetPhone = '';
+    let targetPlan: SubscriptionPlanType = 'free';
+    let targetSubValue = 0;
+    let targetRole: UserRole = 'surveyor';
+    let isCreatingNew = grantModalClientMode === 'new';
+
+    if (isCreatingNew) {
+      targetName = grantNewUserName.trim();
+      targetEmail = grantNewUserEmail.trim().toLowerCase();
+      targetCompany = grantNewUserCompany.trim() || 'Particular';
+      targetPhone = grantNewUserPhone.trim();
+      targetPlan = grantNewUserPlan;
+      targetSubValue = Number(grantNewUserSubValue) || (grantNewUserPlan === 'free' ? 0 : 44.99);
+      targetRole = grantNewUserRole;
+
+      if (!targetName) {
+        notifyWarning('Nome Obrigatório', 'Informe o nome do novo cliente.');
+        return;
+      }
+      if (!targetEmail || !targetEmail.includes('@') || !targetEmail.includes('.')) {
+        notifyWarning('E-mail Inválido', 'Informe um e-mail válido para o novo cliente.');
+        return;
+      }
+
+      // Check duplicate
+      const exists = users.some((u) => (u.email || '').toLowerCase() === targetEmail);
+      if (exists) {
+        notifyError('E-mail Já Cadastrado', `O e-mail "${targetEmail}" já está cadastrado no sistema.`);
+        return;
+      }
+
+      targetUid = `user_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+    } else {
+      if (!grantSelectedUserUid) {
+        notifyWarning('Selecione um Cliente', 'Por favor, escolha um cliente existente na lista.');
+        return;
+      }
+      const existingUser = users.find((u) => u.uid === grantSelectedUserUid);
+      if (!existingUser) {
+        notifyError('Cliente Não Encontrado', 'O cliente selecionado não foi localizado.');
+        return;
+      }
+      targetUid = existingUser.uid;
+      targetName = existingUser.name;
+      targetEmail = existingUser.email;
+      targetCompany = existingUser.company || '';
+      targetPhone = existingUser.phone || '';
+      targetPlan = existingUser.subscriptionPlan || 'free';
+      targetSubValue = existingUser.subscriptionValue || 0;
+      targetRole = existingUser.role || 'surveyor';
+    }
+
+    if (grantSaType === 'custom' && grantSaExpiresAt && grantSaStartsAt && grantSaExpiresAt < grantSaStartsAt) {
+      notifyWarning('Data Inválida', 'A data de término não pode ser anterior à data de início.');
+      return;
+    }
+
+    setSavingGrantSpecial(true);
+
+    try {
+      const nowIso = new Date().toISOString();
+      let finalExpiresAt: string | null = null;
+      if (grantSaType === 'annual') {
+        const d = new Date(grantSaStartsAt + 'T00:00:00');
+        d.setFullYear(d.getFullYear() + 1);
+        finalExpiresAt = d.toISOString().split('T')[0];
+      } else if (grantSaType === 'custom') {
+        finalExpiresAt = grantSaExpiresAt;
+      } else {
+        finalExpiresAt = null; // Lifetime
+      }
+
+      const saConfig: SpecialAccessConfig = {
+        enabled: true,
+        accessType: grantSaType,
+        status: 'active',
+        startsAt: grantSaStartsAt,
+        expiresAt: finalExpiresAt,
+        grantedBy: profile?.email || profile?.name || 'Super Admin',
+        grantedAt: nowIso,
+        reason: grantSaReason.trim() || 'Concessão Administrativa de Acesso Especial',
+      };
+
+      if (isCreatingNew) {
+        const newUserData: UserProfile = {
+          uid: targetUid,
+          email: targetEmail,
+          name: targetName,
+          role: targetRole,
+          status: 'active',
+          avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(targetName)}`,
+          company: targetCompany,
+          phone: targetPhone,
+          createdAt: nowIso,
+          approvedAt: nowIso,
+          approvedBy: profile?.email || 'Super Admin',
+          subscriptionPlan: targetPlan,
+          subscriptionStatus: 'active',
+          subscriptionValue: targetSubValue,
+          hasChosenPlan: true,
+          specialAccess: saConfig,
+        };
+
+        await setDoc(doc(db, 'users', targetUid), newUserData);
+        setUsers((prev) => [newUserData, ...prev]);
+      } else {
+        const cleanPayload = {
+          specialAccess: {
+            enabled: true,
+            accessType: saConfig.accessType,
+            status: 'active',
+            startsAt: saConfig.startsAt,
+            expiresAt: saConfig.expiresAt,
+            grantedBy: saConfig.grantedBy,
+            grantedAt: saConfig.grantedAt,
+            reason: saConfig.reason,
+          },
+        };
+
+        await updateDoc(doc(db, 'users', targetUid), cleanPayload);
+        setUsers((prev) =>
+          prev.map((u) => (u.uid === targetUid ? { ...u, specialAccess: saConfig } : u))
+        );
+      }
+
+      await recordAdminAuditLog({
+        adminUid: profile?.uid || 'super_admin',
+        adminEmail: profile?.email || 'admin@am-tst.com.br',
+        adminName: profile?.name || 'Super Admin',
+        action: isCreatingNew ? 'CREATE_USER_WITH_SPECIAL_ACCESS' : 'GRANT_SPECIAL_ACCESS',
+        targetType: 'user',
+        targetId: targetUid,
+        targetName: targetName,
+        newValue: saConfig,
+        reason: `Acesso Especial ${grantSaType.toUpperCase()} concedido para ${targetName} (${targetEmail}). Motivo: ${saConfig.reason}`,
+      });
+
+      notifySuccess(
+        'Acesso Especial Concedido!',
+        `Acesso ${grantSaType === 'lifetime' ? 'Vitalício' : grantSaType === 'annual' ? 'Anual' : 'Personalizado'} liberado com sucesso para ${targetName}.`
+      );
+
+      // Reset form
+      setGrantSelectedUserUid('');
+      setGrantNewUserName('');
+      setGrantNewUserEmail('');
+      setGrantNewUserCompany('');
+      setGrantNewUserPhone('');
+      setGrantSaType('lifetime');
+      setGrantSaReason('Cliente Parceiro');
+      setIsGrantSpecialModalOpen(false);
+    } catch (err: any) {
+      console.error('Error granting special access:', err);
+      notifyError('Erro ao Conceder Acesso', 'Não foi possível registrar o acesso especial.');
+    } finally {
+      setSavingGrantSpecial(false);
+    }
+  };
+
+  // Atomic Add User Handler (With Commercial Plan + Optional Special Access)
   const handleAddUser = async (e: React.FormEvent) => {
     e.preventDefault();
     const cleanName = newUserName.trim();
@@ -3191,6 +3381,348 @@ export const AdminPanel: React.FC = () => {
                   <>
                     <Check className="w-3.5 h-3.5" />
                     <span>Criar Cliente</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {/* MODAL: CONCEDER NOVO ACESSO ESPECIAL (EXISTING OR NEW CLIENT) */}
+      {isGrantSpecialModalOpen && (
+        <div className="fixed inset-0 z-[99999] bg-black/80 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
+          <form
+            onSubmit={handleExecuteGrantSpecialAccess}
+            className="bg-slate-900 border border-amber-500/50 w-full max-w-xl rounded-3xl shadow-2xl p-5 sm:p-6 space-y-4 animate-in fade-in my-8"
+          >
+            {/* Modal Header */}
+            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+              <div className="flex items-center gap-2.5">
+                <div className="w-10 h-10 rounded-2xl bg-amber-500/20 text-amber-400 border border-amber-500/30 flex items-center justify-center">
+                  <KeyRound className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-black text-white leading-tight">
+                    Conceder Acesso Especial
+                  </h3>
+                  <p className="text-[11px] text-slate-400">
+                    Libere 100% das funcionalidades do aplicativo sem restrições
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsGrantSpecialModalOpen(false)}
+                className="p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 transition-colors cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="space-y-4 text-xs">
+              {/* STEP 1: CLIENT SOURCE SELECTION (EXISTING OR NEW) */}
+              <div>
+                <label className="block text-slate-300 font-bold mb-2 uppercase tracking-wider text-[11px]">
+                  1. Seleção do Cliente
+                </label>
+                <div className="grid grid-cols-2 gap-2 bg-slate-950 p-1 rounded-2xl border border-slate-800">
+                  <button
+                    type="button"
+                    onClick={() => setGrantModalClientMode('existing')}
+                    className={`py-2.5 rounded-xl font-black text-xs transition-all cursor-pointer flex items-center justify-center gap-2 ${
+                      grantModalClientMode === 'existing'
+                        ? 'bg-amber-500 text-slate-950 shadow-md'
+                        : 'text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    <span>● Cliente Existente</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setGrantModalClientMode('new')}
+                    className={`py-2.5 rounded-xl font-black text-xs transition-all cursor-pointer flex items-center justify-center gap-2 ${
+                      grantModalClientMode === 'new'
+                        ? 'bg-amber-500 text-slate-950 shadow-md'
+                        : 'text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    <span>+ Cadastrar Novo Cliente</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* MODE A: SELECT EXISTING CLIENT */}
+              {grantModalClientMode === 'existing' && (
+                <div className="space-y-3 p-3.5 bg-slate-950/80 rounded-2xl border border-slate-800 animate-in fade-in">
+                  <div className="relative">
+                    <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                    <input
+                      type="text"
+                      value={grantSearchQuery}
+                      onChange={(e) => setGrantSearchQuery(e.target.value)}
+                      placeholder="Pesquisar cliente por nome ou e-mail..."
+                      className="w-full bg-slate-900 border border-slate-700 rounded-xl pl-9 pr-3 py-2 text-white text-xs placeholder-slate-500 focus:outline-none focus:border-amber-500"
+                    />
+                  </div>
+
+                  {/* Client Select Dropdown List */}
+                  <div className="space-y-1">
+                    <label className="block text-slate-400 font-bold uppercase tracking-wider text-[10px]">
+                      Selecione um cliente ativo da lista ({activeClientsList.length}):
+                    </label>
+                    <select
+                      value={grantSelectedUserUid}
+                      onChange={(e) => setGrantSelectedUserUid(e.target.value)}
+                      className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2.5 text-white font-semibold text-xs focus:outline-none focus:border-amber-500 cursor-pointer"
+                      required
+                    >
+                      <option value="">-- Escolha o cliente na lista abaixo --</option>
+                      {activeClientsList
+                        .filter((u) => {
+                          if (!grantSearchQuery.trim()) return true;
+                          const q = grantSearchQuery.toLowerCase();
+                          return u.name?.toLowerCase().includes(q) || u.email?.toLowerCase().includes(q);
+                        })
+                        .map((u) => {
+                          const isVip = hasSpecialAccessActive(u);
+                          return (
+                            <option key={u.uid} value={u.uid}>
+                              {u.name} ({u.email}) — Plano: {(u.subscriptionPlan || 'Free').toUpperCase()} {isVip ? '★ [VIP ATIVO]' : ''}
+                            </option>
+                          );
+                        })}
+                    </select>
+                  </div>
+
+                  {/* Summary Card for Selected Existing Client */}
+                  {(() => {
+                    const selUser = users.find((u) => u.uid === grantSelectedUserUid);
+                    if (!selUser) return null;
+                    const isAlreadyVip = hasSpecialAccessActive(selUser);
+
+                    return (
+                      <div className="p-3 bg-slate-900 rounded-xl border border-amber-500/40 space-y-2 animate-in fade-in">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <div className="font-extrabold text-white text-xs">{selUser.name}</div>
+                            <div className="text-[11px] text-slate-400">{selUser.email}</div>
+                          </div>
+                          <div className="text-right">
+                            <span className="text-[9px] uppercase font-bold text-slate-400 block">Plano Atual:</span>
+                            <span className="text-emerald-400 font-bold text-xs uppercase">{selUser.subscriptionPlan || 'Gratuito'}</span>
+                          </div>
+                        </div>
+
+                        {isAlreadyVip && (
+                          <div className="p-2 bg-amber-950/40 rounded-lg border border-amber-500/40 text-[11px] text-amber-300 font-bold flex items-center gap-1.5">
+                            <KeyRound className="w-3.5 h-3.5 shrink-0" />
+                            <span>Este cliente já possui Acesso Especial ativo. Configurar abaixo irá atualizar a autorização.</span>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })()}
+                </div>
+              )}
+
+              {/* MODE B: CREATE NEW CLIENT DIRECTLY */}
+              {grantModalClientMode === 'new' && (
+                <div className="space-y-3 p-3.5 bg-slate-950/80 rounded-2xl border border-slate-800 animate-in fade-in">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                    <div>
+                      <label className="block text-slate-300 font-bold mb-1 uppercase tracking-wider text-[10px]">
+                        Nome Completo *
+                      </label>
+                      <input
+                        type="text"
+                        value={grantNewUserName}
+                        onChange={(e) => setGrantNewUserName(e.target.value)}
+                        placeholder="Ex: Carlos Mendes"
+                        className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white text-xs focus:outline-none focus:border-amber-500"
+                        required={grantModalClientMode === 'new'}
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-slate-300 font-bold mb-1 uppercase tracking-wider text-[10px]">
+                        E-mail de Acesso *
+                      </label>
+                      <input
+                        type="email"
+                        value={grantNewUserEmail}
+                        onChange={(e) => setGrantNewUserEmail(e.target.value.toLowerCase().trim())}
+                        placeholder="carlos@empresa.com"
+                        className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white text-xs focus:outline-none focus:border-amber-500"
+                        required={grantModalClientMode === 'new'}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                    <div>
+                      <label className="block text-slate-300 font-bold mb-1 uppercase tracking-wider text-[10px]">
+                        Empresa / Órgão
+                      </label>
+                      <input
+                        type="text"
+                        value={grantNewUserCompany}
+                        onChange={(e) => setGrantNewUserCompany(e.target.value)}
+                        placeholder="Ex: Agroflorestal Brasil"
+                        className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white text-xs focus:outline-none focus:border-amber-500"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-slate-300 font-bold mb-1 uppercase tracking-wider text-[10px]">
+                        Plano Comercial Inicial
+                      </label>
+                      <select
+                        value={grantNewUserPlan}
+                        onChange={(e) => {
+                          const p = e.target.value as SubscriptionPlanType;
+                          setGrantNewUserPlan(p);
+                          if (p === 'free') setGrantNewUserSubValue(0);
+                          else if (p === 'pro_mensal') setGrantNewUserSubValue(44.99);
+                        }}
+                        className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-slate-200 text-xs focus:outline-none focus:border-amber-500"
+                      >
+                        <option value="free">Plano Gratuito (R$ 0,00)</option>
+                        <option value="pro_mensal">Plano Profissional Mensal (R$ 44,99)</option>
+                        <option value="equipe_mensal">Plano Equipe (R$ 129,90)</option>
+                        <option value="florestal_corporativo">Corporativo Florestal (R$ 399,00)</option>
+                      </select>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* STEP 2: SPECIAL ACCESS CONFIGURATION */}
+              <div className="p-3.5 bg-gradient-to-b from-amber-950/40 via-slate-950 to-slate-950 rounded-2xl border border-amber-500/40 space-y-3">
+                <div className="flex items-center gap-2 text-amber-300 font-black text-xs uppercase tracking-wider">
+                  <KeyRound className="w-4 h-4 text-amber-400" />
+                  <span>2. Configuração do Acesso Especial</span>
+                </div>
+
+                {/* Type Selection */}
+                <div className="grid grid-cols-3 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setGrantSaType('lifetime');
+                      setGrantSaExpiresAt('');
+                    }}
+                    className={`p-2.5 rounded-xl border font-bold text-xs text-center transition-all cursor-pointer ${
+                      grantSaType === 'lifetime'
+                        ? 'bg-gradient-to-r from-amber-500/30 to-yellow-500/30 border-amber-400 text-amber-200 ring-2 ring-amber-500/40 shadow-lg'
+                        : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-200'
+                    }`}
+                  >
+                    <div className="font-black text-amber-300 text-xs">👑 Vitalício</div>
+                    <div className="text-[10px] text-slate-400">Permanente</div>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setGrantSaType('annual');
+                      const d = new Date();
+                      d.setFullYear(d.getFullYear() + 1);
+                      setGrantSaExpiresAt(d.toISOString().split('T')[0]);
+                    }}
+                    className={`p-2.5 rounded-xl border font-bold text-xs text-center transition-all cursor-pointer ${
+                      grantSaType === 'annual'
+                        ? 'bg-amber-500/20 border-amber-500 text-amber-300 ring-2 ring-amber-500/30 shadow'
+                        : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-200'
+                    }`}
+                  >
+                    <div className="font-extrabold text-white text-xs">📅 1 Ano</div>
+                    <div className="text-[10px] text-slate-400">365 dias</div>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setGrantSaType('custom')}
+                    className={`p-2.5 rounded-xl border font-bold text-xs text-center transition-all cursor-pointer ${
+                      grantSaType === 'custom'
+                        ? 'bg-amber-500/20 border-amber-500 text-amber-300 ring-2 ring-amber-500/30 shadow'
+                        : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-200'
+                    }`}
+                  >
+                    <div className="font-extrabold text-white text-xs">⏱️ Personalizado</div>
+                    <div className="text-[10px] text-slate-400">Datas livres</div>
+                  </button>
+                </div>
+
+                {/* Dates */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                  <div>
+                    <label className="block text-slate-300 font-bold mb-1 uppercase tracking-wider text-[10px]">
+                      Data de Início
+                    </label>
+                    <input
+                      type="date"
+                      value={grantSaStartsAt}
+                      onChange={(e) => setGrantSaStartsAt(e.target.value)}
+                      className="w-full bg-slate-900 border border-slate-700 rounded-xl px-2.5 py-1.5 text-white font-medium focus:outline-none focus:border-amber-500 text-xs"
+                      required
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-slate-300 font-bold mb-1 uppercase tracking-wider text-[10px]">
+                      Data de Expiração {grantSaType === 'lifetime' && '(Sem Expiração)'}
+                    </label>
+                    <input
+                      type="date"
+                      value={grantSaExpiresAt}
+                      onChange={(e) => setGrantSaExpiresAt(e.target.value)}
+                      disabled={grantSaType === 'lifetime'}
+                      className="w-full bg-slate-900 border border-slate-700 rounded-xl px-2.5 py-1.5 text-white font-medium focus:outline-none focus:border-amber-500 text-xs disabled:opacity-40"
+                      required={grantSaType !== 'lifetime'}
+                    />
+                  </div>
+                </div>
+
+                {/* Reason */}
+                <div>
+                  <label className="block text-slate-300 font-bold mb-1 uppercase tracking-wider text-[10px]">
+                    Motivo / Justificativa
+                  </label>
+                  <input
+                    type="text"
+                    value={grantSaReason}
+                    onChange={(e) => setGrantSaReason(e.target.value)}
+                    placeholder="Ex: Cliente Parceiro, Cortesia, Demonstração VIP"
+                    className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-1.5 text-white text-xs focus:outline-none focus:border-amber-500"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Modal Actions */}
+            <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-slate-800">
+              <button
+                type="button"
+                onClick={() => setIsGrantSpecialModalOpen(false)}
+                className="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-750 text-slate-300 font-bold text-xs cursor-pointer transition-colors"
+              >
+                Cancelar
+              </button>
+              <button
+                type="submit"
+                disabled={savingGrantSpecial}
+                className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-yellow-500 hover:from-amber-400 hover:to-yellow-400 text-slate-950 font-black text-xs cursor-pointer shadow-lg shadow-amber-950/50 flex items-center gap-1.5 transition-all active:scale-95 disabled:opacity-50"
+              >
+                {savingGrantSpecial ? (
+                  <>
+                    <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                    <span>Concedendo Acesso...</span>
+                  </>
+                ) : (
+                  <>
+                    <Check className="w-3.5 h-3.5" />
+                    <span>CONCEDER ACESSO</span>
                   </>
                 )}
               </button>
