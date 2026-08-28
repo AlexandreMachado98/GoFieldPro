@@ -134,14 +134,24 @@ export async function testAsaasConnection(
 }
 
 /**
+ * Helper to validate basic CPF/CNPJ format before sending to Asaas
+ */
+function isValidCpfOrCnpj(digits: string): boolean {
+  if (!digits || (digits.length !== 11 && digits.length !== 14)) return false;
+  // Reject identical digits like 11111111111
+  if (/^(\d)\1+$/.test(digits)) return false;
+  return true;
+}
+
+/**
  * Creates or gets customer in Asaas
  */
 export async function getOrCreateAsaasCustomer(
   user: UserProfile,
   config?: SystemBillingConfig
-): Promise<string | null> {
+): Promise<{ customerId: string | null; error?: string }> {
   const apiKey = config?.asaasApiKey?.trim();
-  if (!apiKey) return null;
+  if (!apiKey) return { customerId: null, error: 'Chave de API do Asaas não configurada.' };
 
   try {
     // 1. Search existing customer by email
@@ -150,13 +160,14 @@ export async function getOrCreateAsaasCustomer(
     if (searchRes.ok) {
       const data = await searchRes.json();
       if (data.data && data.data.length > 0) {
-        return data.data[0].id;
+        return { customerId: data.data[0].id };
       }
     }
 
     // 2. Create new customer if not found
     const cleanPhone = (user.phone || '').replace(/\D/g, '');
     const cleanCpf = (user.companyCnpj || '').replace(/\D/g, '');
+    const hasValidDoc = isValidCpfOrCnpj(cleanCpf);
 
     const createRes = await asaasApiRequest(
       '/customers',
@@ -166,7 +177,7 @@ export async function getOrCreateAsaasCustomer(
           name: user.name || user.email.split('@')[0] || 'Cliente GoField Pro',
           email: user.email,
           phone: cleanPhone.length >= 10 ? cleanPhone : undefined,
-          cpfCnpj: cleanCpf.length >= 11 ? cleanCpf : undefined,
+          cpfCnpj: hasValidDoc ? cleanCpf : undefined,
           notificationDisabled: false,
         },
       },
@@ -175,7 +186,7 @@ export async function getOrCreateAsaasCustomer(
 
     if (createRes.ok) {
       const created = await createRes.json();
-      return created.id;
+      return { customerId: created.id };
     } else {
       // Fallback: retry with minimal fields
       const retryRes = await asaasApiRequest(
@@ -192,14 +203,17 @@ export async function getOrCreateAsaasCustomer(
       );
       if (retryRes.ok) {
         const retryData = await retryRes.json();
-        return retryData.id;
+        return { customerId: retryData.id };
+      } else {
+        const errData = await retryRes.json().catch(() => ({}));
+        const desc = errData.errors?.[0]?.description || 'Erro ao cadastrar cliente no Asaas.';
+        return { customerId: null, error: desc };
       }
     }
-  } catch (err) {
+  } catch (err: any) {
     console.warn('Asaas getOrCreateCustomer notice:', err);
+    return { customerId: null, error: err.message || 'Falha de conexão com Asaas ao criar cliente.' };
   }
-
-  return null;
 }
 
 /**
@@ -214,13 +228,19 @@ export async function createAsaasPixPayment(
   pixPayload: string;
   pixQrCodeBase64: string;
   invoiceUrl?: string;
+  error?: string;
 } | null> {
   const apiKey = config?.asaasApiKey?.trim();
   if (!apiKey) return null;
 
   try {
-    const customerId = await getOrCreateAsaasCustomer(user, config);
-    if (!customerId) return null;
+    const customerResult = await getOrCreateAsaasCustomer(user, config);
+    if (!customerResult.customerId) {
+      console.warn('Asaas customer creation failed:', customerResult.error);
+      return null;
+    }
+
+    const customerId = customerResult.customerId;
 
     // Today + 3 days dueDate
     const dueDate = new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];

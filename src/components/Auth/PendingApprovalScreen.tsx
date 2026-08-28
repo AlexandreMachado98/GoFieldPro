@@ -325,11 +325,15 @@ export const PendingApprovalScreen: React.FC = () => {
           setPaymentStep('pix_checkout');
           setIsGeneratingPix(false);
           return;
+        } else {
+          setCheckoutError('Não foi possível gerar a cobrança PIX no Asaas. Por favor, fale conosco no WhatsApp para suporte e liberação.');
+          setIsGeneratingPix(false);
+          return;
         }
       }
 
       const directPixKey = billingConfig?.pixKey?.trim() || '';
-      if (directPixKey) {
+      if (directPixKey && directPixKey !== '48123456000190') {
         setPaymentId('');
         setPixPayload(directPixKey);
         setPixQrCodeBase64('');
@@ -339,14 +343,7 @@ export const PendingApprovalScreen: React.FC = () => {
       }
     } catch (err: any) {
       console.error('Checkout error:', err);
-      const directPixKey = billingConfig?.pixKey?.trim() || '';
-      if (directPixKey) {
-        setPixPayload(directPixKey);
-        setPixQrCodeBase64('');
-        setPaymentStep('pix_checkout');
-      } else {
-        setCheckoutError('Não foi possível gerar o PIX automático. Fale conosco via WhatsApp para liberação imediata.');
-      }
+      setCheckoutError('Falha ao processar pagamento. Contate o suporte via WhatsApp.');
     } finally {
       setIsGeneratingPix(false);
     }

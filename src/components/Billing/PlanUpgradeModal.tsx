@@ -238,30 +238,26 @@ export const PlanUpgradeModal: React.FC = () => {
           setIsGeneratingPix(false);
           return;
         } else {
-          console.warn('Asaas API did not return pixPayload, checking direct pix key fallback');
+          notifyError('Erro no Asaas', 'Não foi possível gerar a cobrança PIX no Asaas. Por favor, contate o suporte via WhatsApp.');
+          setIsGeneratingPix(false);
+          return;
         }
       }
 
-      // 2. Fallback to Admin Direct PIX Key
+      // 2. Fallback to Admin Direct PIX Key only if real
       const directPixKey = billingConfig?.pixKey?.trim() || '';
-      if (directPixKey) {
+      if (directPixKey && directPixKey !== '48123456000190') {
         setPaymentId('');
         setPixPayload(directPixKey);
         setPixQrCodeBase64('');
         setPaymentStep('pix_checkout');
       } else {
-        notifyWarning('Chave Pix em Configuração', 'O administrador está configurando a chave Pix. Por favor, contate o suporte via WhatsApp.');
-        setPaymentId('');
-        setPixPayload('Chave Pix pendente de cadastro no Painel Admin');
-        setPixQrCodeBase64('');
-        setPaymentStep('pix_checkout');
+        notifyWarning('Suporte Financeiro', 'Por favor, contate o suporte via WhatsApp para faturamento e ativação.');
+        setIsGeneratingPix(false);
       }
     } catch (err) {
       console.error('Checkout error:', err);
-      const directPixKey = billingConfig?.pixKey?.trim() || '';
-      setPixPayload(directPixKey || 'Contate o suporte para obter a chave Pix');
-      setPixQrCodeBase64('');
-      setPaymentStep('pix_checkout');
+      notifyError('Erro no Checkout', 'Não foi possível iniciar o pagamento. Tente novamente.');
     } finally {
       setIsGeneratingPix(false);
     }
