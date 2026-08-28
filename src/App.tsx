@@ -26,7 +26,33 @@ import { WoodpileCubageModal } from './components/Forestry/WoodpileCubageModal';
 import { LegalPoliciesModal } from './components/Legal/LegalPoliciesModal';
 import { AppUpdateBanner } from './components/Common/AppUpdateBanner';
 import { PlanUpgradeModal } from './components/Billing/PlanUpgradeModal';
-import { Sparkles, Clock, AlertTriangle, ArrowRight } from 'lucide-react';
+import { Sparkles, Clock, AlertTriangle, ArrowRight, Lock } from 'lucide-react';
+
+const FeatureRestrictedView: React.FC<{ featureName: string }> = ({ featureName }) => {
+  const { openUpgradeModal } = useApp();
+  return (
+    <div className="h-full flex items-center justify-center p-4">
+      <div className="bg-slate-900 border border-slate-800 p-8 rounded-3xl max-w-md text-center shadow-2xl space-y-4">
+        <div className="w-14 h-14 rounded-2xl bg-amber-500/20 text-amber-400 border border-amber-500/30 flex items-center justify-center mx-auto">
+          <Lock className="w-7 h-7" />
+        </div>
+        <div className="space-y-1">
+          <h2 className="text-xl font-bold text-white">Funcionalidade Não Disponível</h2>
+          <p className="text-slate-400 text-xs leading-relaxed">
+            O recurso <strong className="text-white">"{featureName}"</strong> não está incluído no seu plano atual. Assine ou faça upgrade do seu plano para liberar o acesso imediatamente.
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={() => openUpgradeModal(featureName)}
+          className="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-emerald-500 to-sky-500 hover:from-emerald-400 hover:to-sky-400 text-slate-950 font-black text-xs uppercase tracking-wider transition-all shadow-lg active:scale-95 cursor-pointer"
+        >
+          Conhecer Planos & Fazer Upgrade
+        </button>
+      </div>
+    </div>
+  );
+};
 import { getUserRawItem } from './utils/userStorage';
 
 const MainAppContent: React.FC = () => {
@@ -39,6 +65,7 @@ const MainAppContent: React.FC = () => {
     isPoliciesModalOpen,
     setIsPoliciesModalOpen,
     openUpgradeModal,
+    hasFeatureAccess,
   } = useApp();
   const { profile } = useAuth();
 

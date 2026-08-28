@@ -44,6 +44,7 @@ export const Sidebar: React.FC = () => {
     setIsPoliciesModalOpen,
     fireIncidents,
     isProUser,
+    hasFeatureAccess,
     openUpgradeModal,
     billingConfig,
     notifyInfo,

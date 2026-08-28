@@ -78,6 +78,18 @@ export interface UserEntitlements {
   canCustomBrandingPdf: boolean;
 }
 
+export interface SystemFeature {
+  id: string;
+  key: string;
+  name: string;
+  description: string;
+  category: 'management' | 'maps' | 'safety' | 'forestry' | 'reports';
+  categoryLabel: string;
+  icon: string;
+  defaultFree: boolean;
+  routeTab?: string;
+}
+
 export interface PlanItemConfig {
   id: string;
   name: string;
@@ -90,6 +102,9 @@ export interface PlanItemConfig {
   highlight?: boolean;
   activeInShowcase?: boolean;
   description?: string;
+  allFeaturesAccess?: boolean; // Se true, libera todas as funcionalidades atuais e futuras
+  allowedFeatureKeys?: string[]; // Array de chaves de funcionalidades liberadas
+  maxConcurrentPdfMaps?: number;
 }
 
 export const DEFAULT_PLANS: PlanItemConfig[] = [

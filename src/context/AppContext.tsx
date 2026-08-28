@@ -29,6 +29,7 @@ import {
   DEFAULT_PLANS,
   UserEntitlements,
 } from '../types';
+import { checkFeatureAccess, getUserMaxPdfMaps } from '../utils/featureAccess';
 import {
   initialProjects,
   initialLayers,
@@ -71,6 +72,7 @@ interface AppContextType {
   openUpgradeModal: (featureName?: string) => void;
   billingConfig: SystemBillingConfig;
   canAddPdfMap: (currentMapCount: number) => { allowed: boolean; reason?: string; isFourthMapBlock?: boolean };
+  hasFeatureAccess: (featureKey: string) => boolean;
 
   // Field Trips / Rodada de Campo (Quilometragem)
   fieldRounds: FieldRound[];
@@ -385,6 +387,11 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   }, [profile]);
 
 
+  // Dynamic Feature Entitlements Check
+  const hasFeatureAccess = useCallback((featureKey: string): boolean => {
+    return checkFeatureAccess(profile, featureKey, billingConfig?.plans);
+  }, [profile, billingConfig?.plans]);
+
   // Centralized Entitlements Architecture
   const entitlements: UserEntitlements = useMemo(() => {
     const isOwner = profile?.role === 'super_admin' || profile?.email?.toLowerCase() === 'alexandre1604981@gmail.com';
@@ -392,34 +399,31 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
     return {
       isPro,
-      canAddUnlimitedPdfMaps: isPro,
-      canUseFieldRounds: isPro,
-      canUseWoodpileCubage: isPro,
-      canUseFireIncidents: isPro,
-      canExportKmlKmzGpx: isPro,
-      canDownloadOfflineTiles: isPro,
-      canUseAiAssistant: isPro,
-      maxConcurrentPdfMaps: isPro ? 999 : 2,
-      canCustomBrandingPdf: isPro,
+      canAddUnlimitedPdfMaps: isOwner || hasFeatureAccess('pdf_maps_unlimited'),
+      canUseFieldRounds: isOwner || hasFeatureAccess('field_rounds'),
+      canUseWoodpileCubage: isOwner || hasFeatureAccess('woodpile_cubage'),
+      canUseFireIncidents: isOwner || hasFeatureAccess('fire_incidents'),
+      canExportKmlKmzGpx: isOwner || hasFeatureAccess('kml_kmz_gpx'),
+      canDownloadOfflineTiles: isOwner || hasFeatureAccess('offline_tiles'),
+      canUseAiAssistant: false,
+      maxConcurrentPdfMaps: (isOwner || hasFeatureAccess('pdf_maps_unlimited')) ? 99999 : 2,
+      canCustomBrandingPdf: isOwner || hasFeatureAccess('custom_branding'),
     };
-  }, [isProUser, profile]);
+  }, [isProUser, profile, hasFeatureAccess]);
 
-  // Check if user can add a PDF map (Free plan: max 2 active/concurrent maps)
+  // Check if user can add a PDF map (Free plan: max 2 active/concurrent maps, Pro: unlimited)
   const canAddPdfMap = useCallback((currentMapCount: number): { allowed: boolean; reason?: string } => {
-    const isOwner = profile?.role === 'super_admin' || profile?.email?.toLowerCase() === 'alexandre1604981@gmail.com';
-    if (isProUser || isOwner) {
-      return { allowed: true };
-    }
+    const maxMaps = getUserMaxPdfMaps(profile, billingConfig?.plans);
 
-    if (currentMapCount >= 2) {
+    if (currentMapCount >= maxMaps) {
       return {
         allowed: false,
-        reason: 'O Plano Gratuito permite manter até 2 mapas PDF ativos simultaneamente. Exclua um dos mapas existentes para importar outro ou assine o Plano Profissional para mapas ilimitados.',
+        reason: `Seu plano atual permite manter até ${maxMaps} mapas PDF ativos simultaneamente. Exclua um dos mapas existentes para importar outro ou assine um plano com mapas ilimitados.`,
       };
     }
 
     return { allowed: true };
-  }, [isProUser, profile]);
+  }, [profile, billingConfig?.plans]);
 
   const toggleSidebarCollapsed = useCallback(() => {
     setIsSidebarCollapsed((prev) => {
@@ -1665,6 +1669,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         billingConfig,
         setBillingConfig,
         canAddPdfMap,
+    hasFeatureAccess,
         isSidebarCollapsed,
         toggleSidebarCollapsed,
       }}

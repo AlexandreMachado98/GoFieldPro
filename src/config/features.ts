@@ -1,0 +1,160 @@
+import { SystemFeature } from '../types';
+
+export const SYSTEM_FEATURES: SystemFeature[] = [
+  // 1. Gestão & Sistema
+  {
+    id: 'dashboard',
+    key: 'dashboard',
+    name: 'Painel Geral & Indicadores',
+    description: 'Acesso ao dashboard com métricas de campo, resumos e atividades recentes.',
+    category: 'management',
+    categoryLabel: 'Gestão & Sistema',
+    icon: 'LayoutDashboard',
+    defaultFree: true,
+    routeTab: 'home',
+  },
+  {
+    id: 'offline_sync',
+    key: 'offline_sync',
+    name: 'Sincronização em Nuvem & Cache',
+    description: 'Armazenamento seguro em nuvem e sincronização bidirecional de dados.',
+    category: 'management',
+    categoryLabel: 'Gestão & Sistema',
+    icon: 'Cloud',
+    defaultFree: false,
+    routeTab: 'offline',
+  },
+  {
+    id: 'team_management',
+    key: 'team_management',
+    name: 'Gestão de Equipe & Frota',
+    description: 'Controle de operadores, técnicos de campo e odômetro da frota.',
+    category: 'management',
+    categoryLabel: 'Gestão & Sistema',
+    icon: 'Users',
+    defaultFree: false,
+  },
+
+  // 2. Mapas & Geoprocessamento
+  {
+    id: 'pdf_maps',
+    key: 'pdf_maps',
+    name: 'Visualizador de Mapas PDF Georreferenciados',
+    description: 'Navegação GPS sobre plantas, projetos e mapas em formato PDF.',
+    category: 'maps',
+    categoryLabel: 'Mapas & Geoprocessamento',
+    icon: 'FileText',
+    defaultFree: true,
+    routeTab: 'pdf_maps',
+  },
+  {
+    id: 'pdf_maps_unlimited',
+    key: 'pdf_maps_unlimited',
+    name: 'Importação Ilimitada de Mapas PDF',
+    description: 'Armazenamento de mapas PDF sem restrições (Plano Free limitado a 2 mapas ativos).',
+    category: 'maps',
+    categoryLabel: 'Mapas & Geoprocessamento',
+    icon: 'Layers',
+    defaultFree: false,
+  },
+  {
+    id: 'kml_kmz_gpx',
+    key: 'kml_kmz_gpx',
+    name: 'Importação & Exportação KML / KMZ / GPX',
+    description: 'Troca de dados geoespaciais com Google Earth, QGIS, ArcGIS e GPS Garmin.',
+    category: 'maps',
+    categoryLabel: 'Mapas & Geoprocessamento',
+    icon: 'DownloadCloud',
+    defaultFree: false,
+    routeTab: 'layers',
+  },
+  {
+    id: 'offline_tiles',
+    key: 'offline_tiles',
+    name: 'Download de Mapas e Satélite Offline',
+    description: 'Download de mosaicos de satélite e relevo para uso 100% sem sinal de internet.',
+    category: 'maps',
+    categoryLabel: 'Mapas & Geoprocessamento',
+    icon: 'HardDrive',
+    defaultFree: false,
+  },
+  {
+    id: 'draw_tools',
+    key: 'draw_tools',
+    name: 'Ferramentas de Medição & Desenho Geo',
+    description: 'Cálculo automático de área (ha / m²), perímetro e distâncias no mapa.',
+    category: 'maps',
+    categoryLabel: 'Mapas & Geoprocessamento',
+    icon: 'Compass',
+    defaultFree: true,
+    routeTab: 'map',
+  },
+
+  // 3. Segurança do Trabalho & Campo
+  {
+    id: 'field_rounds',
+    key: 'field_rounds',
+    name: 'Rondas & Inspeções de Campo SST',
+    description: 'Checklists de conformidade, inspeção de segurança e registro fotográfico geolocalizado.',
+    category: 'safety',
+    categoryLabel: 'Segurança do Trabalho & Campo',
+    icon: 'ShieldCheck',
+    defaultFree: false,
+    routeTab: 'field_rounds',
+  },
+  {
+    id: 'fire_incidents',
+    key: 'fire_incidents',
+    name: 'Registro de Focos de Incêndio & Ocorrências',
+    description: 'Monitoramento, triagem e envio de alertas de focos de queimadas e emergências.',
+    category: 'safety',
+    categoryLabel: 'Segurança do Trabalho & Campo',
+    icon: 'Flame',
+    defaultFree: false,
+    routeTab: 'fire_incidents',
+  },
+
+  // 4. Silvicultura & Florestal
+  {
+    id: 'woodpile_cubage',
+    key: 'woodpile_cubage',
+    name: 'Cubagem de Madeira em Pilha (m³)',
+    description: 'Cálculo volumétrico estéreo e sólido utilizando métodos matemáticos Smalian e Huber.',
+    category: 'forestry',
+    categoryLabel: 'Silvicultura & Florestal',
+    icon: 'Trees',
+    defaultFree: false,
+  },
+
+  // 5. Laudos & Documentos
+  {
+    id: 'technical_reports',
+    key: 'technical_reports',
+    name: 'Emissão de Laudos Técnicos em PDF',
+    description: 'Relatórios profissionais completos com coordenadas, fotos, mapa estático e odômetro.',
+    category: 'reports',
+    categoryLabel: 'Laudos & Documentos',
+    icon: 'FileCheck',
+    defaultFree: false,
+  },
+  {
+    id: 'custom_branding',
+    key: 'custom_branding',
+    name: 'Logotipo & Cabeçalho Personalizado da Empresa',
+    description: 'Personalização visual dos laudos emitidos com a marca corporativa do cliente.',
+    category: 'reports',
+    categoryLabel: 'Laudos & Documentos',
+    icon: 'Sparkles',
+    defaultFree: false,
+  },
+];
+
+export const ALL_FEATURE_KEYS = SYSTEM_FEATURES.map((f) => f.key);
+
+export const FEATURE_CATEGORIES = [
+  { id: 'management', label: '📊 Gestão & Sistema' },
+  { id: 'maps', label: '🗺️ Mapas & Geoprocessamento' },
+  { id: 'safety', label: '🦺 Segurança do Trabalho & Campo' },
+  { id: 'forestry', label: '🌲 Silvicultura & Florestal' },
+  { id: 'reports', label: '📄 Laudos & Documentos' },
+];

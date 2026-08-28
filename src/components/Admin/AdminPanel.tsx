@@ -23,7 +23,9 @@ import {
   PlanItemConfig,
   DEFAULT_PLANS,
   AdminAuditLog,
+  SystemFeature,
 } from '../../types';
+import { SYSTEM_FEATURES, ALL_FEATURE_KEYS, FEATURE_CATEGORIES } from '../../config/features';
 import { testAsaasConnection } from '../../utils/asaasGateway';
 import { recordAdminAuditLog, fetchAdminAuditLogs } from '../../utils/auditLogger';
 import { exportUsersToCsv, exportFinancialSummaryToCsv, exportAuditLogsToCsv } from '../../utils/adminExport';
@@ -72,6 +74,11 @@ import {
   ToggleLeft,
   ToggleRight,
   AlertTriangle,
+  Crown,
+  ShieldCheck,
+  ChevronDown,
+  ChevronRight,
+  ChevronUp,
 } from 'lucide-react';
 
 const DEFAULT_BILLING_CONFIG: SystemBillingConfig = {
@@ -129,19 +136,65 @@ export const AdminPanel: React.FC = () => {
 
   const [savingBilling, setSavingBilling] = useState(false);
 
-  // Edit Plan Modal State
+      // Edit Plan Modal State
   const [editingPlan, setEditingPlan] = useState<PlanItemConfig | null>(null);
+  const [isCreatingPlan, setIsCreatingPlan] = useState<boolean>(false);
   const [planModalName, setPlanModalName] = useState('');
   const [planModalTag, setPlanModalTag] = useState('');
   const [planModalOriginalPrice, setPlanModalOriginalPrice] = useState<number>(0);
   const [planModalPrice, setPlanModalPrice] = useState<number>(0);
   const [planModalBadge, setPlanModalBadge] = useState('');
+  const [planModalPeriod, setPlanModalPeriod] = useState<string>('/mês');
   const [planModalFeaturesText, setPlanModalFeaturesText] = useState('');
-  const [savingPlanChanges, setSavingPlanChanges] = useState(false);
-  const [isCreatingPlan, setIsCreatingPlan] = useState<boolean>(false);
   const [planModalActiveInShowcase, setPlanModalActiveInShowcase] = useState<boolean>(true);
   const [planModalHighlight, setPlanModalHighlight] = useState<boolean>(false);
-  const [planModalPeriod, setPlanModalPeriod] = useState<string>('/mês');
+  const [savingPlanChanges, setSavingPlanChanges] = useState(false);
+
+  // Plan Feature Entitlements State
+  const [planModalAllFeatures, setPlanModalAllFeatures] = useState<boolean>(true);
+  const [planModalAllowedKeys, setPlanModalAllowedKeys] = useState<string[]>(ALL_FEATURE_KEYS);
+  const [planModalSearchFeature, setPlanModalSearchFeature] = useState<string>('');
+  const [planModalExpandedCategories, setPlanModalExpandedCategories] = useState<Record<string, boolean>>({
+    management: true,
+    maps: true,
+    safety: true,
+    forestry: true,
+    reports: true,
+  });
+  const [viewingPlanFeatures, setViewingPlanFeatures] = useState<PlanItemConfig | null>(null);
+
+  // Feature Selection Helpers
+  const handleToggleFeature = (key: string) => {
+    setPlanModalAllowedKeys((prev) =>
+      prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key]
+    );
+  };
+
+  const handleSelectAllFeatures = () => {
+    setPlanModalAllowedKeys(ALL_FEATURE_KEYS);
+  };
+
+  const handleDeselectAllFeatures = () => {
+    setPlanModalAllowedKeys([]);
+  };
+
+  const handleToggleCategory = (category: string) => {
+    const catKeys = SYSTEM_FEATURES.filter((f) => f.category === category).map((f) => f.key);
+    const allSelected = catKeys.every((k) => planModalAllowedKeys.includes(k));
+
+    if (allSelected) {
+      setPlanModalAllowedKeys((prev) => prev.filter((k) => !catKeys.includes(k)));
+    } else {
+      setPlanModalAllowedKeys((prev) => Array.from(new Set([...prev, ...catKeys])));
+    }
+  };
+
+  const handleToggleAccordion = (category: string) => {
+    setPlanModalExpandedCategories((prev) => ({
+      ...prev,
+      [category]: !prev[category],
+    }));
+  };
 
   // Promo Coupons State
   const [coupons, setCoupons] = useState<PromoCoupon[]>([]);
@@ -1743,6 +1796,94 @@ export const AdminPanel: React.FC = () => {
         </div>
       )}
 
+      {/* MODAL: VIEW PLAN FEATURES DETAILS */}
+      {viewingPlanFeatures && (
+        <div className="fixed inset-0 z-[9999] bg-black/80 backdrop-blur-sm flex items-center justify-center p-3">
+          <div className="bg-slate-900 border border-slate-800 w-full max-w-lg rounded-2xl shadow-2xl p-5 space-y-4 max-h-[85vh] flex flex-col">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="text-base font-black text-white">{viewingPlanFeatures.name}</span>
+                  <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-slate-800 text-slate-300">
+                    {viewingPlanFeatures.tag}
+                  </span>
+                </div>
+                <p className="text-xs text-slate-400 mt-0.5">
+                  R$ {viewingPlanFeatures.price.toFixed(2).replace('.', ',')} {viewingPlanFeatures.billingPeriod || '/mês'}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setViewingPlanFeatures(null)}
+                className="p-1.5 rounded-full bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto space-y-3 pr-1 text-xs">
+              <div className="p-3 bg-slate-950 rounded-xl border border-slate-800 flex items-center justify-between">
+                <span className="font-bold text-slate-300">Status de Permissão Geral:</span>
+                <span className="font-black text-emerald-400">
+                  {viewingPlanFeatures.allFeaturesAccess
+                    ? 'Acesso Completo (Todas as Funcionalidades)'
+                    : `${(viewingPlanFeatures.allowedFeatureKeys || []).length} de ${SYSTEM_FEATURES.length} Recursos Liberados`}
+                </span>
+              </div>
+
+              <div className="space-y-2">
+                {SYSTEM_FEATURES.map((feat) => {
+                  const isLiberado =
+                    viewingPlanFeatures.allFeaturesAccess ||
+                    (Array.isArray(viewingPlanFeatures.allowedFeatureKeys) &&
+                      viewingPlanFeatures.allowedFeatureKeys.includes(feat.key));
+
+                  return (
+                    <div
+                      key={feat.key}
+                      className={`p-2.5 rounded-xl border flex items-center justify-between gap-2 ${
+                        isLiberado
+                          ? 'bg-emerald-950/20 border-emerald-500/40 text-white'
+                          : 'bg-slate-950 border-slate-800/80 text-slate-500 opacity-60'
+                      }`}
+                    >
+                      <div>
+                        <div className="font-bold text-xs flex items-center gap-1.5">
+                          {isLiberado ? (
+                            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+                          ) : (
+                            <Lock className="w-3.5 h-3.5 text-slate-600" />
+                          )}
+                          <span>{feat.name}</span>
+                        </div>
+                        <p className="text-[10px] text-slate-400 mt-0.5">{feat.description}</p>
+                      </div>
+                      <span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded-full border ${
+                        isLiberado
+                          ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30'
+                          : 'bg-slate-900 text-slate-600 border-slate-800'
+                      }`}>
+                        {isLiberado ? 'Liberado' : 'Bloqueado'}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div className="pt-2 border-t border-slate-800 flex justify-end">
+              <button
+                type="button"
+                onClick={() => setViewingPlanFeatures(null)}
+                className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs rounded-xl cursor-pointer"
+              >
+                Fechar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* MODAL: EDIT/CREATE PLAN */}
       {editingPlan && (
         <div className="fixed inset-0 z-[9999] bg-black/80 backdrop-blur-sm flex items-center justify-center p-3">
@@ -1827,13 +1968,196 @@ export const AdminPanel: React.FC = () => {
               </div>
 
               <div className="col-span-2">
-                <label className="block text-slate-400 font-bold mb-1">Benefícios (1 por linha)</label>
+                <label className="block text-slate-400 font-bold mb-1">Texto de Benefícios na Vitrine (1 por linha)</label>
                 <textarea
                   value={planModalFeaturesText}
                   onChange={(e) => setPlanModalFeaturesText(e.target.value)}
-                  rows={4}
+                  rows={3}
+                  placeholder="Mapas PDF e GPS Ilimitados&#10;Medição de Pilha de Madeira (m³)&#10;Relatórios Técnicos em PDF com Fotos"
                   className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-white font-mono text-xs"
                 />
+              </div>
+
+              {/* SEÇÃO: FUNCIONALIDADES DISPONÍVEIS NESTE PLANO (RBAC / ENTITLEMENTS) */}
+              <div className="col-span-2 pt-3 border-t border-slate-800 space-y-3">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                  <div>
+                    <h4 className="text-xs font-black uppercase tracking-wider text-emerald-400 flex items-center gap-1.5">
+                      <ShieldCheck className="w-4 h-4" />
+                      <span>Funcionalidades Disponíveis Neste Plano</span>
+                    </h4>
+                    <p className="text-[11px] text-slate-400">
+                      Defina exatamente quais módulos e recursos do sistema estarão liberados para os usuários deste plano.
+                    </p>
+                  </div>
+
+                  <div className="flex items-center gap-1.5 text-xs">
+                    <span className="px-2.5 py-1 rounded-full bg-slate-950 border border-slate-800 font-black text-white text-[11px]">
+                      {planModalAllFeatures
+                        ? `${SYSTEM_FEATURES.length} de ${SYSTEM_FEATURES.length} Liberadas`
+                        : `${planModalAllowedKeys.length} de ${SYSTEM_FEATURES.length} Liberadas`}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Master Switch: Acesso Completo ao Sistema */}
+                <div className="p-3.5 rounded-2xl bg-gradient-to-r from-purple-950/50 via-slate-950 to-slate-950 border border-purple-500/40 flex items-center justify-between gap-3 shadow-md">
+                  <div className="space-y-0.5">
+                    <div className="flex items-center gap-2">
+                      <Crown className="w-4 h-4 text-amber-400" />
+                      <span className="text-xs font-black text-white">Acesso Completo ao Sistema</span>
+                    </div>
+                    <p className="text-[10px] text-slate-400">
+                      Libera 100% de todas as funcionalidades atuais e futuras para os assinantes deste plano (Ideal para Planos Pro / Enterprise).
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setPlanModalAllFeatures(!planModalAllFeatures)}
+                    className={`px-3.5 py-1.5 rounded-xl font-black text-xs transition-all flex items-center gap-1.5 cursor-pointer ${
+                      planModalAllFeatures
+                        ? 'bg-purple-600 text-white shadow-lg shadow-purple-900/50'
+                        : 'bg-slate-800 text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    {planModalAllFeatures ? 'LIBERADO (TOTAL)' : 'PERSONALIZAR'}
+                  </button>
+                </div>
+
+                {/* Granular Feature Checkboxes (When not in allFeaturesAccess mode) */}
+                {!planModalAllFeatures && (
+                  <div className="space-y-3 p-3 bg-slate-950/70 border border-slate-800/80 rounded-2xl animate-in fade-in">
+                    {/* Search and Quick Batch Selectors */}
+                    <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2">
+                      <div className="relative flex-1">
+                        <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                        <input
+                          type="text"
+                          value={planModalSearchFeature}
+                          onChange={(e) => setPlanModalSearchFeature(e.target.value)}
+                          placeholder="Pesquisar funcionalidade ou módulo..."
+                          className="w-full bg-slate-900 border border-slate-800 rounded-xl pl-8 pr-3 py-1.5 text-xs text-white placeholder:text-slate-500 focus:outline-none focus:border-sky-500"
+                        />
+                      </div>
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        <button
+                          type="button"
+                          onClick={handleSelectAllFeatures}
+                          className="px-2.5 py-1 rounded-lg bg-emerald-950/60 hover:bg-emerald-900/80 border border-emerald-500/40 text-emerald-300 font-bold text-[10px] cursor-pointer"
+                        >
+                          Selecionar Todas
+                        </button>
+                        <button
+                          type="button"
+                          onClick={handleDeselectAllFeatures}
+                          className="px-2.5 py-1 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-400 hover:text-white font-bold text-[10px] cursor-pointer"
+                        >
+                          Desmarcar Todas
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Categorized Accordion Groups */}
+                    <div className="space-y-2.5 max-h-[350px] overflow-y-auto pr-1">
+                      {FEATURE_CATEGORIES.map((cat) => {
+                        const catFeatures = SYSTEM_FEATURES.filter(
+                          (f) =>
+                            f.category === cat.id &&
+                            (!planModalSearchFeature.trim() ||
+                              f.name.toLowerCase().includes(planModalSearchFeature.toLowerCase()) ||
+                              f.description.toLowerCase().includes(planModalSearchFeature.toLowerCase()))
+                        );
+
+                        if (catFeatures.length === 0) return null;
+
+                        const isExpanded = planModalExpandedCategories[cat.id] ?? true;
+                        const catKeys = catFeatures.map((f) => f.key);
+                        const selectedInCatCount = catKeys.filter((k) => planModalAllowedKeys.includes(k)).length;
+                        const isCatAllSelected = selectedInCatCount === catKeys.length;
+
+                        return (
+                          <div key={cat.id} className="border border-slate-800/90 rounded-xl overflow-hidden bg-slate-900/80">
+                            <div className="p-2.5 bg-slate-950/90 flex items-center justify-between gap-2 border-b border-slate-800/80">
+                              <button
+                                type="button"
+                                onClick={() => handleToggleAccordion(cat.id)}
+                                className="flex items-center gap-2 font-black text-xs text-white hover:text-sky-400 transition-colors flex-1 text-left cursor-pointer"
+                              >
+                                {isExpanded ? <ChevronDown className="w-3.5 h-3.5 text-slate-400" /> : <ChevronRight className="w-3.5 h-3.5 text-slate-400" />}
+                                <span>{cat.label}</span>
+                                <span className="text-[10px] font-normal text-slate-400">
+                                  ({selectedInCatCount}/{catFeatures.length})
+                                </span>
+                              </button>
+
+                              <button
+                                type="button"
+                                onClick={() => handleToggleCategory(cat.id)}
+                                className={`text-[10px] font-bold px-2 py-0.5 rounded-md border transition-all cursor-pointer ${
+                                  isCatAllSelected
+                                    ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30 hover:bg-rose-500/20 hover:text-rose-300 hover:border-rose-500/30'
+                                    : 'bg-slate-800 text-slate-300 border-slate-700 hover:text-white'
+                                }`}
+                              >
+                                {isCatAllSelected ? 'Desmarcar Categoria' : 'Selecionar Categoria'}
+                              </button>
+                            </div>
+
+                            {isExpanded && (
+                              <div className="p-2.5 space-y-2">
+                                {catFeatures.map((feat) => {
+                                  const isAllowed = planModalAllowedKeys.includes(feat.key);
+                                  return (
+                                    <div
+                                      key={feat.key}
+                                      onClick={() => handleToggleFeature(feat.key)}
+                                      className={`p-2 rounded-xl border flex items-center justify-between gap-2.5 cursor-pointer transition-all ${
+                                        isAllowed
+                                          ? 'bg-emerald-950/30 border-emerald-500/50 hover:border-emerald-400'
+                                          : 'bg-slate-950/60 border-slate-800/80 hover:border-slate-700 opacity-70'
+                                      }`}
+                                    >
+                                      <div className="flex items-start gap-2">
+                                        <div className={`w-4 h-4 rounded mt-0.5 flex items-center justify-center shrink-0 border transition-all ${
+                                          isAllowed
+                                            ? 'bg-emerald-500 border-emerald-400 text-slate-950'
+                                            : 'border-slate-700 bg-slate-900'
+                                        }`}>
+                                          {isAllowed && <Check className="w-3 h-3 stroke-[3]" />}
+                                        </div>
+                                        <div>
+                                          <div className="text-xs font-bold text-white leading-tight flex items-center gap-1.5">
+                                            <span>{feat.name}</span>
+                                            {feat.defaultFree && (
+                                              <span className="text-[8px] font-black px-1.5 py-0.2 rounded bg-sky-500/20 text-sky-300 border border-sky-500/30">
+                                                FREE INCLUSO
+                                              </span>
+                                            )}
+                                          </div>
+                                          <p className="text-[10px] text-slate-400 mt-0.5 leading-snug">{feat.description}</p>
+                                        </div>
+                                      </div>
+
+                                      <div className="shrink-0">
+                                        <span className={`text-[10px] font-black uppercase px-2 py-0.5 rounded-full border ${
+                                          isAllowed
+                                            ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30'
+                                            : 'bg-slate-900 text-slate-500 border-slate-800'
+                                        }`}>
+                                          {isAllowed ? 'Liberado' : 'Bloqueado'}
+                                        </span>
+                                      </div>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
 
