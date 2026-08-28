@@ -93,7 +93,7 @@ const DEFAULT_BILLING_CONFIG: SystemBillingConfig = {
 
 export const AdminPanel: React.FC = () => {
   const { profile } = useAuth();
-  const { notifySuccess, notifyError, notifyInfo, showConfirm } = useApp();
+  const { notifySuccess, notifyError, notifyInfo, notifyWarning, showConfirm } = useApp();
 
   // Navigation subtabs inside SuperAdmin
   const [adminTab, setAdminTab] = useState<
@@ -609,6 +609,113 @@ export const AdminPanel: React.FC = () => {
     }
   };
 
+  // Delete User Permanently
+  const handleDeleteUser = async (userToDelete: UserProfile) => {
+    if (userToDelete.email?.toLowerCase() === 'alexandre1604981@gmail.com') {
+      notifyWarning('Ação Não Permitida', 'Não é possível excluir a conta do Super Administrador.');
+      return;
+    }
+
+    showConfirm({
+      title: 'Excluir Usuário Permanentemente?',
+      message: `Tem certeza que deseja remover permanentemente o cadastro de ${userToDelete.name} (${userToDelete.email})? Esta ação não pode ser desfeita e todos os dados serão apagados.`,
+      confirmText: 'Excluir Permanentemente',
+      cancelText: 'Cancelar',
+      type: 'danger',
+      onConfirm: async () => {
+        try {
+          const userRef = doc(db, 'users', userToDelete.uid);
+          await deleteDoc(userRef);
+          setUsers((prev) => prev.filter((u) => u.uid !== userToDelete.uid));
+
+          await recordAdminAuditLog({
+            adminUid: profile?.uid || 'super_admin',
+            adminEmail: profile?.email || 'admin@am-tst.com.br',
+            adminName: profile?.name || 'Super Admin',
+            action: 'DELETE_USER',
+            targetType: 'user',
+            targetId: userToDelete.uid,
+            targetName: userToDelete.name,
+            reason: `Exclusão permanente do usuário ${userToDelete.name} (${userToDelete.email})`,
+          });
+
+          notifySuccess('Usuário Excluído com Sucesso!', `O registro de ${userToDelete.name} foi removido.`);
+        } catch (error) {
+          console.error('Error deleting user:', error);
+          notifyError('Erro ao Excluir', 'Não foi possível remover o registro do usuário.');
+        }
+      },
+    });
+  };
+
+  // Delete All Pending Users in Batch
+  const handleDeleteAllPendingUsers = async () => {
+    const pendingList = users.filter((u) => u.status === 'pending');
+    if (pendingList.length === 0) {
+      notifyInfo('Nenhum Pendente', 'Não há usuários com cadastro pendente para excluir.');
+      return;
+    }
+
+    showConfirm({
+      title: 'Excluir Todos os Usuários Pendentes?',
+      message: `Tem certeza que deseja remover permanentemente todos os ${pendingList.length} cadastros pendentes de uma só vez?`,
+      confirmText: `Excluir ${pendingList.length} Pendentes`,
+      cancelText: 'Cancelar',
+      type: 'danger',
+      onConfirm: async () => {
+        try {
+          await Promise.all(pendingList.map((u) => deleteDoc(doc(db, 'users', u.uid))));
+          setUsers((prev) => prev.filter((u) => u.status !== 'pending'));
+
+          await recordAdminAuditLog({
+            adminUid: profile?.uid || 'super_admin',
+            adminEmail: profile?.email || 'admin@am-tst.com.br',
+            adminName: profile?.name || 'Super Admin',
+            action: 'DELETE_PENDING_USERS',
+            targetType: 'user',
+            targetId: 'batch_pending',
+            reason: `Exclusão em lote de ${pendingList.length} cadastros pendentes`,
+          });
+
+          notifySuccess('Pendentes Excluídos!', `${pendingList.length} usuário(s) pendente(s) foram excluídos com sucesso.`);
+        } catch (error) {
+          notifyError('Erro', 'Não foi possível excluir os cadastros pendentes.');
+        }
+      },
+    });
+  };
+
+  // Approve Pending User
+  const handleApproveUser = async (userToApprove: UserProfile) => {
+    try {
+      const userRef = doc(db, 'users', userToApprove.uid);
+      await updateDoc(userRef, {
+        status: 'active',
+        approvedAt: new Date().toISOString(),
+        approvedBy: profile?.name || 'Super Admin',
+      });
+
+      setUsers((prev) =>
+        prev.map((u) => (u.uid === userToApprove.uid ? { ...u, status: 'active' } : u))
+      );
+
+      await recordAdminAuditLog({
+        adminUid: profile?.uid || 'super_admin',
+        adminEmail: profile?.email || 'admin@am-tst.com.br',
+        adminName: profile?.name || 'Super Admin',
+        action: 'APPROVE_USER',
+        targetType: 'user',
+        targetId: userToApprove.uid,
+        targetName: userToApprove.name,
+        reason: 'Aprovação manual de acesso ao aplicativo',
+      });
+
+      notifySuccess('Acesso Liberado!', `${userToApprove.name} agora está ativo no GoField Pro.`);
+    } catch (err) {
+      notifyError('Erro', 'Não foi possível aprovar o usuário.');
+    }
+  };
+
   // Unblock User Handler
   const handleUnblockUser = async (userToUnblock: UserProfile) => {
     showConfirm({
@@ -1041,33 +1148,80 @@ export const AdminPanel: React.FC = () => {
       {/* TAB 2: CLIENTS & USERS MANAGEMENT */}
       {adminTab === 'users' && (
         <div className="space-y-4 animate-in fade-in">
-          {/* Filters Bar */}
-          <div className="bg-slate-900 border border-slate-800 p-4 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-            <div className="relative flex-1">
-              <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Buscar por nome, e-mail, empresa ou telefone..."
-                className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-9 pr-4 py-2 text-xs text-white focus:outline-none focus:border-sky-500"
-              />
+          {/* Filters & Status Bar */}
+          <div className="bg-slate-900 border border-slate-800 p-4 rounded-2xl space-y-3">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div className="relative flex-1">
+                <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Buscar por nome, e-mail, empresa ou telefone..."
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-9 pr-4 py-2 text-xs text-white focus:outline-none focus:border-sky-500"
+                />
+              </div>
+
+              <div className="flex items-center gap-2 flex-wrap">
+                {users.some((u) => u.status === 'pending') && (
+                  <button
+                    onClick={handleDeleteAllPendingUsers}
+                    className="bg-rose-950/80 hover:bg-rose-900 text-rose-300 border border-rose-800/80 px-3 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 cursor-pointer shadow-md transition-all active:scale-95"
+                  >
+                    <Trash2 className="w-3.5 h-3.5 text-rose-400" />
+                    <span>Excluir Todos os Pendentes ({users.filter((u) => u.status === 'pending').length})</span>
+                  </button>
+                )}
+                <button
+                  onClick={() => exportUsersToCsv(users)}
+                  className="bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 px-3 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 cursor-pointer"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  <span>Exportar CSV</span>
+                </button>
+                <button
+                  onClick={() => setIsAddUserModalOpen(true)}
+                  className="bg-sky-600 hover:bg-sky-500 text-white px-3 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 cursor-pointer"
+                >
+                  <UserPlus className="w-3.5 h-3.5" />
+                  <span>Adicionar Usuário</span>
+                </button>
+              </div>
             </div>
 
-            <div className="flex items-center gap-2 flex-wrap">
+            {/* Status Pills */}
+            <div className="flex items-center gap-2 pt-2 border-t border-slate-800/60 overflow-x-auto">
               <button
-                onClick={() => exportUsersToCsv(users)}
-                className="bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 px-3 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 cursor-pointer"
+                onClick={() => setFilterStatus('all')}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold cursor-pointer transition-all ${
+                  filterStatus === 'all' ? 'bg-sky-600 text-white shadow-md' : 'bg-slate-950 text-slate-400 hover:text-white'
+                }`}
               >
-                <Download className="w-3.5 h-3.5" />
-                <span>Exportar CSV</span>
+                Todos ({users.length})
               </button>
               <button
-                onClick={() => setIsAddUserModalOpen(true)}
-                className="bg-sky-600 hover:bg-sky-500 text-white px-3 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 cursor-pointer"
+                onClick={() => setFilterStatus('active')}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold cursor-pointer transition-all ${
+                  filterStatus === 'active' ? 'bg-emerald-600 text-white shadow-md' : 'bg-slate-950 text-slate-400 hover:text-white'
+                }`}
               >
-                <UserPlus className="w-3.5 h-3.5" />
-                <span>Adicionar Usuário</span>
+                Ativos ({users.filter((u) => u.status === 'active').length})
+              </button>
+              <button
+                onClick={() => setFilterStatus('pending')}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold cursor-pointer transition-all ${
+                  filterStatus === 'pending' ? 'bg-amber-600 text-white shadow-md' : 'bg-slate-950 text-slate-400 hover:text-white'
+                }`}
+              >
+                Pendentes ({users.filter((u) => u.status === 'pending').length})
+              </button>
+              <button
+                onClick={() => setFilterStatus('blocked')}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold cursor-pointer transition-all ${
+                  filterStatus === 'blocked' ? 'bg-rose-600 text-white shadow-md' : 'bg-slate-950 text-slate-400 hover:text-white'
+                }`}
+              >
+                Bloqueados ({users.filter((u) => u.status === 'blocked' || u.subscriptionStatus === 'suspended').length})
               </button>
             </div>
           </div>
@@ -1121,6 +1275,15 @@ export const AdminPanel: React.FC = () => {
                           )}
                         </td>
                         <td className="p-3.5 text-right space-x-1.5">
+                          {u.status === 'pending' && (
+                            <button
+                              onClick={() => handleApproveUser(u)}
+                              title="Aprovar Acesso"
+                              className="p-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg transition-all cursor-pointer shadow-md"
+                            >
+                              <UserCheck className="w-4 h-4" />
+                            </button>
+                          )}
                           {isBlocked ? (
                             <button
                               onClick={() => handleUnblockUser(u)}
@@ -1136,7 +1299,7 @@ export const AdminPanel: React.FC = () => {
                                 setBlockReason('');
                               }}
                               title="Bloquear Usuário"
-                              className="p-1.5 bg-rose-950/60 hover:bg-rose-800 border border-rose-500/40 text-rose-300 rounded-lg transition-all cursor-pointer"
+                              className="p-1.5 bg-amber-950/60 hover:bg-amber-800 border border-amber-500/40 text-amber-300 rounded-lg transition-all cursor-pointer"
                             >
                               <Lock className="w-4 h-4" />
                             </button>
@@ -1148,6 +1311,15 @@ export const AdminPanel: React.FC = () => {
                           >
                             <Send className="w-4 h-4" />
                           </button>
+                          {u.email !== 'alexandre1604981@gmail.com' && (
+                            <button
+                              onClick={() => handleDeleteUser(u)}
+                              title="Excluir Permanentemente"
+                              className="p-1.5 bg-rose-950/60 hover:bg-rose-800 border border-rose-600/40 text-rose-300 rounded-lg transition-all cursor-pointer"
+                            >
+                              <Trash2 className="w-4 h-4 text-rose-400" />
+                            </button>
+                          )}
                         </td>
                       </tr>
                     );
