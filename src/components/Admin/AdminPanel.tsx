@@ -349,7 +349,14 @@ export const AdminPanel: React.FC = () => {
       const result = await testAsaasConnection(billingConfig);
       setAsaasTestStatus(result);
       if (result.success) {
-        notifySuccess('Asaas Conectado!', result.message);
+        notifySuccess('Asaas Conectado e Salvo!', `${result.message} A chave de API foi salva com sucesso no sistema.`);
+        const newConfig = { ...billingConfig, plans };
+        localStorage.setItem('gofield_billing_config', JSON.stringify(newConfig));
+        try {
+          await setDoc(doc(db, 'system_config', 'billing'), newConfig, { merge: true });
+        } catch (e) {
+          console.warn('Firestore auto-save notice:', e);
+        }
       } else {
         notifyError('Falha no Asaas', result.message);
       }
@@ -1752,17 +1759,28 @@ export const AdminPanel: React.FC = () => {
               </div>
             </div>
 
-            {/* Test Connection Button & Status */}
+            {/* Test Connection Button, Save Button & Status */}
             <div className="pt-1 flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-t border-slate-800/80">
-              <button
-                type="button"
-                onClick={handleTestAsaasConnection}
-                disabled={isTestingAsaas}
-                className="px-3.5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-black text-xs flex items-center justify-center gap-1.5 shadow transition-all active:scale-95 cursor-pointer disabled:opacity-50"
-              >
-                <RefreshCw className={`w-3.5 h-3.5 ${isTestingAsaas ? 'animate-spin' : ''}`} />
-                <span>{isTestingAsaas ? 'Testando Conexão...' : 'Testar Conexão com o Asaas'}</span>
-              </button>
+              <div className="flex items-center gap-2 flex-wrap">
+                <button
+                  type="button"
+                  onClick={handleTestAsaasConnection}
+                  disabled={isTestingAsaas}
+                  className="px-3.5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-black text-xs flex items-center justify-center gap-1.5 shadow transition-all active:scale-95 cursor-pointer disabled:opacity-50"
+                >
+                  <RefreshCw className={`w-3.5 h-3.5 ${isTestingAsaas ? 'animate-spin' : ''}`} />
+                  <span>{isTestingAsaas ? 'Testando Conexão...' : 'Testar Conexão com o Asaas'}</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={(e) => handleSaveBillingConfig(e as any)}
+                  disabled={savingBilling}
+                  className="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs flex items-center justify-center gap-1.5 shadow transition-all active:scale-95 cursor-pointer"
+                >
+                  <Check className="w-3.5 h-3.5" />
+                  <span>Salvar Chave Asaas</span>
+                </button>
+              </div>
 
               {asaasTestStatus && (
                 <div className={`text-xs px-3 py-1.5 rounded-xl border flex items-center gap-1.5 ${
@@ -1782,10 +1800,10 @@ export const AdminPanel: React.FC = () => {
             <div className="border-b border-slate-800 pb-3">
               <h3 className="text-sm sm:text-base font-extrabold text-white flex items-center gap-2">
                 <QrCode className="w-4 h-4 sm:w-5 sm:h-5 text-amber-400" />
-                Chave Pix Direta & Suporte WhatsApp (Contingência)
+                Chave Pix Direta & Suporte WhatsApp (Contingência / Opcional)
               </h3>
               <p className="text-[11px] sm:text-xs text-slate-400 mt-1">
-                Utilizado para transferências manuais ou como contingência quando o cliente preferir falar diretamente no WhatsApp.
+                Opcional: utilizado apenas para transferências manuais ou quando o cliente preferir falar diretamente no WhatsApp.
               </p>
             </div>
 
@@ -1793,7 +1811,7 @@ export const AdminPanel: React.FC = () => {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <label className="block text-[10px] sm:text-[11px] font-bold text-slate-300 uppercase mb-1">
-                  Tipo da Chave Pix
+                  Tipo da Chave Pix (Opcional)
                 </label>
                 <select
                   value={billingConfig.pixKeyType}
@@ -1809,12 +1827,11 @@ export const AdminPanel: React.FC = () => {
 
               <div>
                 <label className="block text-[10px] sm:text-[11px] font-bold text-slate-300 uppercase mb-1">
-                  Sua Chave Pix *
+                  Sua Chave Pix (Opcional)
                 </label>
                 <input
                   type="text"
-                  required
-                  value={billingConfig.pixKey}
+                  value={billingConfig.pixKey || ''}
                   onChange={(e) => setBillingConfig((p) => ({ ...p, pixKey: e.target.value }))}
                   placeholder="Ex: seuemail@dominio.com ou CNPJ ou Telefone"
                   className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white font-mono focus:outline-none focus:border-amber-500"
@@ -1823,12 +1840,11 @@ export const AdminPanel: React.FC = () => {
 
               <div>
                 <label className="block text-[10px] sm:text-[11px] font-bold text-slate-300 uppercase mb-1">
-                  Nome do Titular / Razão Social *
+                  Nome do Titular / Razão Social (Opcional)
                 </label>
                 <input
                   type="text"
-                  required
-                  value={billingConfig.beneficiaryName}
+                  value={billingConfig.beneficiaryName || ''}
                   onChange={(e) => setBillingConfig((p) => ({ ...p, beneficiaryName: e.target.value }))}
                   placeholder="Ex: Nome Completo ou Razão Social"
                   className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-amber-500"
