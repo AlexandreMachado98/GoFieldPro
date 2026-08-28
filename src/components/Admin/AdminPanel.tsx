@@ -1,3 +1,4 @@
+import { sanitizeFirestorePayload } from '../../utils/firestoreSanitizer';
 import { formatCurrencyBRL } from '../../utils/commercialVisibility';
 import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import {
@@ -459,14 +460,15 @@ export const AdminPanel: React.FC = () => {
       const newConfig: SystemBillingConfig = {
         ...billingConfig,
         plans,
-        proLaunchPrice: proPlan ? proPlan.price : billingConfig.proLaunchPrice,
-        proOriginalPrice: proPlan ? proPlan.originalPrice : billingConfig.proOriginalPrice,
-        proDiscountBadge: proPlan?.discountBadge || billingConfig.proDiscountBadge,
+        proLaunchPrice: proPlan ? proPlan.price : (billingConfig.proLaunchPrice || 44.99),
+        proOriginalPrice: proPlan ? proPlan.originalPrice : (billingConfig.proOriginalPrice || 97.99),
+        proDiscountBadge: proPlan?.discountBadge || billingConfig.proDiscountBadge || '',
       };
       localStorage.setItem('gofield_billing_config', JSON.stringify(newConfig));
       localStorage.setItem('gofield_custom_plans', JSON.stringify(plans));
 
-      await setDoc(doc(db, 'system_config', 'billing'), newConfig, { merge: true });
+      const cleanBillingPayload = sanitizeFirestorePayload(newConfig);
+      await setDoc(doc(db, 'system_config', 'billing'), cleanBillingPayload, { merge: true });
 
       await recordAdminAuditLog({
         adminUid: profile?.uid || 'super_admin',
@@ -505,7 +507,7 @@ export const AdminPanel: React.FC = () => {
     setBillingConfig(updatedConfig);
     localStorage.setItem('gofield_billing_config', JSON.stringify(updatedConfig));
 
-    await setDoc(doc(db, 'system_config', 'billing'), updatedConfig, { merge: true });
+    await setDoc(doc(db, 'system_config', 'billing'), sanitizeFirestorePayload(updatedConfig), { merge: true });
 
     await recordAdminAuditLog({
       adminUid: profile?.uid || 'super_admin',
@@ -580,7 +582,7 @@ export const AdminPanel: React.FC = () => {
     notifySuccess('Plano Duplicado!', `Criada cópia de "${plan.name}" (oculta por padrão).`);
   };
 
-  // Save Plan Changes & Log Price Alteration
+  // Save Plan Changes & Log Price Alteration (100% Clean Payload - Zero Undefined)
   const handleSavePlanChanges = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingPlan) return;
@@ -592,35 +594,55 @@ export const AdminPanel: React.FC = () => {
         .map((f) => f.replace(/^[-*•]\s*/, '').trim())
         .filter((f) => f.length > 0);
 
-      const cleanOrigPrice = Number(planModalOriginalPrice) || 0;
-      const cleanPrice = Number(planModalPrice) || 0;
-      const cleanPromoPrice = planModalPromoPrice.trim() !== '' ? Number(planModalPromoPrice) : undefined;
-      const cleanPromoStartsAt = planModalPromoStartsAt.trim() || undefined;
-      const cleanPromoExpiresAt = planModalPromoExpiresAt.trim() || undefined;
+      const cleanOrigPrice = typeof planModalOriginalPrice === 'number' ? planModalOriginalPrice : Number(String(planModalOriginalPrice || '0').replace(',', '.'));
+      const cleanPrice = typeof planModalPrice === 'number' ? planModalPrice : Number(String(planModalPrice || '0').replace(',', '.'));
+
+      if (isNaN(cleanPrice) || cleanPrice < 0) {
+        notifyError('Valor Inválido', 'Por favor, informe um preço numérico válido (maior ou igual a zero).');
+        setSavingPlanChanges(false);
+        return;
+      }
+
+      const cleanPromoNum = planModalPromoPrice.trim() !== '' ? Number(planModalPromoPrice.replace(',', '.')) : null;
+      const cleanPromoStarts = planModalPromoStartsAt.trim() || null;
+      const cleanPromoExpires = planModalPromoExpiresAt.trim() || null;
 
       const existingPlan = plans.find((p) => p.id === editingPlan.id);
       let updatedPlans: PlanItemConfig[];
 
+      const buildCleanItem = (base?: Partial<PlanItemConfig>): PlanItemConfig => {
+        const item: PlanItemConfig = {
+          id: editingPlan.id,
+          name: planModalName.trim() || base?.name || 'Plano',
+          tag: planModalTag.trim() || base?.tag || 'Profissional',
+          originalPrice: !isNaN(cleanOrigPrice) && cleanOrigPrice >= 0 ? cleanOrigPrice : cleanPrice,
+          price: cleanPrice,
+          discountBadge: planModalBadge.trim() || '',
+          billingPeriod: planModalPeriod || (cleanPrice === 0 ? '/sempre' : base?.billingPeriod || '/mês'),
+          highlight: Boolean(planModalHighlight),
+          activeInShowcase: Boolean(planModalActiveInShowcase),
+          features: updatedFeatures.length > 0 ? updatedFeatures : (base?.features || ['Mapas PDF Ilimitados']),
+          allFeaturesAccess: cleanPrice === 0 ? false : Boolean(planModalAllFeatures),
+          allowedFeatureKeys: planModalAllowedKeys || base?.allowedFeatureKeys || ALL_FEATURE_KEYS,
+        };
+
+        if (cleanPromoNum !== null && !isNaN(cleanPromoNum) && cleanPromoNum >= 0) {
+          item.promoPrice = cleanPromoNum;
+        }
+        if (cleanPromoStarts) {
+          item.promoStartsAt = cleanPromoStarts;
+        }
+        if (cleanPromoExpires) {
+          item.promoExpiresAt = cleanPromoExpires;
+        }
+
+        return item;
+      };
+
       if (existingPlan) {
         updatedPlans = plans.map((p) => {
           if (p.id === editingPlan.id) {
-            return {
-              ...p,
-              name: planModalName.trim() || p.name,
-              tag: planModalTag.trim() || p.tag,
-              originalPrice: cleanOrigPrice,
-              price: cleanPrice,
-              discountBadge: planModalBadge.trim(),
-              billingPeriod: planModalPeriod || (cleanPrice === 0 ? '/sempre' : p.billingPeriod || '/mês'),
-              highlight: planModalHighlight,
-              activeInShowcase: planModalActiveInShowcase,
-              features: updatedFeatures.length > 0 ? updatedFeatures : p.features,
-              promoPrice: cleanPromoPrice,
-              promoStartsAt: cleanPromoStartsAt,
-              promoExpiresAt: cleanPromoExpiresAt,
-              allFeaturesAccess: cleanPrice === 0 ? false : planModalAllFeatures,
-              allowedFeatureKeys: planModalAllowedKeys,
-            };
+            return buildCleanItem(p);
           }
           return p;
         });
@@ -639,21 +661,7 @@ export const AdminPanel: React.FC = () => {
           reason: `Edição de valores e benefícios do plano ${planModalName}`,
         });
       } else {
-        const newPlanItem: PlanItemConfig = {
-          id: editingPlan.id,
-          name: planModalName.trim() || 'Novo Plano',
-          tag: planModalTag.trim() || 'Profissional',
-          originalPrice: cleanOrigPrice,
-          price: cleanPrice,
-          discountBadge: planModalBadge.trim(),
-          billingPeriod: planModalPeriod || '/mês',
-          highlight: planModalHighlight,
-          activeInShowcase: planModalActiveInShowcase,
-          features: updatedFeatures.length > 0 ? updatedFeatures : ['Mapas PDF Ilimitados', 'Medição de Madeira (m³)'],
-          promoPrice: cleanPromoPrice,
-          promoStartsAt: cleanPromoStartsAt,
-          promoExpiresAt: cleanPromoExpiresAt,
-        };
+        const newPlanItem = buildCleanItem();
         updatedPlans = [...plans, newPlanItem];
 
         await recordAdminAuditLog({
@@ -676,19 +684,21 @@ export const AdminPanel: React.FC = () => {
       const updatedConfig: SystemBillingConfig = {
         ...billingConfig,
         plans: updatedPlans,
-        proLaunchPrice: proPlan ? proPlan.price : billingConfig.proLaunchPrice,
-        proOriginalPrice: proPlan ? proPlan.originalPrice : billingConfig.proOriginalPrice,
-        proDiscountBadge: proPlan?.discountBadge || billingConfig.proDiscountBadge,
+        proLaunchPrice: proPlan ? proPlan.price : (billingConfig.proLaunchPrice || 44.99),
+        proOriginalPrice: proPlan ? proPlan.originalPrice : (billingConfig.proOriginalPrice || 97.99),
+        proDiscountBadge: proPlan?.discountBadge || billingConfig.proDiscountBadge || '',
       };
       setBillingConfig(updatedConfig);
       localStorage.setItem('gofield_billing_config', JSON.stringify(updatedConfig));
 
-      await setDoc(doc(db, 'system_config', 'billing'), updatedConfig, { merge: true });
+      const cleanFirestoreDoc = sanitizeFirestorePayload(updatedConfig);
+      await setDoc(doc(db, 'system_config', 'billing'), cleanFirestoreDoc, { merge: true });
 
-      notifySuccess('Plano Salvo com Sucesso!', `O plano "${planModalName}" foi salvo.`);
+      notifySuccess('Plano Salvo com Sucesso!', `O plano "${planModalName}" foi salvo no banco de dados.`);
       setEditingPlan(null);
     } catch (err: any) {
-      notifyError('Erro ao Salvar Plano', err?.message || 'Falha ao salvar plano.');
+      console.error('Error saving plan to Firestore:', err);
+      notifyError('Erro ao Salvar Plano', err?.message || 'Falha ao salvar plano no banco de dados.');
     } finally {
       setSavingPlanChanges(false);
     }
