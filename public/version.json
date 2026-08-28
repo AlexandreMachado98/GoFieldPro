@@ -1,8 +1,9 @@
 {
-  "version": "v2.6.0",
-  "buildNumber": 260,
-  "buildDate": "2026-08-27",
-  "releaseTimestamp": 1787865000000,
+  "version": "v2.6.47920",
+  "buildNumber": 1787920970366,
+  "buildDate": "28/08/2026",
+  "buildTime": "08:42:50",
+  "releaseTimestamp": 1787920970366,
   "minSupportedVersion": "v2.0.0",
-  "description": "GoField Pro - Versão 2.6.0 com Controle Dinâmico de Planos na Vitrine, Isolamento Multiusuário e Limpeza Segura de Cache"
+  "description": "GoField Pro - Build v2.6.47920 (28/08/2026 08:42:50)"
 }

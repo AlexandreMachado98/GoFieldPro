@@ -1,6 +1,6 @@
 // Service Worker for GoField Pro PWA
-// Version: v2.6.0 - Auto-Update and Offline Resilient Engine
-const CACHE_NAME = 'gofield-pro-v2.6.0';
+// Build-Timestamp: 1787920722959
+const CACHE_NAME = 'gofield-pro-build-1787920970366';
 const OFFLINE_URLS = [
   '/',
   '/index.html',
@@ -23,14 +23,14 @@ self.addEventListener('install', (event) => {
   );
 });
 
-// Activate: Clear ALL outdated caches from previous versions and claim clients
+// Activate: Immediately claim clients and delete ALL previous outdated caches
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys().then((keyList) => {
       return Promise.all(
         keyList.map((key) => {
-          if (key !== CACHE_NAME) {
-            console.log('[SW] Deletando cache antigo:', key);
+          if (key !== CACHE_NAME && !key.startsWith('geofield_offline_tiles')) {
+            console.log('[SW] Purgando cache antigo:', key);
             return caches.delete(key);
           }
         })
@@ -46,7 +46,7 @@ self.addEventListener('message', (event) => {
   }
 });
 
-// Fetch Interception
+// Fetch Interception with Network-First for HTML/Version and Cache-First for Hashed Assets
 self.addEventListener('fetch', (event) => {
   if (event.request.method !== 'GET') return;
   const url = new URL(event.request.url);
@@ -59,13 +59,14 @@ self.addEventListener('fetch', (event) => {
     url.hostname.includes('firebase') ||
     url.hostname.includes('googleapis') ||
     url.hostname.includes('firestore') ||
-    url.hostname.includes('identitytoolkit')
+    url.hostname.includes('identitytoolkit') ||
+    url.hostname.includes('asaas')
   ) {
     return;
   }
 
-  // Version.json: Network ONLY / No-Store to guarantee instant update detection
-  if (url.pathname === '/version.json') {
+  // Version.json & SW itself: Always Network ONLY with no-store
+  if (url.pathname === '/version.json' || url.pathname === '/sw.js') {
     event.respondWith(
       fetch(event.request, { cache: 'no-store' }).catch(() => {
         return caches.match('/version.json') || new Response(JSON.stringify({ version: 'offline' }));
@@ -74,10 +75,10 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Navigation & HTML: Network-First with offline cache fallback
+  // Navigation & HTML (index.html): Network-First with offline cache fallback
   if (event.request.mode === 'navigate' || url.pathname === '/' || url.pathname.endsWith('.html')) {
     event.respondWith(
-      fetch(event.request)
+      fetch(event.request, { cache: 'no-cache' })
         .then((networkResponse) => {
           if (networkResponse && networkResponse.status === 200) {
             const resClone = networkResponse.clone();
