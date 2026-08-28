@@ -377,12 +377,20 @@ export const AdminPanel: React.FC = () => {
         if (configDoc.exists()) {
           const data = configDoc.data() as SystemBillingConfig;
           setBillingConfig((prev) => ({ ...prev, ...data }));
-          localStorage.setItem('gofield_billing_config', JSON.stringify(data));
-          if (data.plans && Array.isArray(data.plans)) {
+          if (data.plans && Array.isArray(data.plans) && data.plans.length > 0) {
             const normalized = normalizePlansList(data.plans);
             setPlans(normalized);
             localStorage.setItem('gofield_custom_plans', JSON.stringify(normalized));
+          } else {
+            const fullConfig = { ...data, plans: DEFAULT_PLANS };
+            setDoc(doc(db, 'system_config', 'billing'), fullConfig, { merge: true }).catch(() => {});
+            setPlans(DEFAULT_PLANS);
           }
+        } else {
+          const initialConfig = { ...DEFAULT_BILLING_CONFIG, plans: DEFAULT_PLANS };
+          setDoc(doc(db, 'system_config', 'billing'), initialConfig, { merge: true }).catch(() => {});
+          setBillingConfig(initialConfig);
+          setPlans(DEFAULT_PLANS);
         }
       },
       (err) => console.warn('Real-time billing config listener notice:', err)
