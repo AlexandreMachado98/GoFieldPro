@@ -256,8 +256,17 @@ export const AdminPanel: React.FC = () => {
   const [newUserPhone, setNewUserPhone] = useState('');
   const [newUserRole, setNewUserRole] = useState<UserRole>('surveyor');
   const [newUserStatus, setNewUserStatus] = useState<UserStatus>('active');
-  const [newUserPlan, setNewUserPlan] = useState<SubscriptionPlanType>('pro_mensal');
-  const [newUserSubValue, setNewUserSubValue] = useState<number>(44.99);
+  const [newUserPlan, setNewUserPlan] = useState<SubscriptionPlanType>('free');
+  const [newUserSubValue, setNewUserSubValue] = useState<number>(0);
+  const [newUserGrantSpecialAccess, setNewUserGrantSpecialAccess] = useState<boolean>(false);
+  const [newUserSaType, setNewUserSaType] = useState<'annual' | 'custom' | 'lifetime'>('lifetime');
+  const [newUserSaStartsAt, setNewUserSaStartsAt] = useState<string>(() => new Date().toISOString().split('T')[0]);
+  const [newUserSaExpiresAt, setNewUserSaExpiresAt] = useState<string>(() => {
+    const nextYear = new Date();
+    nextYear.setFullYear(nextYear.getFullYear() + 1);
+    return nextYear.toISOString().split('T')[0];
+  });
+  const [newUserSaReason, setNewUserSaReason] = useState<string>('Novo Cliente VIP');
   const [savingUser, setSavingUser] = useState(false);
 
   // Helper to parse snapshot with subscription defaults
@@ -897,7 +906,153 @@ export const AdminPanel: React.FC = () => {
     window.open(whatsappUrl, '_blank');
   };
 
-    // Special Access Management Handlers
+    // Atomic Add User Handler (With Commercial Plan + Optional Special Access)
+  const handleAddUser = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const cleanName = newUserName.trim();
+    const cleanEmail = newUserEmail.trim().toLowerCase();
+
+    if (!cleanName) {
+      notifyWarning('Nome Obrigatório', 'Por favor, informe o nome completo do cliente.');
+      return;
+    }
+
+    if (!cleanEmail || !cleanEmail.includes('@') || !cleanEmail.includes('.')) {
+      notifyWarning('E-mail Inválido', 'Por favor, informe um endereço de e-mail válido.');
+      return;
+    }
+
+    // Check duplicate in memory
+    const emailExistsInMemory = users.some(
+      (u) => (u.email || '').toLowerCase() === cleanEmail
+    );
+    if (emailExistsInMemory) {
+      notifyError('E-mail Já Cadastrado', `O e-mail "${cleanEmail}" já está cadastrado no sistema. Escolha outro e-mail.`);
+      return;
+    }
+
+    // Custom date validation
+    if (newUserGrantSpecialAccess && newUserSaType === 'custom') {
+      if (newUserSaExpiresAt && newUserSaStartsAt && newUserSaExpiresAt < newUserSaStartsAt) {
+        notifyWarning('Data Inválida', 'A data de término não pode ser anterior à data de início.');
+        return;
+      }
+    }
+
+    setSavingUser(true);
+
+    try {
+      // Check duplicate directly in Firestore
+      const usersRef = collection(db, 'users');
+      const emailSnap = await getDocs(usersRef);
+      const emailExistsInDb = emailSnap.docs.some(
+        (docSnap) => (docSnap.data().email || '').toLowerCase() === cleanEmail
+      );
+
+      if (emailExistsInDb) {
+        notifyError('E-mail Já Cadastrado', `O e-mail "${cleanEmail}" já está cadastrado no banco de dados.`);
+        setSavingUser(false);
+        return;
+      }
+
+      const generatedUid = `user_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+      const nowIso = new Date().toISOString();
+
+      let specialAccessData: SpecialAccessConfig | undefined = undefined;
+      if (newUserGrantSpecialAccess) {
+        let finalExpiresAt: string | null = null;
+        if (newUserSaType === 'annual') {
+          const d = new Date(newUserSaStartsAt + 'T00:00:00');
+          d.setFullYear(d.getFullYear() + 1);
+          finalExpiresAt = d.toISOString().split('T')[0];
+        } else if (newUserSaType === 'custom') {
+          finalExpiresAt = newUserSaExpiresAt;
+        } else {
+          finalExpiresAt = null; // Lifetime
+        }
+
+        specialAccessData = {
+          enabled: true,
+          accessType: newUserSaType,
+          status: 'active',
+          startsAt: newUserSaStartsAt,
+          expiresAt: finalExpiresAt,
+          grantedBy: profile?.email || profile?.name || 'Super Admin',
+          grantedAt: nowIso,
+          reason: newUserSaReason.trim() || 'Criado com Acesso Especial',
+        };
+      }
+
+      // Build clean payload without undefined keys
+      const newUserData: UserProfile = {
+        uid: generatedUid,
+        email: cleanEmail,
+        name: cleanName,
+        role: newUserRole,
+        status: newUserStatus,
+        avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(cleanName)}`,
+        company: newUserCompany.trim() || 'Empresa Particular',
+        phone: newUserPhone.trim() || '',
+        createdAt: nowIso,
+        approvedAt: nowIso,
+        approvedBy: profile?.email || 'Super Admin',
+        subscriptionPlan: newUserPlan,
+        subscriptionStatus: 'active',
+        subscriptionValue: Number(newUserSubValue) || (newUserPlan === 'free' ? 0 : 44.99),
+        hasChosenPlan: true,
+      };
+
+      if (specialAccessData) {
+        newUserData.specialAccess = specialAccessData;
+      }
+
+      await setDoc(doc(db, 'users', generatedUid), newUserData);
+
+      setUsers((prev) => [newUserData, ...prev]);
+
+      await recordAdminAuditLog({
+        adminUid: profile?.uid || 'super_admin',
+        adminEmail: profile?.email || 'admin@am-tst.com.br',
+        adminName: profile?.name || 'Super Admin',
+        action: 'CREATE_USER',
+        targetType: 'user',
+        targetId: generatedUid,
+        targetName: cleanName,
+        newValue: newUserData,
+        reason: `Criação de usuário "${cleanName}" (${cleanEmail}) com Plano ${newUserPlan.toUpperCase()}${
+          specialAccessData ? ` e Acesso Especial ${specialAccessData.accessType.toUpperCase()}` : ''
+        }.`,
+      });
+
+      notifySuccess(
+        'Cliente Criado com Sucesso!',
+        `Usuário ${cleanName} criado no plano ${newUserPlan.toUpperCase()}${
+          specialAccessData ? ` com Acesso Especial (${specialAccessData.accessType === 'lifetime' ? 'Vitalício' : 'Anual'})` : ''
+        }.`
+      );
+
+      // Reset form
+      setNewUserName('');
+      setNewUserEmail('');
+      setNewUserCompany('');
+      setNewUserPhone('');
+      setNewUserRole('surveyor');
+      setNewUserStatus('active');
+      setNewUserPlan('free');
+      setNewUserSubValue(0);
+      setNewUserGrantSpecialAccess(false);
+      setNewUserSaType('lifetime');
+      setNewUserSaReason('Novo Cliente VIP');
+      setIsAddUserModalOpen(false);
+    } catch (err: any) {
+      console.error('Error creating user:', err);
+      notifyError('Erro ao Criar Cliente', 'Não foi possível salvar o usuário no banco de dados.');
+    } finally {
+      setSavingUser(false);
+    }
+  };
+
+  // Special Access Management Handlers
   const handleOpenSpecialAccessModal = (u: UserProfile) => {
     setSpecialAccessUser(u);
     if (u.specialAccess && u.specialAccess.enabled && u.specialAccess.status !== 'revoked') {
@@ -2701,6 +2856,307 @@ export const AdminPanel: React.FC = () => {
                 className="px-4 py-2 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-black text-xs cursor-pointer shadow-lg"
               >
                 {savingPlanChanges ? 'Salvando...' : 'Salvar Plano'}
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {/* MODAL: ADD NEW USER / CLIENT */}
+      {isAddUserModalOpen && (
+        <div className="fixed inset-0 z-[99999] bg-black/80 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
+          <form
+            onSubmit={handleAddUser}
+            className="bg-slate-900 border border-sky-500/40 w-full max-w-xl rounded-3xl shadow-2xl p-5 sm:p-6 space-y-4 animate-in fade-in my-8"
+          >
+            {/* Header */}
+            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-sky-500/20 text-sky-400 border border-sky-500/30 flex items-center justify-center">
+                  <UserPlus className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-sm sm:text-base font-black text-white leading-tight">
+                    Adicionar Novo Cliente
+                  </h3>
+                  <p className="text-[11px] text-slate-400">
+                    Cadastre o usuário, vincule o plano comercial e configure o Acesso Especial
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsAddUserModalOpen(false)}
+                className="p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 transition-colors cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="space-y-3.5 text-xs">
+              {/* Name & Email */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-slate-300 font-bold mb-1 uppercase tracking-wider text-[11px]">
+                    Nome Completo *
+                  </label>
+                  <input
+                    type="text"
+                    value={newUserName}
+                    onChange={(e) => setNewUserName(e.target.value)}
+                    placeholder="Ex: João da Silva"
+                    className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-white font-medium focus:outline-none focus:border-sky-500 transition-colors"
+                    required
+                    autoFocus
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-slate-300 font-bold mb-1 uppercase tracking-wider text-[11px]">
+                    E-mail de Acesso *
+                  </label>
+                  <input
+                    type="email"
+                    value={newUserEmail}
+                    onChange={(e) => setNewUserEmail(e.target.value.toLowerCase().trim())}
+                    placeholder="cliente@empresa.com"
+                    className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-white font-medium focus:outline-none focus:border-sky-500 transition-colors"
+                    required
+                  />
+                </div>
+              </div>
+
+              {/* Company & Phone */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-slate-300 font-bold mb-1 uppercase tracking-wider text-[11px]">
+                    Empresa / Órgão
+                  </label>
+                  <input
+                    type="text"
+                    value={newUserCompany}
+                    onChange={(e) => setNewUserCompany(e.target.value)}
+                    placeholder="Ex: Agroflorestal São Paulo"
+                    className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-white font-medium focus:outline-none focus:border-sky-500 transition-colors"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-slate-300 font-bold mb-1 uppercase tracking-wider text-[11px]">
+                    WhatsApp / Telefone
+                  </label>
+                  <input
+                    type="tel"
+                    value={newUserPhone}
+                    onChange={(e) => setNewUserPhone(e.target.value)}
+                    placeholder="(11) 99999-9999"
+                    className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-white font-medium focus:outline-none focus:border-sky-500 transition-colors"
+                  />
+                </div>
+              </div>
+
+              {/* Role & Commercial Plan */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-slate-300 font-bold mb-1 uppercase tracking-wider text-[11px]">
+                    Função no Sistema
+                  </label>
+                  <select
+                    value={newUserRole}
+                    onChange={(e) => setNewUserRole(e.target.value as UserRole)}
+                    className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-slate-200 font-medium focus:outline-none focus:border-sky-500 transition-colors"
+                  >
+                    <option value="surveyor">Topógrafo / Pesquisador de Campo</option>
+                    <option value="field_lead">Líder de Equipe / Operação</option>
+                    <option value="auditor">Auditor / Engenheiro SST</option>
+                    <option value="super_admin">Super Administrador</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-slate-300 font-bold mb-1 uppercase tracking-wider text-[11px]">
+                    Plano Comercial
+                  </label>
+                  <select
+                    value={newUserPlan}
+                    onChange={(e) => {
+                      const p = e.target.value as SubscriptionPlanType;
+                      setNewUserPlan(p);
+                      if (p === 'free') setNewUserSubValue(0);
+                      else if (p === 'pro_mensal') setNewUserSubValue(44.99);
+                      else if (p === 'equipe_mensal') setNewUserSubValue(129.90);
+                      else if (p === 'florestal_corporativo') setNewUserSubValue(399.00);
+                    }}
+                    className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-slate-200 font-medium focus:outline-none focus:border-sky-500 transition-colors"
+                  >
+                    <option value="free">Plano Gratuito (R$ 0,00)</option>
+                    <option value="pro_mensal">Plano Profissional Mensal (R$ 44,99)</option>
+                    <option value="equipe_mensal">Plano Equipe Mensal (R$ 129,90)</option>
+                    <option value="florestal_corporativo">Plano Corporativo Florestal (R$ 399,00)</option>
+                    <option value="personalizado">Plano Personalizado</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* SPECIAL ACCESS SECTION (HIGHLIGHTED IN GOLD) */}
+              <div className="p-3.5 bg-gradient-to-b from-amber-950/40 via-slate-950 to-slate-950 rounded-2xl border border-amber-500/40 space-y-3 shadow-inner">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-1.5 text-amber-300 font-black text-xs uppercase tracking-wider">
+                    <KeyRound className="w-4 h-4 text-amber-400" />
+                    <span>🔑 Conceder Acesso Especial Exclusivo?</span>
+                  </div>
+                  <div className="flex items-center gap-1 bg-slate-900 p-0.5 rounded-lg border border-slate-700">
+                    <button
+                      type="button"
+                      onClick={() => setNewUserGrantSpecialAccess(false)}
+                      className={`px-2.5 py-1 rounded-md text-[11px] font-bold transition-all cursor-pointer ${
+                        !newUserGrantSpecialAccess ? 'bg-slate-800 text-white shadow' : 'text-slate-400 hover:text-white'
+                      }`}
+                    >
+                      Não
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setNewUserGrantSpecialAccess(true)}
+                      className={`px-2.5 py-1 rounded-md text-[11px] font-black transition-all cursor-pointer ${
+                        newUserGrantSpecialAccess ? 'bg-amber-600 text-white shadow' : 'text-slate-400 hover:text-white'
+                      }`}
+                    >
+                      Sim (VIP)
+                    </button>
+                  </div>
+                </div>
+
+                {newUserGrantSpecialAccess && (
+                  <div className="space-y-3 pt-2 border-t border-slate-800/80 animate-in fade-in">
+                    {/* Access Type */}
+                    <div>
+                      <label className="block text-slate-300 font-bold mb-1.5 uppercase tracking-wider text-[10px]">
+                        Tipo de Acesso Especial
+                      </label>
+                      <div className="grid grid-cols-3 gap-2">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setNewUserSaType('annual');
+                            const d = new Date();
+                            d.setFullYear(d.getFullYear() + 1);
+                            setNewUserSaExpiresAt(d.toISOString().split('T')[0]);
+                          }}
+                          className={`p-2 rounded-xl border font-bold text-xs text-center transition-all cursor-pointer ${
+                            newUserSaType === 'annual'
+                              ? 'bg-amber-500/20 border-amber-500 text-amber-300 ring-1 ring-amber-500/30'
+                              : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-200'
+                          }`}
+                        >
+                          <div className="font-extrabold text-white text-xs">1 Ano</div>
+                          <div className="text-[10px] text-slate-400">365 dias</div>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => setNewUserSaType('custom')}
+                          className={`p-2 rounded-xl border font-bold text-xs text-center transition-all cursor-pointer ${
+                            newUserSaType === 'custom'
+                              ? 'bg-amber-500/20 border-amber-500 text-amber-300 ring-1 ring-amber-500/30'
+                              : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-200'
+                          }`}
+                        >
+                          <div className="font-extrabold text-white text-xs">Personalizado</div>
+                          <div className="text-[10px] text-slate-400">Datas livres</div>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setNewUserSaType('lifetime');
+                            setNewUserSaExpiresAt('');
+                          }}
+                          className={`p-2 rounded-xl border font-bold text-xs text-center transition-all cursor-pointer ${
+                            newUserSaType === 'lifetime'
+                              ? 'bg-gradient-to-r from-amber-500/30 to-emerald-500/30 border-amber-400 text-amber-200 ring-1 ring-amber-500/40'
+                              : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-200'
+                          }`}
+                        >
+                          <div className="font-extrabold text-amber-300 text-xs">👑 Vitalício</div>
+                          <div className="text-[10px] text-slate-400">Permanente</div>
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Dates */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                      <div>
+                        <label className="block text-slate-300 font-bold mb-1 uppercase tracking-wider text-[10px]">
+                          Data de Início
+                        </label>
+                        <input
+                          type="date"
+                          value={newUserSaStartsAt}
+                          onChange={(e) => setNewUserSaStartsAt(e.target.value)}
+                          className="w-full bg-slate-900 border border-slate-700 rounded-xl px-2.5 py-1.5 text-white font-medium focus:outline-none focus:border-amber-500 text-xs"
+                          required
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-slate-300 font-bold mb-1 uppercase tracking-wider text-[10px]">
+                          Data de Término {newUserSaType === 'lifetime' && '(Sem Expiração)'}
+                        </label>
+                        <input
+                          type="date"
+                          value={newUserSaExpiresAt}
+                          onChange={(e) => setNewUserSaExpiresAt(e.target.value)}
+                          disabled={newUserSaType === 'lifetime'}
+                          className="w-full bg-slate-900 border border-slate-700 rounded-xl px-2.5 py-1.5 text-white font-medium focus:outline-none focus:border-amber-500 text-xs disabled:opacity-40"
+                          required={newUserSaType !== 'lifetime'}
+                        />
+                      </div>
+                    </div>
+
+                    {/* Reason */}
+                    <div>
+                      <label className="block text-slate-300 font-bold mb-1 uppercase tracking-wider text-[10px]">
+                        Motivo / Justificativa
+                      </label>
+                      <input
+                        type="text"
+                        value={newUserSaReason}
+                        onChange={(e) => setNewUserSaReason(e.target.value)}
+                        placeholder="Ex: Cliente Parceiro, Cortesia, Demonstração"
+                        className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-1.5 text-white text-xs focus:outline-none focus:border-amber-500"
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Actions */}
+            <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-slate-800">
+              <button
+                type="button"
+                onClick={() => setIsAddUserModalOpen(false)}
+                className="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-750 text-slate-300 font-bold text-xs cursor-pointer transition-colors"
+              >
+                Cancelar
+              </button>
+              <button
+                type="submit"
+                disabled={savingUser}
+                className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-sky-500 to-emerald-500 hover:from-sky-400 hover:to-emerald-400 text-slate-950 font-black text-xs cursor-pointer shadow-lg shadow-sky-950/50 flex items-center gap-1.5 transition-all active:scale-95 disabled:opacity-50"
+              >
+                {savingUser ? (
+                  <>
+                    <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                    <span>Criando Cliente...</span>
+                  </>
+                ) : (
+                  <>
+                    <Check className="w-3.5 h-3.5" />
+                    <span>Criar Cliente</span>
+                  </>
+                )}
               </button>
             </div>
           </form>
