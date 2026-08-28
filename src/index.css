@@ -2,16 +2,24 @@
 
 @layer base {
   :root {
-    --bg-oled: #070a10;
-    --surface-1: #0d121d;
-    --surface-2: #131b2a;
-    --border-tactical: rgba(30, 41, 59, 0.75);
-    --text-main: #f1f5f9;
+    --bg-oled: #070d1e;
+    --surface-1: #0b132b;
+    --surface-2: #17223b;
+    --border-tactical: rgba(37, 51, 82, 0.8);
+    --text-main: #f8fafc;
     --text-muted: #94a3b8;
-    --emerald-tactical: #10b981;
-    --sky-tactical: #38bdf8;
-    --amber-tactical: #f59e0b;
+    
+    /* AM TST Brand Palette */
+    --amtst-green: #10b981;
+    --amtst-green-dark: #059669;
+    --amtst-green-light: #34d399;
+    --amtst-navy: #0b132b;
+    --amtst-navy-deep: #070d1e;
+    --amtst-cyan: #38bdf8;
+    --amtst-amber: #fbbf24;
+    --amtst-rose: #f43f5e;
   }
+
 
   html, body, #root {
     height: 100%;
@@ -226,4 +234,48 @@ html.light .leaflet-container {
 .no-scrollbar {
   -ms-overflow-style: none;
   scrollbar-width: none;
+}
+
+/* =========================================================
+   AM TST DESIGN SYSTEM — UTILITY CLASSES & MICROINTERACTIONS
+   ========================================================= */
+.amtst-gradient-primary {
+  background: linear-gradient(135deg, #059669 0%, #10b981 100%);
+}
+
+.amtst-gradient-navy {
+  background: linear-gradient(135deg, #070d1e 0%, #0b132b 100%);
+}
+
+.amtst-card {
+  background-color: #0b132b;
+  border: 1px solid rgba(37, 51, 82, 0.8);
+  border-radius: 1rem;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.amtst-card:hover {
+  border-color: rgba(16, 185, 129, 0.4);
+}
+
+.amtst-btn-primary {
+  background: linear-gradient(135deg, #059669 0%, #10b981 100%);
+  color: #ffffff;
+  font-weight: 800;
+  border-radius: 0.75rem;
+  box-shadow: 0 4px 14px rgba(5, 150, 105, 0.35);
+  transition: all 0.15s ease-in-out;
+}
+
+.amtst-btn-primary:active {
+  transform: scale(0.97);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, ::before, ::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }
