@@ -239,6 +239,29 @@ export const PendingApprovalScreen: React.FC = () => {
     return () => clearInterval(interval);
   }, [paymentStep, paymentId, billingConfig]);
 
+  const [isActivatingFree, setIsActivatingFree] = useState(false);
+
+  const handleContinueAsFree = async () => {
+    if (!profile?.uid) return;
+    setIsActivatingFree(true);
+    try {
+      const userRef = doc(db, 'users', profile.uid);
+      await updateDoc(userRef, {
+        status: 'active',
+        subscriptionPlan: 'free',
+        subscriptionStatus: 'active',
+        subscriptionValue: 0,
+        approvedAt: new Date().toISOString(),
+        approvedBy: 'Auto Free Tier Activation',
+      });
+      await refreshProfile();
+    } catch (err: any) {
+      console.error('Error activating free tier:', err);
+    } finally {
+      setIsActivatingFree(false);
+    }
+  };
+
   const handlePaymentSuccess = async () => {
     if (!profile) return;
     try {
