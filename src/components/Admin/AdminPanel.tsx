@@ -555,9 +555,8 @@ export const AdminPanel: React.FC = () => {
     localStorage.setItem('gofield_custom_plans', JSON.stringify(newPlans));
     const updatedConfig = { ...billingConfig, plans: newPlans };
     setBillingConfig(updatedConfig);
-    localStorage.setItem('gofield_billing_config', JSON.stringify(updatedConfig));
-
-    await setDoc(doc(db, 'system_config', 'billing'), updatedConfig, { merge: true });
+    const cleanDoc = sanitizeFirestorePayload(updatedConfig);
+    await setDoc(doc(db, 'system_config', 'billing'), cleanDoc, { merge: true });
 
     notifySuccess('Ordem Atualizada', 'A ordem de exibição dos planos na vitrine foi salva.');
   };
@@ -578,7 +577,8 @@ export const AdminPanel: React.FC = () => {
     setBillingConfig(updatedConfig);
     localStorage.setItem('gofield_billing_config', JSON.stringify(updatedConfig));
 
-    await setDoc(doc(db, 'system_config', 'billing'), updatedConfig, { merge: true });
+    const cleanDoc = sanitizeFirestorePayload(updatedConfig);
+    await setDoc(doc(db, 'system_config', 'billing'), cleanDoc, { merge: true });
 
     await recordAdminAuditLog({
       adminUid: profile?.uid || 'super_admin',

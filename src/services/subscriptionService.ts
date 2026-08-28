@@ -1,8 +1,9 @@
-﻿import { doc, getDoc, setDoc, onSnapshot } from 'firebase/firestore';
+import { doc, getDoc, setDoc, onSnapshot } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { SystemBillingConfig, PlanItemConfig, UserProfile, PromoCoupon } from '../types';
 import { DEFAULT_PLANS } from '../types';
 import { SYSTEM_FEATURES } from '../config/features';
+import { sanitizeFirestorePayload } from '../utils/firestoreSanitizer';
 
 const BILLING_CONFIG_DOC = 'system_config';
 const BILLING_CONFIG_ID = 'billing';
@@ -133,13 +134,14 @@ export async function saveBillingConfig(config: SystemBillingConfig): Promise<vo
     plans: normalizedPlans,
   };
 
+  const cleanDoc = sanitizeFirestorePayload(updated);
+  const docRef = doc(db, BILLING_CONFIG_DOC, BILLING_CONFIG_ID);
+  await setDoc(docRef, cleanDoc, { merge: true });
+
   try {
     localStorage.setItem(STORAGE_KEY_BILLING, JSON.stringify(updated));
     localStorage.setItem(STORAGE_KEY_PLANS, JSON.stringify(normalizedPlans));
   } catch {}
-
-  const docRef = doc(db, BILLING_CONFIG_DOC, BILLING_CONFIG_ID);
-  await setDoc(docRef, updated, { merge: true });
 }
 
 /**
