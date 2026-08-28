@@ -1,9 +1,11 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { collection, onSnapshot } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { useApp } from '../context/AppContext';
 import { useAuth } from '../context/AuthContext';
 import { useUpdate } from '../context/UpdateContext';
+import { DEFAULT_PLANS } from '../types';
+import { shouldShowCommercialOffers, getPlanEffectivePrice, formatCurrencyBRL } from '../utils/commercialVisibility';
 import { APP_VERSION } from '../config/version';
 import { PwaInstallButton } from './PWA/PwaInstallButton';
 import {
@@ -55,6 +57,21 @@ export const Sidebar: React.FC = () => {
   const isOwnerAdmin = profile?.role === 'super_admin' || profile?.email?.toLowerCase() === 'alexandre1604981@gmail.com';
   const isSuperAdmin = isOwnerAdmin;
   const hasFullProAccess = isOwnerAdmin || isProUser;
+  // Centralized Commercial Visibility & Dynamic Plan Pricing
+  const lowestPaidPlan = useMemo(() => {
+    const rawPlans = (billingConfig?.plans && Array.isArray(billingConfig.plans) && billingConfig.plans.length > 0)
+      ? billingConfig.plans
+      : DEFAULT_PLANS;
+    const paidPlans = rawPlans.filter((p) => p.activeInShowcase !== false && p.id !== 'free' && (typeof p.price === 'number' && p.price > 0));
+    return paidPlans.find((p) => p.id === 'pro') || paidPlans[0] || DEFAULT_PLANS[1];
+  }, [billingConfig?.plans]);
+
+  const effectivePriceInfo = useMemo(() => {
+    if (!lowestPaidPlan) return { price: 44.99, discountBadge: '54% OFF' };
+    return getPlanEffectivePrice(lowestPaidPlan);
+  }, [lowestPaidPlan]);
+
+  const showCommercialBanner = shouldShowCommercialOffers(profile);
   const { 
     isUpdateAvailable, 
     latestVersion, 
@@ -345,16 +362,16 @@ export const Sidebar: React.FC = () => {
 
             {(!isSidebarCollapsed || isMobileMenuOpen) && <PwaInstallButton variant="sidebar" />}
 
-          {/* Pro Upgrade Banner for Free Users */}
-          {!isSuperAdmin && (!isSidebarCollapsed || isMobileMenuOpen) && (
+                    {/* Pro Upgrade Banner for Free / Expired Users ONLY */}
+          {showCommercialBanner && (!isSidebarCollapsed || isMobileMenuOpen) && (
             <div className="p-2.5 bg-gradient-to-br from-amber-500/10 via-sky-500/10 to-transparent border border-amber-500/30 rounded-2xl space-y-2 mt-2">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-1.5">
                   <Crown className="w-4 h-4 text-amber-400" />
-                  <span className="text-xs font-black text-white">GoField Pro</span>
+                  <span className="text-xs font-black text-white">{lowestPaidPlan?.name || 'GoField Pro'}</span>
                 </div>
                 <span className="text-[9px] font-extrabold bg-amber-500 text-slate-950 px-1.5 py-0.5 rounded-full">
-                  {billingConfig?.proDiscountBadge || '54% OFF'}
+                  {effectivePriceInfo.discountBadge || 'OFERTA'}
                 </span>
               </div>
               <p className="text-[10px] text-slate-400 leading-tight">
@@ -366,7 +383,7 @@ export const Sidebar: React.FC = () => {
                 className="w-full py-2 px-3 bg-gradient-to-r from-amber-500 to-sky-500 hover:from-amber-400 hover:to-sky-400 text-slate-950 font-black text-xs rounded-xl shadow-md transition-all flex items-center justify-center gap-1.5 active:scale-95 cursor-pointer"
               >
                 <Zap className="w-3.5 h-3.5 fill-current" />
-                <span>Assinar R$ {((billingConfig?.proLaunchPrice ?? 44.99)).toFixed(2).replace('.', ',')}/mês</span>
+                <span>Assinar {formatCurrencyBRL(effectivePriceInfo.price)}{lowestPaidPlan?.billingPeriod || '/mês'}</span>
               </button>
             </div>
           )}

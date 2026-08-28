@@ -139,6 +139,9 @@ export interface PlanItemConfig {
   allFeaturesAccess?: boolean; // Se true, libera todas as funcionalidades atuais e futuras
   allowedFeatureKeys?: string[]; // Array de chaves de funcionalidades liberadas
   maxConcurrentPdfMaps?: number;
+  promoPrice?: number; // Preço promocional temporário sazonal
+  promoStartsAt?: string; // Data início YYYY-MM-DD
+  promoExpiresAt?: string; // Data término YYYY-MM-DD
 }
 
 export const DEFAULT_FREE_PLAN: PlanItemConfig = {

@@ -1,3 +1,4 @@
+import { formatCurrencyBRL } from '../../utils/commercialVisibility';
 import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import {
   collection,
@@ -154,6 +155,9 @@ export const AdminPanel: React.FC = () => {
   const [planModalFeaturesText, setPlanModalFeaturesText] = useState('');
   const [planModalActiveInShowcase, setPlanModalActiveInShowcase] = useState<boolean>(true);
   const [planModalHighlight, setPlanModalHighlight] = useState<boolean>(false);
+  const [planModalPromoPrice, setPlanModalPromoPrice] = useState<string>('');
+  const [planModalPromoStartsAt, setPlanModalPromoStartsAt] = useState<string>('');
+  const [planModalPromoExpiresAt, setPlanModalPromoExpiresAt] = useState<string>('');
   const [savingPlanChanges, setSavingPlanChanges] = useState(false);
 
   // Plan Feature Entitlements State
@@ -594,6 +598,9 @@ export const AdminPanel: React.FC = () => {
 
       const cleanOrigPrice = Number(planModalOriginalPrice) || 0;
       const cleanPrice = Number(planModalPrice) || 0;
+      const cleanPromoPrice = planModalPromoPrice.trim() !== '' ? Number(planModalPromoPrice) : undefined;
+      const cleanPromoStartsAt = planModalPromoStartsAt.trim() || undefined;
+      const cleanPromoExpiresAt = planModalPromoExpiresAt.trim() || undefined;
 
       const existingPlan = plans.find((p) => p.id === editingPlan.id);
       let updatedPlans: PlanItemConfig[];
@@ -612,6 +619,9 @@ export const AdminPanel: React.FC = () => {
               highlight: planModalHighlight,
               activeInShowcase: planModalActiveInShowcase,
               features: updatedFeatures.length > 0 ? updatedFeatures : p.features,
+              promoPrice: cleanPromoPrice,
+              promoStartsAt: cleanPromoStartsAt,
+              promoExpiresAt: cleanPromoExpiresAt,
             };
           }
           return p;
@@ -642,6 +652,9 @@ export const AdminPanel: React.FC = () => {
           highlight: planModalHighlight,
           activeInShowcase: planModalActiveInShowcase,
           features: updatedFeatures.length > 0 ? updatedFeatures : ['Mapas PDF Ilimitados', 'Medição de Madeira (m³)'],
+          promoPrice: cleanPromoPrice,
+          promoStartsAt: cleanPromoStartsAt,
+          promoExpiresAt: cleanPromoExpiresAt,
         };
         updatedPlans = [...plans, newPlanItem];
 
@@ -3697,18 +3710,24 @@ export const AdminPanel: React.FC = () => {
                     onChange={(e) => {
                       const p = e.target.value as SubscriptionPlanType;
                       setNewUserPlan(p);
-                      if (p === 'free') setNewUserSubValue(0);
-                      else if (p === 'pro_mensal') setNewUserSubValue(44.99);
-                      else if (p === 'equipe_mensal') setNewUserSubValue(129.90);
-                      else if (p === 'florestal_corporativo') setNewUserSubValue(399.00);
+                      const found = plans.find((pl) => pl.id === p);
+                      if (found) {
+                        setNewUserSubValue(found.price);
+                      } else if (p === 'free') {
+                        setNewUserSubValue(0);
+                      }
                     }}
                     className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-slate-200 font-medium focus:outline-none focus:border-sky-500 transition-colors"
                   >
-                    <option value="free">Plano Gratuito (R$ 0,00)</option>
-                    <option value="pro_mensal">Plano Profissional Mensal (R$ 44,99)</option>
-                    <option value="equipe_mensal">Plano Equipe Mensal (R$ 129,90)</option>
-                    <option value="florestal_corporativo">Plano Corporativo Florestal (R$ 399,00)</option>
-                    <option value="personalizado">Plano Personalizado</option>
+                    <option value="free">Plano Gratuito ({formatCurrencyBRL(0)})</option>
+                    {plans
+                      .filter((pl) => pl.id !== 'free')
+                      .map((pl) => (
+                        <option key={pl.id} value={pl.id}>
+                          {pl.name} ({formatCurrencyBRL(pl.price)}{pl.billingPeriod || '/mês'})
+                        </option>
+                      ))}
+                    <option value="personalizado">Plano Personalizado (Valor Livre)</option>
                   </select>
                 </div>
               </div>
@@ -4124,10 +4143,14 @@ export const AdminPanel: React.FC = () => {
                           onChange={(e) => setGrantNewUserPlan(e.target.value as SubscriptionPlanType)}
                           className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-slate-200 text-xs focus:outline-none focus:border-amber-500"
                         >
-                          <option value="free">Plano Gratuito (R$ 0,00)</option>
-                          <option value="pro_mensal">Plano Profissional Mensal (R$ 44,99)</option>
-                          <option value="equipe_mensal">Plano Equipe (R$ 129,90)</option>
-                          <option value="florestal_corporativo">Corporativo Florestal (R$ 399,00)</option>
+                          <option value="free">Plano Gratuito ({formatCurrencyBRL(0)})</option>
+                          {plans
+                            .filter((pl) => pl.id !== 'free')
+                            .map((pl) => (
+                              <option key={pl.id} value={pl.id}>
+                                {pl.name} ({formatCurrencyBRL(pl.price)}{pl.billingPeriod || '/mês'})
+                              </option>
+                            ))}
                         </select>
                       </div>
                     </div>
