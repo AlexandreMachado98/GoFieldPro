@@ -1026,7 +1026,7 @@ export const AdminPanel: React.FC = () => {
 
       // Check if start date is in the future (scheduled) or today (active)
       const startDateVal = grantSaStartsAt ? new Date(grantSaStartsAt + 'T00:00:00').getTime() : 0;
-      const initialStatus: SpecialAccessStatus = startDateVal > Date.now() ? 'scheduled' : 'active';
+      const initialStatus: SpecialAccessStatus = startDateVal > Date.now() ? 'scheduled' : 'pending_acceptance';
 
       const saConfig: SpecialAccessConfig = {
         enabled: true,
@@ -2114,8 +2114,8 @@ export const AdminPanel: React.FC = () => {
                 />
               </div>
 
-              {/* Status Filter Pills */}
-              <div className="flex items-center gap-1.5 overflow-x-auto w-full sm:w-auto">
+                            {/* Status Filter Pills */}
+              <div className="flex items-center gap-1.5 overflow-x-auto w-full sm:w-auto pb-1">
                 <button
                   type="button"
                   onClick={() => setSaTabFilter('all')}
@@ -2127,12 +2127,30 @@ export const AdminPanel: React.FC = () => {
                 </button>
                 <button
                   type="button"
+                  onClick={() => setSaTabFilter('pending')}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
+                    saTabFilter === 'pending' ? 'bg-yellow-500 text-slate-950 font-black shadow' : 'bg-slate-950 text-yellow-400/80 hover:text-yellow-300'
+                  }`}
+                >
+                  🟡 Aguardando Aceite ({users.filter((u) => u.specialAccess && !u.specialAccess.acceptedAt && u.specialAccess.status !== 'declined' && u.specialAccess.status !== 'revoked').length})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSaTabFilter('active')}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
+                    saTabFilter === 'active' ? 'bg-emerald-600 text-white shadow' : 'bg-slate-950 text-emerald-400/80 hover:text-emerald-300'
+                  }`}
+                >
+                  🟢 Ativos ({users.filter((u) => getSpecialAccessComputedStatus(u) === 'active').length})
+                </button>
+                <button
+                  type="button"
                   onClick={() => setSaTabFilter('lifetime')}
                   className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
                     saTabFilter === 'lifetime' ? 'bg-yellow-600 text-slate-950 font-black shadow' : 'bg-slate-950 text-slate-400 hover:text-white'
                   }`}
                 >
-                  👑 Vitalícios ({users.filter((u) => getSpecialAccessComputedStatus(u) === 'active' && u.specialAccess?.accessType === 'lifetime').length})
+                  👑 Vitalícios ({users.filter((u) => u.specialAccess && u.specialAccess.accessType === 'lifetime' && u.specialAccess.enabled).length})
                 </button>
                 <button
                   type="button"
@@ -2141,7 +2159,25 @@ export const AdminPanel: React.FC = () => {
                     saTabFilter === 'annual' ? 'bg-sky-600 text-white shadow' : 'bg-slate-950 text-slate-400 hover:text-white'
                   }`}
                 >
-                  📅 Anuais ({users.filter((u) => getSpecialAccessComputedStatus(u) === 'active' && u.specialAccess?.accessType === 'annual').length})
+                  📅 Anuais ({users.filter((u) => u.specialAccess && u.specialAccess.accessType === 'annual' && u.specialAccess.enabled).length})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSaTabFilter('expired')}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
+                    saTabFilter === 'expired' ? 'bg-rose-600 text-white shadow' : 'bg-slate-950 text-rose-400/80 hover:text-rose-300'
+                  }`}
+                >
+                  🔴 Expirados ({users.filter((u) => getSpecialAccessComputedStatus(u) === 'expired').length})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSaTabFilter('revoked')}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
+                    saTabFilter === 'revoked' ? 'bg-slate-700 text-white shadow' : 'bg-slate-950 text-slate-500 hover:text-slate-300'
+                  }`}
+                >
+                  ⚫ Revogados ({users.filter((u) => u.specialAccess && (u.specialAccess.status === 'revoked' || u.specialAccess.status === 'declined')).length})
                 </button>
               </div>
             </div>
@@ -2155,9 +2191,9 @@ export const AdminPanel: React.FC = () => {
                     <th className="p-3.5">Plano Original</th>
                     <th className="p-3.5">Tipo de Acesso</th>
                     <th className="p-3.5">Vigência (Início → Fim)</th>
-                    <th className="p-3.5">Dias Restantes</th>
                     <th className="p-3.5">Status</th>
-                    <th className="p-3.5">Concedido por / Motivo</th>
+                    <th className="p-3.5">Aceite do Membro</th>
+                    <th className="p-3.5">Responsável / Motivo</th>
                     <th className="p-3.5 text-right">Ações</th>
                   </tr>
                 </thead>
@@ -2165,8 +2201,13 @@ export const AdminPanel: React.FC = () => {
                   {users
                     .filter((u) => {
                       if (!u.specialAccess) return false;
-                      if (saTabFilter === 'lifetime') return getSpecialAccessComputedStatus(u) === 'active' && u.specialAccess?.accessType === 'lifetime';
-                      if (saTabFilter === 'annual') return getSpecialAccessComputedStatus(u) === 'active' && u.specialAccess?.accessType === 'annual';
+                      const compStatus = getSpecialAccessComputedStatus(u);
+                      if (saTabFilter === 'pending') return !u.specialAccess.acceptedAt && u.specialAccess.status !== 'declined' && u.specialAccess.status !== 'revoked';
+                      if (saTabFilter === 'active') return compStatus === 'active';
+                      if (saTabFilter === 'lifetime') return u.specialAccess.accessType === 'lifetime' && u.specialAccess.enabled;
+                      if (saTabFilter === 'annual') return u.specialAccess.accessType === 'annual' && u.specialAccess.enabled;
+                      if (saTabFilter === 'expired') return compStatus === 'expired';
+                      if (saTabFilter === 'revoked') return u.specialAccess.status === 'revoked' || u.specialAccess.status === 'declined';
                       return true;
                     })
                     .filter((u) => {
@@ -2183,6 +2224,8 @@ export const AdminPanel: React.FC = () => {
                       const compStatus = getSpecialAccessComputedStatus(u);
                       const isLifetime = u.specialAccess?.accessType === 'lifetime';
                       const isAnnual = u.specialAccess?.accessType === 'annual';
+                      const isAccepted = !!u.specialAccess?.acceptedAt;
+                      const isDeclined = u.specialAccess?.status === 'declined';
                       const daysRemaining = getSpecialAccessDaysRemaining(u);
 
                       return (
@@ -2213,36 +2256,66 @@ export const AdminPanel: React.FC = () => {
                             {isLifetime ? (
                               <span className="text-amber-300 font-bold">Permanente (desde {u.specialAccess?.startsAt})</span>
                             ) : (
-                              <span>{u.specialAccess?.startsAt} → {u.specialAccess?.expiresAt || '—'}</span>
-                            )}
-                          </td>
-                          <td className="p-3.5 font-mono text-[11px]">
-                            {isLifetime ? (
-                              <span className="text-amber-400 font-black font-sans">∞ Ilimitado</span>
-                            ) : compStatus === 'active' ? (
-                              <span className={typeof daysRemaining === 'number' && daysRemaining <= 3 ? 'text-orange-400 font-bold' : 'text-emerald-400 font-bold'}>
-                                {daysRemaining} dias
-                              </span>
-                            ) : compStatus === 'scheduled' ? (
-                              <span className="text-yellow-400 font-bold">Em espera</span>
-                            ) : (
-                              <span className="text-slate-500">0 dias</span>
+                              <div>
+                                <div>{u.specialAccess?.startsAt} → {u.specialAccess?.expiresAt || '—'}</div>
+                                {compStatus === 'active' && (
+                                  <div className="text-[10px] text-emerald-400 font-sans font-bold">
+                                    {daysRemaining} dias restantes
+                                  </div>
+                                )}
+                              </div>
                             )}
                           </td>
                           <td className="p-3.5">
                             <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase inline-flex items-center gap-1 ${
                               compStatus === 'active'
                                 ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'
-                                : compStatus === 'scheduled'
+                                : compStatus === 'pending_acceptance'
                                 ? 'bg-yellow-500/20 text-yellow-300 border border-yellow-500/40'
+                                : compStatus === 'scheduled'
+                                ? 'bg-sky-500/20 text-sky-300 border border-sky-500/40'
+                                : isDeclined
+                                ? 'bg-orange-500/20 text-orange-300 border border-orange-500/40'
                                 : 'bg-rose-500/20 text-rose-300 border border-rose-500/40'
                             }`}>
                               <span>●</span>
-                              <span>{compStatus === 'active' ? 'Ativo' : compStatus === 'scheduled' ? 'Agendado' : compStatus === 'expired' ? 'Expirado' : 'Revogado'}</span>
+                              <span>
+                                {compStatus === 'active'
+                                  ? 'Ativo'
+                                  : compStatus === 'pending_acceptance'
+                                  ? 'Aguardando Aceite'
+                                  : compStatus === 'scheduled'
+                                  ? 'Agendado'
+                                  : isDeclined
+                                  ? 'Recusado'
+                                  : compStatus === 'expired'
+                                  ? 'Expirado'
+                                  : 'Revogado'}
+                              </span>
                             </span>
                           </td>
+                          <td className="p-3.5 text-[11px]">
+                            {isAccepted ? (
+                              <div className="space-y-0.5">
+                                <span className="inline-flex items-center gap-1 font-bold text-emerald-400">
+                                  <Check className="w-3 h-3 text-emerald-400 stroke-[3]" />
+                                  <span>Sim, Aceitou</span>
+                                </span>
+                                <div className="text-[10px] text-slate-400 font-mono">
+                                  {new Date(u.specialAccess?.acceptedAt!).toLocaleDateString('pt-BR')} {new Date(u.specialAccess?.acceptedAt!).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                                </div>
+                              </div>
+                            ) : isDeclined ? (
+                              <span className="font-bold text-orange-400">Recusado pelo membro</span>
+                            ) : (
+                              <span className="inline-flex items-center gap-1 font-semibold text-yellow-400/90">
+                                <Clock className="w-3 h-3" />
+                                <span>Aguardando Aceite</span>
+                              </span>
+                            )}
+                          </td>
                           <td className="p-3.5 text-slate-400 text-[11px] max-w-[200px] truncate">
-                            <div className="font-semibold text-slate-300">{u.specialAccess?.reason || 'Parceria Comercial'}</div>
+                            <div className="font-semibold text-slate-300 truncate">{u.specialAccess?.reason || 'Parceria Comercial'}</div>
                             <div className="text-[10px] text-slate-500 truncate">Por: {u.specialAccess?.grantedBy}</div>
                           </td>
                           <td className="p-3.5 text-right space-x-2 whitespace-nowrap">
@@ -2253,7 +2326,7 @@ export const AdminPanel: React.FC = () => {
                             >
                               Editar
                             </button>
-                            {(compStatus === 'active' || compStatus === 'scheduled') && (
+                            {(compStatus === 'active' || compStatus === 'pending_acceptance' || compStatus === 'scheduled') && (
                               <button
                                 type="button"
                                 onClick={() => handleRevokeSpecialAccess(u)}

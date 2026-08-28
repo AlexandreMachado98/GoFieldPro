@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Sparkles, KeyRound, Calendar, ShieldCheck, X, ArrowRight, Clock } from 'lucide-react';
+import { Sparkles, KeyRound, Calendar, ShieldCheck, X, ArrowRight, Clock, Check } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { getSpecialAccessComputedStatus, getSpecialAccessDaysRemaining } from '../../utils/featureAccess';
 import { doc, updateDoc } from 'firebase/firestore';
@@ -13,6 +13,7 @@ export const SpecialAccessModal: React.FC<SpecialAccessModalProps> = ({ onOpenUp
   const { profile } = useAuth();
   const [isOpen, setIsOpen] = useState(false);
   const [modalType, setModalType] = useState<'granted' | 'expired'>('granted');
+  const [savingAction, setSavingAction] = useState(false);
 
   useEffect(() => {
     if (!profile || !profile.specialAccess) return;
@@ -20,12 +21,12 @@ export const SpecialAccessModal: React.FC<SpecialAccessModalProps> = ({ onOpenUp
     const sa = profile.specialAccess;
     const compStatus = getSpecialAccessComputedStatus(profile);
 
-    // 1. ACTIVE SPECIAL ACCESS GREETING MODAL
-    if (compStatus === 'active') {
+    // 1. ACTIVE / PENDING ACCEPTANCE GREETING & INVITATION MODAL
+    if (compStatus === 'active' || compStatus === 'pending_acceptance') {
       const storageKey = `sa_notified_${profile.uid}_${sa.grantedAt || sa.startsAt}`;
       const alreadyNotified = localStorage.getItem(storageKey);
 
-      if (!alreadyNotified && !sa.notifiedAt) {
+      if (!alreadyNotified && !sa.acceptedAt) {
         setModalType('granted');
         setIsOpen(true);
       }
@@ -42,31 +43,70 @@ export const SpecialAccessModal: React.FC<SpecialAccessModalProps> = ({ onOpenUp
     }
   }, [profile]);
 
-  const handleAcknowledge = async () => {
+  // Handler: Member Accepts the Special Access
+  const handleAcceptAccess = async () => {
     if (!profile || !profile.specialAccess) {
       setIsOpen(false);
       return;
     }
 
+    setSavingAction(true);
     const sa = profile.specialAccess;
+    const nowIso = new Date().toISOString();
 
-    if (modalType === 'granted') {
+    try {
       const storageKey = `sa_notified_${profile.uid}_${sa.grantedAt || sa.startsAt}`;
       localStorage.setItem(storageKey, 'true');
 
-      // Silently update Firestore notifiedAt if possible
-      try {
-        await updateDoc(doc(db, 'users', profile.uid), {
-          'specialAccess.notifiedAt': new Date().toISOString(),
-        });
-      } catch (e) {
-        // Local acknowledgement suffices
-      }
-    } else {
-      const storageKey = `sa_expired_notified_${profile.uid}_${sa.expiresAt}`;
-      localStorage.setItem(storageKey, 'true');
+      // Atomic Update on Firestore: Transition status to 'active' and record acceptedAt
+      await updateDoc(doc(db, 'users', profile.uid), {
+        'specialAccess.status': 'active',
+        'specialAccess.acceptedAt': nowIso,
+        'specialAccess.acceptedBy': profile.email || profile.name || 'Membro',
+        'specialAccess.notifiedAt': nowIso,
+      });
+    } catch (e) {
+      console.warn('Special access acceptance update notice:', e);
+    } finally {
+      setSavingAction(false);
+      setIsOpen(false);
+    }
+  };
+
+  // Handler: Member Declines the Special Access
+  const handleDeclineAccess = async () => {
+    if (!profile || !profile.specialAccess) {
+      setIsOpen(false);
+      return;
     }
 
+    setSavingAction(true);
+    const sa = profile.specialAccess;
+    const nowIso = new Date().toISOString();
+
+    try {
+      const storageKey = `sa_notified_${profile.uid}_${sa.grantedAt || sa.startsAt}`;
+      localStorage.setItem(storageKey, 'true');
+
+      await updateDoc(doc(db, 'users', profile.uid), {
+        'specialAccess.status': 'declined',
+        'specialAccess.declinedAt': nowIso,
+        'specialAccess.declinedReason': 'Recusado pelo membro',
+      });
+    } catch (e) {
+      console.warn('Special access decline update notice:', e);
+    } finally {
+      setSavingAction(false);
+      setIsOpen(false);
+    }
+  };
+
+  // Handler for expired modal acknowledge
+  const handleAcknowledgeExpired = () => {
+    if (profile?.specialAccess?.expiresAt) {
+      const storageKey = `sa_expired_notified_${profile.uid}_${profile.specialAccess.expiresAt}`;
+      localStorage.setItem(storageKey, 'true');
+    }
     setIsOpen(false);
   };
 
@@ -103,13 +143,13 @@ export const SpecialAccessModal: React.FC<SpecialAccessModalProps> = ({ onOpenUp
                 <Sparkles className="w-8 h-8 stroke-[2.5]" />
               </div>
               <span className="inline-block px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider bg-amber-500/20 text-amber-300 border border-amber-500/40">
-                ★ Autorização Especial VIP
+                ★ Presente & Autorização VIP
               </span>
               <h2 className="text-xl sm:text-2xl font-black text-white">
-                🎉 ACESSO ESPECIAL LIBERADO
+                🎉 VOCÊ RECEBEU ACESSO ESPECIAL!
               </h2>
               <p className="text-xs sm:text-sm text-slate-300">
-                Seu acesso especial aos recursos Premium foi liberado pelo administrador.
+                O Super Admin liberou acesso a todos os recursos Premium para a sua conta.
               </p>
             </div>
 
@@ -128,6 +168,13 @@ export const SpecialAccessModal: React.FC<SpecialAccessModalProps> = ({ onOpenUp
                   {isLifetime ? 'Acesso Permanente' : formatDateBr(sa.expiresAt)}
                 </span>
               </div>
+
+              {sa.reason && (
+                <div className="flex items-center justify-between text-xs border-b border-slate-800 pb-2">
+                  <span className="text-slate-400 font-bold">Motivo:</span>
+                  <span className="font-semibold text-slate-300 truncate max-w-[200px]">{sa.reason}</span>
+                </div>
+              )}
 
               {!isLifetime && (
                 <div className="flex items-center justify-between text-xs">
@@ -166,15 +213,26 @@ export const SpecialAccessModal: React.FC<SpecialAccessModalProps> = ({ onOpenUp
               </div>
             </div>
 
-            {/* Action Button */}
-            <button
-              type="button"
-              onClick={handleAcknowledge}
-              className="w-full py-3.5 rounded-2xl bg-gradient-to-r from-amber-500 via-yellow-500 to-amber-600 hover:from-amber-400 hover:to-yellow-400 text-slate-950 font-black text-xs sm:text-sm cursor-pointer shadow-xl shadow-amber-950/60 flex items-center justify-center gap-2 transition-all active:scale-98"
-            >
-              <span>ENTENDI E APROVEITAR</span>
-              <ArrowRight className="w-4 h-4 text-slate-950" />
-            </button>
+            {/* Action Buttons */}
+            <div className="flex flex-col sm:flex-row items-center gap-2.5 pt-1">
+              <button
+                type="button"
+                onClick={handleDeclineAccess}
+                disabled={savingAction}
+                className="w-full sm:w-1/3 py-3 rounded-2xl bg-slate-800 hover:bg-slate-750 text-slate-400 hover:text-slate-200 font-bold text-xs cursor-pointer transition-colors"
+              >
+                Recusar
+              </button>
+              <button
+                type="button"
+                onClick={handleAcceptAccess}
+                disabled={savingAction}
+                className="w-full sm:w-2/3 py-3.5 rounded-2xl bg-gradient-to-r from-amber-500 via-yellow-500 to-amber-600 hover:from-amber-400 hover:to-yellow-400 text-slate-950 font-black text-xs sm:text-sm cursor-pointer shadow-xl shadow-amber-950/60 flex items-center justify-center gap-2 transition-all active:scale-98 disabled:opacity-50"
+              >
+                <Check className="w-4 h-4 text-slate-950 stroke-[3]" />
+                <span>ACEITAR ACESSO ESPECIAL</span>
+              </button>
+            </div>
           </>
         ) : (
           <>
@@ -200,7 +258,7 @@ export const SpecialAccessModal: React.FC<SpecialAccessModalProps> = ({ onOpenUp
             <div className="flex flex-col sm:flex-row items-center gap-2.5">
               <button
                 type="button"
-                onClick={handleAcknowledge}
+                onClick={handleAcknowledgeExpired}
                 className="w-full sm:w-1/2 py-3 rounded-2xl bg-slate-800 hover:bg-slate-750 text-slate-300 font-bold text-xs cursor-pointer transition-colors"
               >
                 Continuar no Gratuito
@@ -208,7 +266,7 @@ export const SpecialAccessModal: React.FC<SpecialAccessModalProps> = ({ onOpenUp
               <button
                 type="button"
                 onClick={() => {
-                  handleAcknowledge();
+                  handleAcknowledgeExpired();
                   if (onOpenUpgradeModal) onOpenUpgradeModal();
                 }}
                 className="w-full sm:w-1/2 py-3 rounded-2xl bg-gradient-to-r from-amber-500 to-yellow-500 text-slate-950 font-black text-xs cursor-pointer shadow-lg flex items-center justify-center gap-1.5 transition-all"

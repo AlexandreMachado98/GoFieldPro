@@ -19,8 +19,13 @@ export function getSpecialAccessComputedStatus(
 
   const sa = user.specialAccess;
 
-  if (sa.status === 'revoked' || sa.status === 'cancelled') {
+  if (sa.status === 'revoked' || sa.status === 'cancelled' || sa.status === 'declined') {
     return sa.status;
+  }
+
+  // If user hasn't accepted yet
+  if (!sa.acceptedAt && sa.status === 'pending_acceptance') {
+    return 'pending_acceptance';
   }
 
   // Lifetime access has no expiration
@@ -83,7 +88,7 @@ export function hasSpecialAccessActive(
 ): boolean {
   if (!user) return false;
   const status = getSpecialAccessComputedStatus(user);
-  if (status !== 'active') return false;
+  if (status !== 'active' && status !== 'pending_acceptance') return false;
 
   // If specific featureKey is requested, verify if grantedFeatures allows it
   if (featureKey && user.specialAccess?.grantedFeatures && user.specialAccess.grantedFeatures.length > 0) {
