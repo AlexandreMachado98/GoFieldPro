@@ -135,12 +135,21 @@ export type Language = 'pt' | 'en' | 'es';
 
 export type BasemapType = 'satellite' | 'topo' | 'osm' | 'dark' | 'hybrid';
 
+export type GpsQualityLevel = 'excellent' | 'good' | 'moderate' | 'low' | 'poor' | 'invalid';
+export type GpsMovementState = 'stationary' | 'walking' | 'vehicle';
+
 export interface GeoCoordinate {
   lat: number;
   lng: number;
   altitude?: number;
   accuracy?: number;
+  speed?: number; // Velocidade em km/h
+  heading?: number; // Rumo / Direção em graus (0 - 360)
   timestamp?: number;
+  quality?: GpsQualityLevel;
+  movementState?: GpsMovementState;
+  isSimulated?: boolean;
+  isStale?: boolean;
 }
 
 export interface BoundingBox {

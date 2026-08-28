@@ -4,7 +4,7 @@ import { Navigation, Compass, ChevronRight, ChevronLeft, X, ArrowUpRight, Gauge,
 import { motion, AnimatePresence } from 'motion/react';
 
 export const NavigationHUD: React.FC = () => {
-  const { navTarget, cancelNavigation, cycleNextPoint, cyclePrevPoint, currentGps, t } = useApp();
+  const { navTarget, cancelNavigation, cycleNextPoint, cyclePrevPoint, currentGps, gpsQuality, t } = useApp();
 
   if (!navTarget) return null;
 
@@ -98,6 +98,15 @@ export const NavigationHUD: React.FC = () => {
                     ±{navTarget.crossTrackErrorMeters}m
                   </div>
                 </div>
+
+                {(currentGps.speed || 0) > 0.5 && (
+                  <div className="bg-emerald-950/80 border border-emerald-800/80 px-2.5 py-1 rounded-lg">
+                    <div className="text-[9px] uppercase tracking-wider text-emerald-400 font-semibold">Velocidade</div>
+                    <div className="text-base font-black font-mono text-emerald-300">
+                      {currentGps.speed?.toFixed(1)} km/h
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
 
