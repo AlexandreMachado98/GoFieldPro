@@ -19,6 +19,7 @@ import {
   Loader2,
   RefreshCw,
   Star,
+  CheckCircle,
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { useAuth } from '../../context/AuthContext';
@@ -30,7 +31,7 @@ import {
   generatePixEmvPayload,
   getPixQrCodeImageUrl,
 } from '../../utils/asaasGateway';
-import { PlanItemConfig, DEFAULT_PLANS } from '../../types';
+import { PlanItemConfig, DEFAULT_PLANS, DEFAULT_FREE_PLAN } from '../../types';
 
 export const PlanUpgradeModal: React.FC = () => {
   const {
@@ -53,44 +54,29 @@ export const PlanUpgradeModal: React.FC = () => {
   const [paymentId, setPaymentId] = useState<string>('');
   const [copied, setCopied] = useState<boolean>(false);
   const [isCheckingPayment, setIsCheckingPayment] = useState<boolean>(false);
+  const [selectedPlanId, setSelectedPlanId] = useState<string>('pro');
 
-  // Active showcase plan - STRICTLY EXACTLY 1 SINGLE PLAN VISIBLE
+  // Available showcase plans (always includes Free Plan and Pro Plan)
   const availablePlans = useMemo(() => {
     const rawPlans = (billingConfig?.plans && Array.isArray(billingConfig.plans) && billingConfig.plans.length > 0)
       ? billingConfig.plans
       : DEFAULT_PLANS;
 
-    // Strictly pick ONLY the single Pro plan
-    const singlePlan = rawPlans.find((p) => (p.id === 'pro' || p.highlight) && p.activeInShowcase !== false)
-      || rawPlans.find((p) => p.activeInShowcase !== false && (p as any).activeInShowcase !== 'false')
-      || DEFAULT_PLANS[0];
-
-    return [singlePlan];
+    const visible = rawPlans.filter((p) => p.activeInShowcase !== false && (p as any).activeInShowcase !== 'false');
+    
+    // Ensure Free Plan is always present in the list
+    if (!visible.some((p) => p.id === 'free' || p.price === 0)) {
+      return [DEFAULT_FREE_PLAN, ...visible];
+    }
+    return visible;
   }, [billingConfig, billingConfig?.plans]);
 
-  // Selected plan state
-  const [selectedPlanId, setSelectedPlanId] = useState<string>(() => {
-    const defaultHighlighted = availablePlans.find((p) => p.highlight) || availablePlans[0];
-    return defaultHighlighted ? defaultHighlighted.id : 'pro';
-  });
-
-  // Keep selected plan valid if available plans change
-  useEffect(() => {
-    if (!availablePlans.some((p) => p.id === selectedPlanId)) {
-      const defaultHighlighted = availablePlans.find((p) => p.highlight) || availablePlans[0];
-      if (defaultHighlighted) {
-        setSelectedPlanId(defaultHighlighted.id);
-      }
-    }
+  const currentPaidPlan = useMemo(() => {
+    return availablePlans.find((p) => p.id === selectedPlanId && p.id !== 'free')
+      || availablePlans.find((p) => p.id !== 'free')
+      || DEFAULT_PLANS[1]
+      || DEFAULT_PLANS[0];
   }, [availablePlans, selectedPlanId]);
-
-  const currentPlan = useMemo(() => {
-    return availablePlans.find((p) => p.id === selectedPlanId) || availablePlans[0] || DEFAULT_PLANS[0];
-  }, [availablePlans, selectedPlanId]);
-
-  const originalPrice = currentPlan.originalPrice || (currentPlan.price * 1.5);
-  const launchPrice = currentPlan.price;
-  const discountBadge = currentPlan.discountBadge || 'OFERTA ESPECIAL';
 
   // Reset state when opened
   useEffect(() => {
@@ -98,12 +84,41 @@ export const PlanUpgradeModal: React.FC = () => {
       setPaymentStep('showcase');
       setCopied(false);
       setIsGeneratingPix(false);
+      setSelectedPlanId('pro');
     }
   }, [isUpgradeModalOpen]);
 
-    const handleStartCheckout = async (planToBuy?: PlanItemConfig) => {
-    const plan = planToBuy || currentPlan;
-    setSelectedPlanId(plan.id);
+  const handleContinueAsFree = async () => {
+    setIsUpgradeModalOpen(false);
+    
+    if (profile?.uid) {
+      try {
+        localStorage.setItem(`gofield_welcome_dismissed_${profile.uid}`, 'true');
+        const userRef = doc(db, 'users', profile.uid);
+        await updateDoc(userRef, {
+          hasChosenPlan: true,
+          subscriptionPlan: profile.subscriptionPlan || 'free',
+          subscriptionStatus: profile.subscriptionStatus || 'active',
+        });
+        await refreshProfile();
+      } catch (err) {
+        console.warn('Notice saving free plan choice:', err);
+      }
+    }
+
+    notifyInfo(
+      'Plano Gratuito Ativo',
+      'Você está utilizando o GoField Pro no Plano Gratuito (limite de até 2 mapas PDF ativos).'
+    );
+  };
+
+  const handleStartCheckout = async (planToBuy: PlanItemConfig) => {
+    if (planToBuy.id === 'free' || planToBuy.price === 0) {
+      await handleContinueAsFree();
+      return;
+    }
+
+    setSelectedPlanId(planToBuy.id);
     setIsGeneratingPix(true);
 
     try {
@@ -112,39 +127,42 @@ export const PlanUpgradeModal: React.FC = () => {
       );
 
       if (isAsaasConfigured && profile) {
-        const asaasResult = await createAsaasPixPayment(profile, plan.price, billingConfig);
+        const asaasResult = await createAsaasPixPayment(profile, planToBuy.price, billingConfig);
 
         if (asaasResult && asaasResult.pixPayload) {
           setPixPayload(asaasResult.pixPayload);
           setPixQrCodeBase64(asaasResult.pixQrCodeBase64 || '');
           setPaymentId(asaasResult.paymentId || '');
           setPaymentStep('pix_checkout');
-          notifySuccess('PIX Asaas Gerado com Sucesso!', 'Pague pelo seu banco e a ativação ocorrerá automaticamente.');
+          setIsGeneratingPix(false);
           return;
         }
       }
 
-      // Fallback Direct Pix
+      // Fallback EMVCo Instant Pix Code
+      const pixKey = billingConfig?.pixKey?.trim() || 'alexandre1604981@gmail.com';
+      const beneficiary = billingConfig?.beneficiaryName?.trim() || 'AM TST SAUDE';
       const fallbackPayload = generatePixEmvPayload({
-        pixKey: billingConfig?.pixKey || 'pix@amtst.com.br',
-        beneficiaryName: billingConfig?.beneficiaryName || 'AM TST',
-        amount: plan.price,
-      });
+        pixKey,
+        beneficiaryName: beneficiary,
+        amount: planToBuy.price,
+        cityName: 'BRASILIA',
+              });
+
       setPixPayload(fallbackPayload);
       setPixQrCodeBase64('');
       setPaymentId('');
       setPaymentStep('pix_checkout');
-      notifyInfo('Chave PIX Pronta', 'Copie o código PIX ou escaneie o QR Code para pagar.');
     } catch (err: any) {
-      console.warn('Fallback Pix activation:', err);
+      console.error('Error starting checkout:', err);
+      const pixKey = billingConfig?.pixKey?.trim() || 'alexandre1604981@gmail.com';
       const fallbackPayload = generatePixEmvPayload({
-        pixKey: billingConfig?.pixKey || 'pix@amtst.com.br',
-        beneficiaryName: billingConfig?.beneficiaryName || 'AM TST',
-        amount: plan.price,
+        pixKey,
+        beneficiaryName: 'AM TST SAUDE',
+        amount: planToBuy.price,
+        cityName: 'BRASILIA',
       });
       setPixPayload(fallbackPayload);
-      setPixQrCodeBase64('');
-      setPaymentId('');
       setPaymentStep('pix_checkout');
     } finally {
       setIsGeneratingPix(false);
@@ -155,50 +173,34 @@ export const PlanUpgradeModal: React.FC = () => {
     if (!pixPayload) return;
     navigator.clipboard.writeText(pixPayload);
     setCopied(true);
-    notifySuccess('Código PIX Copiado!', 'Abra o aplicativo do seu banco e escolha "Pix Copia e Cola".');
-    setTimeout(() => setCopied(false), 4000);
-  };
-
-  const handlePaymentSuccess = async () => {
-    try {
-      if (profile?.uid) {
-        const userRef = doc(db, 'users', profile.uid);
-        const expiry = new Date();
-        expiry.setDate(expiry.getDate() + (currentPlan.billingPeriod === '/ano' ? 365 : 30));
-
-        await updateDoc(userRef, {
-          subscriptionPlan: currentPlan.id === 'pro' ? 'pro_mensal' : (currentPlan.id as any),
-          subscriptionStatus: 'active',
-          subscriptionValue: currentPlan.price,
-          subscriptionExpiresAt: expiry.toISOString().split('T')[0],
-          lastPaymentDate: new Date().toISOString(),
-        });
-
-        if (refreshProfile) {
-          await refreshProfile();
-        }
-      }
-      setPaymentStep('success');
-      notifySuccess('Assinatura Ativada!', 'Seu plano Profissional foi liberado com sucesso.');
-    } catch (err) {
-      console.error('Error updating profile on payment success:', err);
-      setPaymentStep('success');
-    }
+    setTimeout(() => setCopied(false), 3000);
   };
 
   const handleManualCheck = async () => {
     setIsCheckingPayment(true);
-    if (paymentId) {
-      const status = await checkAsaasPaymentStatus(paymentId, billingConfig);
-      if (status === 'CONFIRMED' || status === 'RECEIVED') {
-        await handlePaymentSuccess();
+    setTimeout(async () => {
+      if (!profile) {
         setIsCheckingPayment(false);
         return;
       }
-    }
-
-    setTimeout(async () => {
-      await handlePaymentSuccess();
+      try {
+        const userRef = doc(db, 'users', profile.uid);
+        const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
+        await updateDoc(userRef, {
+          status: 'active',
+          subscriptionPlan: currentPaidPlan.id || 'pro_mensal',
+          subscriptionStatus: 'active',
+          subscriptionExpiresAt: expiresAt,
+          subscriptionValue: Number(currentPaidPlan.price.toFixed(2)),
+          paymentMethod: 'pix',
+          lastPaymentDate: new Date().toISOString(),
+          hasChosenPlan: true,
+        });
+        await refreshProfile();
+        setPaymentStep('success');
+      } catch (err) {
+        console.error('Error manually activating subscription:', err);
+      }
       setIsCheckingPayment(false);
     }, 1200);
   };
@@ -206,223 +208,170 @@ export const PlanUpgradeModal: React.FC = () => {
   if (!isUpgradeModalOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-[100000] flex items-center justify-center p-3 sm:p-4 bg-black/85 backdrop-blur-md animate-fade-in overflow-y-auto">
-      <div className="relative w-full max-w-xl bg-slate-950 border border-slate-800 rounded-3xl shadow-2xl overflow-hidden my-auto flex flex-col max-h-[92vh]">
+    <div className="fixed inset-0 z-[999999] flex items-center justify-center p-3 sm:p-4 bg-slate-950/85 backdrop-blur-md overflow-y-auto animate-fade-in">
+      <div className="relative w-full max-w-2xl bg-gradient-to-b from-[#0F172A] to-[#090D16] border border-slate-700/60 rounded-3xl shadow-2xl overflow-hidden my-auto">
         
-        {/* Header Glow */}
-        <div className="absolute top-0 left-0 right-0 h-36 bg-gradient-to-b from-sky-500/20 via-amber-500/10 to-transparent pointer-events-none" />
-
+        {/* Glow Header Accent */}
+        <div className="absolute top-0 inset-x-0 h-1.5 bg-gradient-to-r from-sky-500 via-emerald-500 to-teal-400" />
+        
         {/* Close Button */}
         <button
-          onClick={() => setIsUpgradeModalOpen(false)}
-          className="absolute top-4 right-4 p-2 rounded-full text-slate-400 hover:text-white bg-slate-900/80 border border-slate-800 hover:bg-slate-800 transition-all z-10 active:scale-95 cursor-pointer"
+          onClick={handleContinueAsFree}
+          className="absolute top-4 right-4 p-2 text-slate-400 hover:text-white rounded-full bg-slate-800/60 hover:bg-slate-700/80 transition-all active:scale-95 z-20 cursor-pointer"
+          aria-label="Fechar"
         >
           <X className="w-5 h-5" />
         </button>
 
-        {/* Modal Content */}
-        <div className="p-5 sm:p-7 overflow-y-auto flex-1 space-y-5">
-
+        <div className="p-4 sm:p-7 space-y-5">
           {paymentStep === 'showcase' && (
             <>
-              {/* Badge & Title */}
+              {/* Header Title */}
               <div className="text-center space-y-1.5 pt-1">
-                <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-gradient-to-r from-amber-500/20 to-sky-500/20 border border-amber-500/40 text-amber-400 text-xs font-black uppercase tracking-wider">
-                  <Crown className="w-3.5 h-3.5" />
-                  <span>Plano Profissional • AM TST Campo</span>
+                <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-[11px] font-black uppercase tracking-wider">
+                  <Sparkles className="w-3.5 h-3.5" />
+                  <span>Escolha Seu Plano</span>
                 </div>
+                
                 <h2 className="text-xl sm:text-2xl font-black text-white tracking-tight">
-                  {isProUser ? 'Gerenciar Planos & Assinatura' : 'Desbloqueie o Poder Total do Campo'}
+                  {upgradeModalFeature
+                    ? `Desbloqueie "${upgradeModalFeature}"`
+                    : 'Aproveite todos os recursos do GoField Pro'}
                 </h2>
-                {upgradeModalFeature ? (
-                  <p className="text-xs text-sky-300 font-medium">
-                    O recurso <strong className="text-white">"{upgradeModalFeature}"</strong> é exclusivo para assinantes dos planos profissionais.
-                  </p>
-                ) : (
-                  <p className="text-xs text-slate-400">
-                    Clique no plano desejado abaixo para gerar o pagamento instantâneo via PIX.
-                  </p>
-                )}
+                
+                <p className="text-xs text-slate-400 max-w-lg mx-auto">
+                  Você pode usar o aplicativo no <strong>Plano Gratuito</strong> ou assinar um dos nossos planos para recursos e mapas ilimitados.
+                </p>
               </div>
 
-              {/* Pro / Trial Status Notice */}
-              {isProUser && (
-                <div className="p-3.5 bg-gradient-to-r from-emerald-950/80 via-slate-900 to-emerald-950/80 border border-emerald-500/40 rounded-2xl text-left space-y-1 shadow-md animate-in fade-in">
-                  <div className="flex items-center gap-2">
-                    <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
-                    <span className="text-xs font-black text-emerald-300">
-                      {profile?.role === 'super_admin' || profile?.email?.toLowerCase() === 'alexandre1604981@gmail.com'
-                        ? 'Acesso Super Admin (Ilimitado)'
-                        : profile?.subscriptionStatus === 'active'
-                        ? 'Você já é um Assinante GoField Pro Ativo!'
-                        : 'Você está no Período de Teste Grátis (Acesso Pro Liberado)!'}
-                    </span>
-                  </div>
-                  <p className="text-[11px] text-slate-300 leading-relaxed">
-                    Você pode visualizar os outros planos da vitrine abaixo e contratar para renovar antecipadamente ou migrar para um plano Equipe/Corporativo.
-                  </p>
-                </div>
-              )}
-
-              {/* Feature Value Preview Grid */}
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 text-left pt-1">
-                <div className="p-2.5 rounded-2xl bg-slate-900/90 border border-slate-800 flex items-center gap-2">
-                  <div className="w-7 h-7 rounded-xl bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 flex items-center justify-center shrink-0">
-                    <FileText className="w-3.5 h-3.5" />
-                  </div>
-                  <div>
-                    <div className="text-[11px] font-black text-white leading-tight">Laudos PDF</div>
-                    <div className="text-[9px] text-slate-400">Com fotos e odômetro</div>
-                  </div>
-                </div>
-
-                <div className="p-2.5 rounded-2xl bg-slate-900/90 border border-slate-800 flex items-center gap-2">
-                  <div className="w-7 h-7 rounded-xl bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 flex items-center justify-center shrink-0">
-                    <Trees className="w-3.5 h-3.5" />
-                  </div>
-                  <div>
-                    <div className="text-[11px] font-black text-white leading-tight">Cubagem m³</div>
-                    <div className="text-[9px] text-slate-400">Smalian & Huber</div>
-                  </div>
-                </div>
-
-                <div className="p-2.5 rounded-2xl bg-slate-900/90 border border-slate-800 flex items-center gap-2 col-span-2 sm:col-span-1">
-                  <div className="w-7 h-7 rounded-xl bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 flex items-center justify-center shrink-0">
-                    <HardDrive className="w-3.5 h-3.5" />
-                  </div>
-                  <div>
-                    <div className="text-[11px] font-black text-white leading-tight">100% Offline</div>
-                    <div className="text-[9px] text-slate-400">Navegação sem sinal</div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Plan Cards Grid with 1-Click Action */}
-              <div className="space-y-4">
+              {/* Plans Comparison Grid */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
                 {availablePlans.map((plan) => {
-                  const origPrice = plan.originalPrice || (plan.price * 1.5);
-                  const isSelected = plan.id === selectedPlanId;
+                  const isFree = plan.id === 'free' || plan.price === 0;
+                  const isHighlighted = plan.highlight || !isFree;
 
                   return (
                     <div
                       key={plan.id}
-                      onClick={() => handleStartCheckout(plan)}
-                      className={`relative p-4 sm:p-5 rounded-3xl border-2 transition-all cursor-pointer shadow-xl ${
-                        isSelected || plan.highlight
-                          ? 'bg-gradient-to-br from-slate-900 via-slate-900 to-sky-950/60 border-emerald-500 ring-2 ring-emerald-500/30 hover:border-emerald-400'
-                          : 'bg-slate-900/90 border-slate-800 hover:border-slate-700'
-                      } hover:scale-[1.01] active:scale-98`}
+                      className={`rounded-2xl p-4 sm:p-5 flex flex-col justify-between transition-all relative border ${
+                        isHighlighted
+                          ? 'bg-gradient-to-b from-emerald-950/40 via-slate-900/90 to-slate-950 border-emerald-500/60 ring-2 ring-emerald-500/40 shadow-xl'
+                          : 'bg-slate-900/70 border-slate-800 hover:border-slate-700'
+                      }`}
                     >
-                      {plan.discountBadge && (
-                        <div className="absolute -top-2.5 right-4 px-3 py-0.5 bg-gradient-to-r from-amber-500 to-rose-500 text-slate-950 text-[10px] font-black rounded-full shadow-md animate-pulse">
-                          {plan.discountBadge}
+                      {isHighlighted && (
+                        <div className="absolute -top-3 right-4 bg-gradient-to-r from-emerald-500 to-teal-400 text-slate-950 text-[9px] font-black px-2.5 py-0.5 rounded-full uppercase tracking-wider shadow">
+                          {plan.discountBadge || 'Recomendado'}
                         </div>
                       )}
 
-                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-800/80">
-                        <div>
-                          <div className="flex items-center gap-2">
-                            <span className="text-base sm:text-lg font-black text-white">{plan.name}</span>
-                            <span className="text-[9px] font-black px-2 py-0.5 rounded-full bg-slate-800 text-slate-300 border border-slate-700">
-                              {plan.tag}
-                            </span>
-                          </div>
-                          <p className="text-[11px] text-slate-400 mt-0.5">Acesso completo e liberação imediata via PIX</p>
-                        </div>
-
-                        <div className="text-left sm:text-right">
-                          {origPrice > plan.price && (
-                            <span className="text-xs line-through text-slate-500 font-bold block">
-                              R$ {origPrice.toFixed(2).replace('.', ',')}
+                      <div>
+                        {/* Tag & Plan Name */}
+                        <div className="flex items-center justify-between gap-1 mb-1">
+                          <span className="text-[9px] font-black uppercase px-2 py-0.5 rounded-md bg-slate-800 text-slate-300 border border-slate-700">
+                            {plan.tag || (isFree ? 'Gratuito' : 'Profissional')}
+                          </span>
+                          {isFree && (
+                            <span className="text-[9px] font-black uppercase px-2 py-0.5 rounded-md bg-sky-500/20 text-sky-300 border border-sky-500/30">
+                              Sem Custos
                             </span>
                           )}
-                          <div className="flex items-baseline sm:justify-end gap-1">
-                            <span className="text-2xl sm:text-3xl font-black text-emerald-400 font-mono">
+                        </div>
+
+                        <h3 className="font-extrabold text-white text-base sm:text-lg">{plan.name}</h3>
+
+                        {/* Pricing Box */}
+                        <div className="my-2.5 bg-slate-950/70 p-2.5 rounded-xl border border-slate-800/80">
+                          {plan.originalPrice > plan.price && (
+                            <div className="text-[10px] text-slate-400 line-through font-mono">
+                              R$ {plan.originalPrice.toFixed(2)}
+                            </div>
+                          )}
+                          <div className="flex items-baseline gap-1">
+                            <span className={`text-xl sm:text-2xl font-black font-mono ${isFree ? 'text-sky-400' : 'text-emerald-400'}`}>
                               R$ {plan.price.toFixed(2).replace('.', ',')}
                             </span>
-                            <span className="text-xs text-slate-400 font-bold">{plan.billingPeriod || '/mês'}</span>
+                            <span className="text-[10px] text-slate-400 font-medium">
+                              {plan.billingPeriod || (isFree ? '/sempre' : '/mês')}
+                            </span>
                           </div>
                         </div>
+
+                        {/* Features List */}
+                        <ul className="space-y-1.5 text-xs text-slate-300 mb-4">
+                          {plan.features.map((feat, idx) => (
+                            <li key={idx} className="flex items-start gap-2 leading-tight">
+                              <div className={`w-4 h-4 rounded-full flex items-center justify-center shrink-0 mt-0.5 ${
+                                isFree ? 'bg-sky-500/20 text-sky-400' : 'bg-emerald-500/20 text-emerald-400'
+                              }`}>
+                                <Check className="w-2.5 h-2.5 stroke-[3]" />
+                              </div>
+                              <span className="text-[11px]">{feat}</span>
+                            </li>
+                          ))}
+                        </ul>
                       </div>
 
-                      {/* Features */}
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 py-3 text-xs text-slate-200">
-                        {plan.features.map((feat, idx) => (
-                          <div key={idx} className="flex items-center gap-2">
-                            <div className="w-4 h-4 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center shrink-0">
-                              <Check className="w-3 h-3" />
-                            </div>
-                            <span className="text-[11px] font-medium leading-tight">{feat}</span>
-                          </div>
-                        ))}
-                      </div>
-
-                      {/* 1-Click Subscribe Button inside each card */}
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleStartCheckout(plan);
-                        }}
-                        disabled={isGeneratingPix}
-                        className="w-full mt-2 py-3 px-4 rounded-2xl bg-gradient-to-r from-emerald-500 via-sky-500 to-emerald-500 hover:from-emerald-400 hover:to-emerald-400 text-slate-950 font-black text-xs sm:text-sm uppercase tracking-wider shadow-lg shadow-emerald-950/60 transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-95"
-                      >
-                        {isGeneratingPix && selectedPlanId === plan.id ? (
-                          <>
-                            <Loader2 className="w-4 h-4 animate-spin" />
-                            <span>Gerando PIX Asaas...</span>
-                          </>
+                      {/* Action Button */}
+                      <div>
+                        {isFree ? (
+                          <button
+                            type="button"
+                            onClick={handleContinueAsFree}
+                            className="w-full py-2.5 px-4 rounded-xl bg-slate-800 hover:bg-slate-750 border border-slate-700 text-sky-300 hover:text-white font-black text-xs transition-all flex items-center justify-center gap-1.5 cursor-pointer active:scale-95 shadow"
+                          >
+                            <span>Continuar Gratuitamente</span>
+                            <ArrowRight className="w-3.5 h-3.5 text-sky-400" />
+                          </button>
                         ) : (
-                          <>
-                            <Zap className="w-4 h-4 fill-current text-slate-950" />
-                            <span>Pagar via PIX • Liberar Acesso Imediato (R$ {plan.price.toFixed(2).replace('.', ',')})</span>
-                            <ArrowRight className="w-4 h-4 ml-1" />
-                          </>
+                          <button
+                            type="button"
+                            onClick={() => handleStartCheckout(plan)}
+                            disabled={isGeneratingPix}
+                            className="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-emerald-500 via-teal-500 to-emerald-600 hover:from-emerald-400 hover:to-teal-400 text-slate-950 font-black text-xs sm:text-sm uppercase tracking-wider transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-95 shadow-lg shadow-emerald-950/60 disabled:opacity-50"
+                          >
+                            {isGeneratingPix && selectedPlanId === plan.id ? (
+                              <>
+                                <Loader2 className="w-4 h-4 animate-spin" />
+                                <span>Gerando PIX...</span>
+                              </>
+                            ) : (
+                              <>
+                                <Zap className="w-4 h-4 fill-current text-slate-950" />
+                                <span>Assinar Plano Pro</span>
+                              </>
+                            )}
+                          </button>
                         )}
-                      </button>
+                      </div>
                     </div>
                   );
                 })}
               </div>
 
-              {/* Security & Warranty Note */}
-              <div className="text-center pt-2 text-[11px] text-slate-400 space-y-1">
-                <div className="flex items-center justify-center gap-3 text-slate-300">
-                  <span className="flex items-center gap-1"><ShieldCheck className="w-3.5 h-3.5 text-emerald-400" /> Pagamento 100% Seguro</span>
+              {/* Bottom Prominent Free Tier Option */}
+              <div className="pt-2 text-center space-y-2 border-t border-slate-800/80">
+                <button
+                  type="button"
+                  onClick={handleContinueAsFree}
+                  className="text-xs sm:text-sm font-black text-slate-300 hover:text-sky-300 transition-colors inline-flex items-center gap-1.5 underline cursor-pointer py-1"
+                >
+                  <span>Continuar usando gratuitamente</span>
+                  <ArrowRight className="w-4 h-4" />
+                </button>
+                <div className="flex items-center justify-center gap-3 text-[10px] text-slate-500">
+                  <span className="flex items-center gap-1"><ShieldCheck className="w-3 h-3 text-emerald-400" /> Pagamento 100% Seguro</span>
                   <span>•</span>
                   <span>Liberação Automática</span>
                   <span>•</span>
-                  <span>Sem Fidelidade</span>
+                  <span>Cancele Quando Quiser</span>
                 </div>
               </div>
-
-              {/* Skip and Access Free Version Button */}
-              {!isProUser && (
-                <div className="pt-2 border-t border-slate-800/80 space-y-2">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setIsUpgradeModalOpen(false);
-                      notifyInfo(
-                        'Modo Gratuito Ativo',
-                        'Você está utilizando o GoField Pro no Plano Gratuito (limite de até 2 mapas PDF ativos simultâneos).'
-                      );
-                    }}
-                    className="w-full py-2.5 px-4 rounded-2xl bg-slate-900 hover:bg-slate-800 border border-slate-700/80 hover:border-slate-600 text-slate-300 hover:text-white font-bold text-xs transition-all flex items-center justify-center gap-2 active:scale-98 cursor-pointer shadow-md"
-                  >
-                    <span>Pular e Acessar Versão Gratuita (Free)</span>
-                    <ArrowRight className="w-3.5 h-3.5 text-slate-400" />
-                  </button>
-                  <p className="text-[10px] text-slate-500 text-center">
-                    No plano gratuito você pode importar até 2 mapas PDF e navegar com as ferramentas básicas de campo.
-                  </p>
-                </div>
-              )}
             </>
           )}
 
           {paymentStep === 'pix_checkout' && (
-            <div className="space-y-5 text-center">
+            <div className="space-y-4 text-center">
               <div className="inline-flex items-center justify-center w-12 h-12 rounded-2xl bg-emerald-500/20 text-emerald-400 mx-auto">
                 <QrCode className="w-6 h-6" />
               </div>
@@ -430,25 +379,25 @@ export const PlanUpgradeModal: React.FC = () => {
               <div>
                 <h3 className="text-xl font-extrabold text-white">Pagamento Instantâneo via PIX</h3>
                 <p className="text-xs text-slate-400 mt-1">
-                  Plano: <strong className="text-white">{currentPlan.name}</strong> • Valor: <strong className="text-emerald-400 font-mono">R$ {launchPrice.toFixed(2).replace('.', ',')}</strong>
+                  Plano: <strong className="text-white">{currentPaidPlan.name}</strong> • Valor: <strong className="text-emerald-400 font-mono">R$ {currentPaidPlan.price.toFixed(2).replace('.', ',')}</strong>
                 </p>
               </div>
 
-              {/* QR Code Display (Asaas Base64 or EMVCo QR Code) */}
+              {/* QR Code Display */}
               <div className="p-3 bg-white rounded-2xl inline-block mx-auto shadow-2xl border-4 border-emerald-500/40">
                 <img
                   src={pixQrCodeBase64 ? `data:image/png;base64,${pixQrCodeBase64}` : getPixQrCodeImageUrl(pixPayload)}
                   alt="QR Code Pix"
-                  className="w-48 h-48 sm:w-56 sm:h-56 object-contain"
+                  className="w-44 h-44 sm:w-52 sm:h-52 object-contain"
                 />
               </div>
 
               {/* Pix Copia e Cola */}
-              <div className="space-y-2">
-                <label className="block text-[11px] font-bold text-slate-400 uppercase tracking-wider text-left">
+              <div className="space-y-1.5 text-left">
+                <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider">
                   Código Pix Copia e Cola:
                 </label>
-                <div className="flex items-center gap-2 bg-slate-900 border border-slate-800 rounded-xl p-2 text-left">
+                <div className="flex items-center gap-2 bg-slate-900 border border-slate-800 rounded-xl p-2">
                   <input
                     type="text"
                     readOnly
@@ -458,7 +407,9 @@ export const PlanUpgradeModal: React.FC = () => {
                   <button
                     type="button"
                     onClick={handleCopyPix}
-                    className="px-3 py-1.5 bg-sky-500 hover:bg-sky-400 text-slate-950 font-bold text-xs rounded-lg transition-all flex items-center gap-1 shrink-0 active:scale-95 cursor-pointer"
+                    className={`px-3 py-1.5 font-bold text-xs rounded-lg transition-all flex items-center gap-1 shrink-0 active:scale-95 cursor-pointer ${
+                      copied ? 'bg-emerald-500 text-slate-950' : 'bg-sky-500 text-slate-950'
+                    }`}
                   >
                     {copied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
                     <span>{copied ? 'Copiado!' : 'Copiar'}</span>
@@ -466,13 +417,13 @@ export const PlanUpgradeModal: React.FC = () => {
                 </div>
               </div>
 
-              {/* Real-time Status Notice */}
-              <div className="p-3 bg-slate-900/60 border border-slate-800 rounded-xl flex items-center justify-center gap-2 text-xs text-slate-400">
+              {/* Status Notice */}
+              <div className="p-2.5 bg-slate-900/60 border border-slate-800 rounded-xl flex items-center justify-center gap-2 text-xs text-slate-400">
                 <Loader2 className="w-4 h-4 text-sky-400 animate-spin" />
                 <span>Aguardando confirmação do banco... O app liberará seu acesso na hora!</span>
               </div>
 
-              {/* Manual Check Button */}
+              {/* Action Buttons */}
               <div className="flex items-center justify-between gap-3 pt-2">
                 <button
                   type="button"
@@ -487,12 +438,19 @@ export const PlanUpgradeModal: React.FC = () => {
                   disabled={isCheckingPayment}
                   className="px-5 py-2.5 rounded-xl text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-500 transition-all flex items-center gap-1.5 shadow-lg active:scale-95 disabled:opacity-50 cursor-pointer"
                 >
-                  {isCheckingPayment ? (
-                    <RefreshCw className="w-4 h-4 animate-spin" />
-                  ) : (
-                    <CheckCircle2 className="w-4 h-4" />
-                  )}
-                  <span>Já realizei o pagamento</span>
+                  <RefreshCw className={`w-4 h-4 ${isCheckingPayment ? 'animate-spin' : ''}`} />
+                  <span>{isCheckingPayment ? 'Verificando...' : 'Já realizei o pagamento'}</span>
+                </button>
+              </div>
+
+              {/* Skip and Use Free fallback option */}
+              <div className="pt-2">
+                <button
+                  type="button"
+                  onClick={handleContinueAsFree}
+                  className="text-[11px] text-slate-400 hover:text-sky-300 underline cursor-pointer"
+                >
+                  Pagar depois e continuar usando no Plano Gratuito
                 </button>
               </div>
             </div>
@@ -506,7 +464,7 @@ export const PlanUpgradeModal: React.FC = () => {
               <div>
                 <h3 className="text-2xl font-black text-white">Parabéns! Assinatura Ativada</h3>
                 <p className="text-xs text-slate-400 mt-1.5 max-w-sm mx-auto">
-                  Você agora é assinante oficial do <strong className="text-emerald-400">{currentPlan.name}</strong>. Todos os recursos ilimitados foram desbloqueados.
+                  Você agora é assinante oficial do <strong className="text-emerald-400">{currentPaidPlan.name}</strong>. Todos os recursos e mapas ilimitados foram desbloqueados.
                 </p>
               </div>
               <button

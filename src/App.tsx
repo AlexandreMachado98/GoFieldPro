@@ -1,32 +1,33 @@
 import React from 'react';
-import { ErrorBoundary } from './components/ErrorBoundary';
-import { AppProvider, useApp } from './context/AppContext';
 import { AuthProvider, useAuth } from './context/AuthContext';
+import { AppProvider, useApp } from './context/AppContext';
 import { UpdateProvider } from './context/UpdateContext';
 import { Sidebar } from './components/Sidebar';
 import { Topbar } from './components/Topbar';
 import { MapViewer } from './components/Map/MapViewer';
 import { NavigationHUD } from './components/Navigation/NavigationHUD';
-import { LayerManagerModal } from './components/Layers/LayerManagerModal';
-import { AddWaypointModal } from './components/Waypoints/AddWaypointModal';
-import { HomeDashboard } from './components/Home/HomeDashboard';
 import { PdfMapNavigator } from './components/PdfMaps/PdfMapNavigator';
-import { OfflineSyncDrawer } from './components/Offline/OfflineSyncDrawer';
 import { FieldRoundsPanel } from './components/FieldRounds/FieldRoundsPanel';
 import { FireIncidentsPanel } from './components/FireIncidents/FireIncidentsPanel';
-import { MobileBottomNav } from './components/Navigation/MobileBottomNav';
+import { HomeDashboard } from './components/Home/HomeDashboard';
+import { OfflineSyncDrawer } from './components/Offline/OfflineSyncDrawer';
 import { AdminPanel } from './components/Admin/AdminPanel';
-import { LoginScreen } from './components/Auth/LoginScreen';
-import { PendingApprovalScreen } from './components/Auth/PendingApprovalScreen';
-import { ApprovalCelebrationScreen } from './components/Auth/ApprovalCelebrationScreen';
-import { ToastContainer } from './components/Common/ToastContainer';
-import { ConfirmModal } from './components/Common/ConfirmModal';
 import { SettingsModal } from './components/Settings/SettingsModal';
 import { WoodpileCubageModal } from './components/Forestry/WoodpileCubageModal';
 import { LegalPoliciesModal } from './components/Legal/LegalPoliciesModal';
-import { AppUpdateBanner } from './components/Common/AppUpdateBanner';
+import { LoginScreen } from './components/Auth/LoginScreen';
+import { PendingApprovalScreen } from './components/Auth/PendingApprovalScreen';
+import { ApprovalCelebrationScreen } from './components/Auth/ApprovalCelebrationScreen';
+import { ErrorBoundary } from './components/ErrorBoundary';
+import { ConfirmModal } from './components/Common/ConfirmModal';
+import { ToastContainer } from './components/Common/ToastContainer';
 import { PlanUpgradeModal } from './components/Billing/PlanUpgradeModal';
+import { AddWaypointModal } from './components/Waypoints/AddWaypointModal';
+import { LayerManagerModal } from './components/Layers/LayerManagerModal';
+import { MobileBottomNav } from './components/Navigation/MobileBottomNav';
+import { AppUpdateBanner } from './components/Common/AppUpdateBanner';
 import { Sparkles, Clock, AlertTriangle, ArrowRight, Lock } from 'lucide-react';
+import { getUserRawItem } from './utils/userStorage';
 
 const FeatureRestrictedView: React.FC<{ featureName: string }> = ({ featureName }) => {
   const { openUpgradeModal } = useApp();
@@ -53,7 +54,6 @@ const FeatureRestrictedView: React.FC<{ featureName: string }> = ({ featureName 
     </div>
   );
 };
-import { getUserRawItem } from './utils/userStorage';
 
 const MainAppContent: React.FC = () => {
   const {
@@ -68,6 +68,20 @@ const MainAppContent: React.FC = () => {
     hasFeatureAccess,
   } = useApp();
   const { profile } = useAuth();
+
+  // Show Welcome / Plan Choice modal on first login if not yet dismissed
+  React.useEffect(() => {
+    if (!profile || profile.role === 'super_admin' || profile.email?.toLowerCase() === 'alexandre1604981@gmail.com') {
+      return;
+    }
+    const isDismissed = localStorage.getItem(`gofield_welcome_dismissed_${profile.uid}`) === 'true';
+    if (!profile.hasChosenPlan && !isDismissed) {
+      const timer = setTimeout(() => {
+        openUpgradeModal();
+      }, 600);
+      return () => clearTimeout(timer);
+    }
+  }, [profile?.uid, profile?.hasChosenPlan, profile?.role, openUpgradeModal]);
 
   return (
     <div className="flex h-[100dvh] w-full max-w-full overflow-hidden bg-slate-950 text-slate-100 font-sans">
@@ -108,21 +122,17 @@ const MainAppContent: React.FC = () => {
                   {isExpired ? (
                     <><b>Seu período de teste de 14 dias expirou.</b> Renove sua assinatura para continuar usando todos os recursos Pro!</>
                   ) : (
-                    <><b>Período de Teste Grátis:</b> Restam <span className="underline font-black text-amber-300">{diffDays} {diffDays === 1 ? 'dia' : 'dias'}</span> de acesso Pro ilimitado.</>
+                    <><b>Atenção:</b> Seu período de teste gratuito expira em <b>{diffDays} {diffDays === 1 ? 'dia' : 'dias'}</b>.</>
                   )}
                 </span>
               </div>
 
               <button
-                onClick={() => openUpgradeModal(isExpired ? 'Renovação de Assinatura' : 'Assinatura Plano Pro')}
-                className={`px-3 py-1 rounded-xl font-black text-[11px] uppercase tracking-wider flex items-center gap-1.5 shadow-md active:scale-95 transition-all cursor-pointer shrink-0 ${
-                  isExpired
-                    ? 'bg-rose-600 hover:bg-rose-500 text-white shadow-rose-950/50'
-                    : 'bg-gradient-to-r from-amber-500 to-emerald-500 hover:from-amber-400 hover:to-emerald-400 text-slate-950'
-                }`}
+                onClick={() => openUpgradeModal('Assinatura GoField Pro')}
+                className="px-3 py-1 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 font-black rounded-lg text-xs flex items-center gap-1.5 transition-all shadow-md shrink-0 active:scale-95 cursor-pointer"
               >
                 <Sparkles className="w-3.5 h-3.5" />
-                <span>{isExpired ? 'Renovar Assinatura' : 'Garantir Plano Pro'}</span>
+                <span>{isExpired ? 'Assinar Agora' : 'Ativar Plano Oficial'}</span>
                 <ArrowRight className="w-3 h-3" />
               </button>
             </div>
@@ -138,8 +148,20 @@ const MainAppContent: React.FC = () => {
               {activeTab === 'layers' && <LayerManagerModal />}
             </div>
           )}
-          {activeTab === 'field_rounds' && <FieldRoundsPanel />}
-          {activeTab === 'fire_incidents' && <FireIncidentsPanel />}
+          {activeTab === 'field_rounds' && (
+            hasFeatureAccess('field_rounds') ? (
+              <FieldRoundsPanel />
+            ) : (
+              <FeatureRestrictedView featureName="Rondas & Inspeções de Campo SST" />
+            )
+          )}
+          {activeTab === 'fire_incidents' && (
+            hasFeatureAccess('fire_incidents') ? (
+              <FireIncidentsPanel />
+            ) : (
+              <FeatureRestrictedView featureName="Registro de Focos de Incêndio & Ocorrências" />
+            )
+          )}
           {activeTab === 'home' && <HomeDashboard />}
           {activeTab === 'pdf_maps' && (
             <ErrorBoundary fallbackTitle="Visualizador de Mapas e Plantas PDF">
@@ -179,12 +201,12 @@ const AuthenticatedApp: React.FC = () => {
     }
   }, [profile?.status, profile?.uid, profile?.role]);
 
-  // If the user's account is pending approval or blocked (and not the owner super_admin)
-  if (profile && profile.role !== 'super_admin' && (profile.status === 'pending' || profile.status === 'blocked')) {
+  // If the user's account is specifically blocked by admin
+  if (profile && profile.role !== 'super_admin' && profile.status === 'blocked') {
     return <PendingApprovalScreen />;
   }
 
-  // If newly approved, display the celebration transition screen
+  // If newly approved, display celebration screen
   if (showCelebration && profile && profile.status === 'active' && profile.role !== 'super_admin') {
     return <ApprovalCelebrationScreen onContinue={() => setShowCelebration(false)} />;
   }

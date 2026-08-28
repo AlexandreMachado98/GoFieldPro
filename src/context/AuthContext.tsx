@@ -59,7 +59,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               email: currentUser.email || '',
               name: currentUser.displayName || currentUser.email?.split('@')[0] || 'Usuário de Campo',
               role: isOwner ? 'super_admin' : 'surveyor',
-              status: isOwner ? 'active' : 'pending',
+              status: 'active',
+            subscriptionPlan: 'free',
+            subscriptionStatus: 'active',
+            subscriptionValue: 0,
               avatar: currentUser.photoURL || `https://ui-avatars.com/api/?name=${encodeURIComponent(currentUser.displayName || currentUser.email || 'U')}&background=0284c7&color=fff`,
               createdAt: new Date().toISOString(),
             };

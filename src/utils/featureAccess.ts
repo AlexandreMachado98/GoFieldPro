@@ -31,8 +31,17 @@ export function checkFeatureAccess(
     user.subscriptionStatus === 'trial' ||
     user.status === 'active';
 
-  // If user has a specific plan
+  // If user has a paid plan, verify expiration date
   if (userPlanId && userPlanId !== 'free' && isSubscriptionActive) {
+    if (user.subscriptionExpiresAt) {
+      const expiry = new Date(user.subscriptionExpiresAt).getTime();
+      if (!isNaN(expiry) && expiry <= Date.now()) {
+        // Paid plan expired -> fallback smoothly to Free plan privileges!
+        const targetFeature = SYSTEM_FEATURES.find((f) => f.key === featureKey);
+        return Boolean(targetFeature?.defaultFree);
+      }
+    }
+
     // Find plan configuration from billing config or local defaults
     const activePlans = plansConfig || [];
     const matchedPlan = activePlans.find(

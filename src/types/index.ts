@@ -29,6 +29,7 @@ export interface UserProfile {
   billingNotes?: string;
   maxUsersAllowed?: number;
   lastPaymentDate?: string;
+  hasChosenPlan?: boolean;
   blockReason?: string;
   blockType?: 'overdue' | 'security' | 'requested' | 'deactivated';
   blockedAt?: string;
@@ -107,11 +108,35 @@ export interface PlanItemConfig {
   maxConcurrentPdfMaps?: number;
 }
 
+export const DEFAULT_FREE_PLAN: PlanItemConfig = {
+  id: 'free',
+  name: 'Plano Gratuito',
+  tag: 'Iniciante',
+  originalPrice: 0,
+  price: 0,
+  discountBadge: '100% GRÁTIS',
+  billingPeriod: '/sempre',
+  features: [
+    'Até 2 Mapas PDF ativos simultâneos',
+    'Navegação GPS em Tempo Real',
+    'Marcação de Pontos (Waypoints)',
+    'Gravação de Trajetos (Tracks)',
+    'Cálculo de Distâncias e Áreas (ha)',
+    '1 Operador de Campo'
+  ],
+  highlight: false,
+  activeInShowcase: true,
+  allFeaturesAccess: false,
+  allowedFeatureKeys: ['dashboard', 'pdf_maps', 'draw_tools', 'offline_sync'],
+  maxConcurrentPdfMaps: 2,
+};
+
 export const DEFAULT_PLANS: PlanItemConfig[] = [
+  DEFAULT_FREE_PLAN,
   {
     id: 'pro',
     name: 'Plano Profissional Completo',
-    tag: 'Individual',
+    tag: 'Mais Popular',
     originalPrice: 97.99,
     price: 44.99,
     discountBadge: '54% OFF • LANÇAMENTO',
@@ -126,6 +151,22 @@ export const DEFAULT_PLANS: PlanItemConfig[] = [
     ],
     highlight: true,
     activeInShowcase: true,
+    allFeaturesAccess: true,
+    allowedFeatureKeys: [
+      'dashboard',
+      'offline_sync',
+      'pdf_maps',
+      'pdf_maps_unlimited',
+      'kml_kmz_gpx',
+      'offline_tiles',
+      'draw_tools',
+      'field_rounds',
+      'fire_incidents',
+      'woodpile_cubage',
+      'technical_reports',
+      'custom_branding'
+    ],
+    maxConcurrentPdfMaps: 99999,
   },
 ];
 

@@ -1657,6 +1657,20 @@ export const PdfMapNavigator: React.FC = () => {
 
   const triggerFileInput = (inputRef: React.RefObject<HTMLInputElement | null>) => {
     if (!inputRef.current) return;
+    if (inputRef === fileInputRef) {
+      const check = canAddPdfMap(documents.length);
+      if (!check.allowed) {
+        showConfirm({
+          title: '🔒 Limite de Mapas Atingido',
+          message: check.reason || 'Você atingiu o limite de 2 mapas PDF ativos do Plano Gratuito. Faça upgrade para o Plano Profissional para mapas ilimitados ou exclua um dos mapas existentes.',
+          type: 'warning',
+          confirmText: 'Ver Planos & Upgrade',
+          cancelText: 'Continuar no Plano Gratuito',
+          onConfirm: () => openUpgradeModal('Mapas PDF Ilimitados'),
+        });
+        return;
+      }
+    }
     setTimeout(() => {
       try {
         inputRef.current?.click();
@@ -1670,6 +1684,20 @@ export const PdfMapNavigator: React.FC = () => {
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+
+    const check = canAddPdfMap(documents.length);
+    if (!check.allowed) {
+      showConfirm({
+        title: '🔒 Limite de Mapas Atingido',
+        message: check.reason || 'Você atingiu o limite de 2 mapas PDF ativos do Plano Gratuito. Faça upgrade para o Plano Profissional para mapas ilimitados ou exclua um dos mapas existentes.',
+        type: 'warning',
+        confirmText: 'Ver Planos & Upgrade',
+        cancelText: 'Continuar no Plano Gratuito',
+        onConfirm: () => openUpgradeModal('Mapas PDF Ilimitados'),
+      });
+      if (fileInputRef.current) fileInputRef.current.value = '';
+      return;
+    }
 
     setIsProcessing(true);
     setErrorMsg(null);
