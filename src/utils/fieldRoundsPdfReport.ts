@@ -21,7 +21,7 @@ export const generateFieldRoundsPdf = async (
     format: 'a4',
   });
 
-  const companyName = options.companyName || 'GOFIELD PRO - GESTÃO OPERACIONAL DE CAMPO';
+  const companyName = options.companyName || 'AM TST — SAÚDE, SEGURANÇA DO TRABALHO & TOPOGRAFIA';
   const issueDate = new Date().toLocaleDateString('pt-BR', {
     day: '2-digit',
     month: '2-digit',
@@ -40,7 +40,7 @@ export const generateFieldRoundsPdf = async (
   doc.rect(0, 0, 210, 32, 'F');
 
   // Accent Line
-  doc.setFillColor(14, 165, 233); // sky-500
+  doc.setFillColor(16, 185, 129); // emerald-500 (AM TST Green)
   doc.rect(0, 32, 210, 2, 'F');
 
   // Title & Subtitle

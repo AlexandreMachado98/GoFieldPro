@@ -43,6 +43,20 @@ export interface PromoCoupon {
   notes?: string;
 }
 
+
+export interface UserEntitlements {
+  isPro: boolean;
+  canAddUnlimitedPdfMaps: boolean;
+  canUseFieldRounds: boolean;
+  canUseWoodpileCubage: boolean;
+  canUseFireIncidents: boolean;
+  canExportKmlKmzGpx: boolean;
+  canDownloadOfflineTiles: boolean;
+  canUseAiAssistant: boolean;
+  maxConcurrentPdfMaps: number;
+  canCustomBrandingPdf: boolean;
+}
+
 export interface PlanItemConfig {
   id: string;
   name: string;

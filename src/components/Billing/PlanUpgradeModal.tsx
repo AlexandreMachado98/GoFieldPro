@@ -239,7 +239,7 @@ export const PlanUpgradeModal: React.FC = () => {
               <div className="text-center space-y-1.5 pt-1">
                 <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-gradient-to-r from-amber-500/20 to-sky-500/20 border border-amber-500/40 text-amber-400 text-xs font-black uppercase tracking-wider">
                   <Crown className="w-3.5 h-3.5" />
-                  <span>Vitrine de Planos GoField Pro</span>
+                  <span>Plano Profissional • AM TST Campo</span>
                 </div>
                 <h2 className="text-xl sm:text-2xl font-black text-white tracking-tight">
                   {isProUser ? 'Gerenciar Planos & Assinatura' : 'Desbloqueie o Poder Total do Campo'}
@@ -274,7 +274,41 @@ export const PlanUpgradeModal: React.FC = () => {
                 </div>
               )}
 
-              {/* Plan Cards Grid with 1-Click Action */}
+              
+              {/* Feature Value Preview Grid */}
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 text-left pt-1">
+                <div className="p-2.5 rounded-2xl bg-slate-900/90 border border-slate-800 flex items-center gap-2">
+                  <div className="w-7 h-7 rounded-xl bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 flex items-center justify-center shrink-0">
+                    <FileText className="w-3.5 h-3.5" />
+                  </div>
+                  <div>
+                    <div className="text-[11px] font-black text-white leading-tight">Laudos PDF</div>
+                    <div className="text-[9px] text-slate-400">Com fotos e odômetro</div>
+                  </div>
+                </div>
+
+                <div className="p-2.5 rounded-2xl bg-slate-900/90 border border-slate-800 flex items-center gap-2">
+                  <div className="w-7 h-7 rounded-xl bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 flex items-center justify-center shrink-0">
+                    <Trees className="w-3.5 h-3.5" />
+                  </div>
+                  <div>
+                    <div className="text-[11px] font-black text-white leading-tight">Cubagem m³</div>
+                    <div className="text-[9px] text-slate-400">Smalian & Huber</div>
+                  </div>
+                </div>
+
+                <div className="p-2.5 rounded-2xl bg-slate-900/90 border border-slate-800 flex items-center gap-2 col-span-2 sm:col-span-1">
+                  <div className="w-7 h-7 rounded-xl bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 flex items-center justify-center shrink-0">
+                    <HardDrive className="w-3.5 h-3.5" />
+                  </div>
+                  <div>
+                    <div className="text-[11px] font-black text-white leading-tight">100% Offline</div>
+                    <div className="text-[9px] text-slate-400">Navegação sem sinal</div>
+                  </div>
+                </div>
+              </div>
+
+{/* Plan Cards Grid with 1-Click Action */}
               <div className="space-y-4">
                 {availablePlans.map((plan) => {
                   const origPrice = plan.originalPrice || (plan.price * 1.5);

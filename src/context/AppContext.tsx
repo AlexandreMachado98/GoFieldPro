@@ -27,6 +27,7 @@ import {
   AppSettings,
   SystemBillingConfig,
   DEFAULT_PLANS,
+  UserEntitlements,
 } from '../types';
 import {
   initialProjects,
@@ -382,6 +383,26 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
     return false;
   }, [profile]);
+
+
+  // Centralized Entitlements Architecture
+  const entitlements: UserEntitlements = useMemo(() => {
+    const isOwner = profile?.role === 'super_admin' || profile?.email?.toLowerCase() === 'alexandre1604981@gmail.com';
+    const isPro = isProUser || isOwner;
+
+    return {
+      isPro,
+      canAddUnlimitedPdfMaps: isPro,
+      canUseFieldRounds: isPro,
+      canUseWoodpileCubage: isPro,
+      canUseFireIncidents: isPro,
+      canExportKmlKmzGpx: isPro,
+      canDownloadOfflineTiles: isPro,
+      canUseAiAssistant: isPro,
+      maxConcurrentPdfMaps: isPro ? 999 : 2,
+      canCustomBrandingPdf: isPro,
+    };
+  }, [isProUser, profile]);
 
   // Check if user can add a PDF map (Free plan: max 2 concurrent maps; block on 4th total map)
   const canAddPdfMap = useCallback((currentMapCount: number): { allowed: boolean; reason?: string; isFourthMapBlock?: boolean } => {
