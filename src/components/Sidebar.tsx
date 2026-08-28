@@ -327,31 +327,6 @@ export const Sidebar: React.FC = () => {
               {(!isSidebarCollapsed || isMobileMenuOpen) && <span>Configurações</span>}
             </button>
 
-            {/* Check for Updates & Cache Purge */}
-            <button
-              type="button"
-              onClick={handleCheckUpdates}
-              disabled={isCheckingUpdate || isApplyingUpdate}
-              title={isSidebarCollapsed && !isMobileMenuOpen ? 'Verificar Atualizações & Limpar Cache' : undefined}
-              className={`w-full flex items-center ${
-                isSidebarCollapsed && !isMobileMenuOpen ? 'justify-center p-2.5' : 'justify-between px-3.5 py-2.5'
-              } rounded-xl text-xs font-bold text-sky-400 bg-sky-950/20 hover:text-sky-300 hover:bg-sky-950/40 border border-sky-500/30 transition-all active:scale-98 cursor-pointer disabled:opacity-50`}
-            >
-              <div className="flex items-center gap-3">
-                <RefreshCw className={`w-5 h-5 text-sky-400 shrink-0 ${isCheckingUpdate || isApplyingUpdate ? 'animate-spin' : ''}`} />
-                {(!isSidebarCollapsed || isMobileMenuOpen) && <span>Verificar Atualizações</span>}
-              </div>
-              {(!isSidebarCollapsed || isMobileMenuOpen) && (
-                <span className={`text-[9px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded-md border flex items-center gap-1 shadow-sm ${
-                  isUpdateAvailable
-                    ? 'bg-amber-500 text-slate-950 border-amber-400 animate-bounce'
-                    : 'bg-sky-500/10 text-sky-400 border-sky-500/30'
-                }`}>
-                  {isCheckingUpdate ? 'Checando...' : isUpdateAvailable ? 'Nova Versão' : 'Checar'}
-                </span>
-              )}
-            </button>
-
             {/* Policies */}
             <button
               onClick={() => {
