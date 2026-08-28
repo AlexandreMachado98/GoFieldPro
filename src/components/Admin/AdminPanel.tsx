@@ -464,8 +464,8 @@ export const AdminPanel: React.FC = () => {
       const newConfig: SystemBillingConfig = {
         ...billingConfig,
         plans,
-        proLaunchPrice: proPlan ? proPlan.price : (billingConfig.proLaunchPrice || 44.99),
-        proOriginalPrice: proPlan ? proPlan.originalPrice : (billingConfig.proOriginalPrice || 97.99),
+        proLaunchPrice: proPlan ? proPlan.price : (billingConfig.proLaunchPrice || 99.98),
+        proOriginalPrice: proPlan ? proPlan.originalPrice : (billingConfig.proOriginalPrice || 199.90),
         proDiscountBadge: proPlan?.discountBadge || billingConfig.proDiscountBadge || '',
       };
       localStorage.setItem('gofield_billing_config', JSON.stringify(newConfig));
@@ -2717,19 +2717,19 @@ export const AdminPanel: React.FC = () => {
                   id: `plan_${Date.now()}`,
                   name: '',
                   tag: 'Novo Plano',
-                  originalPrice: 97.99,
-                  price: 44.99,
-                  discountBadge: '54% OFF',
-                  billingPeriod: '/mês',
+                  originalPrice: 199.90,
+                  price: 99.98,
+                  discountBadge: '50% OFF • PLANO ANUAL',
+                  billingPeriod: '/ano',
                   features: ['Mapas PDF Ilimitados', 'Medição de Madeira (m³)'],
                   activeInShowcase: true,
                 });
                 setPlanModalName('');
                 setPlanModalTag('Novo');
-                setPlanModalOriginalPrice(97.99);
-                setPlanModalPrice(44.99);
-                setPlanModalBadge('54% OFF');
-                setPlanModalPeriod('/mês');
+                setPlanModalOriginalPrice(199.90);
+                setPlanModalPrice(99.98);
+                setPlanModalBadge('50% OFF • PLANO ANUAL');
+                setPlanModalPeriod('/ano');
                 setPlanModalActiveInShowcase(true);
                 setPlanModalFeaturesText('Mapas PDF Ilimitados\nMedição de Madeira (m³)\nRelatórios com Fotos');
               }}

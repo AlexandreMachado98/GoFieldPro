@@ -67,7 +67,7 @@ export const Sidebar: React.FC = () => {
   }, [billingConfig?.plans]);
 
   const effectivePriceInfo = useMemo(() => {
-    if (!lowestPaidPlan) return { price: 44.99, discountBadge: '54% OFF' };
+    if (!lowestPaidPlan) return { price: 99.98, discountBadge: '50% OFF' };
     return getPlanEffectivePrice(lowestPaidPlan);
   }, [lowestPaidPlan]);
 
