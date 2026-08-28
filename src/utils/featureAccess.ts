@@ -1,31 +1,108 @@
-import { UserProfile, PlanItemConfig } from '../types';
+import { UserProfile, PlanItemConfig, SpecialAccessStatus } from '../types';
 import { SYSTEM_FEATURES, ALL_FEATURE_KEYS } from '../config/features';
 
 /**
- * Checks if the user has an active Special Access grant (Lifetime, Annual, or Custom within valid date range).
- * Special Access acts as an authoritative override that grants 100% feature access and unlimited limits,
- * completely independent of the user's commercial billing plan.
+ * Computes the real-time status of a user's Special Access grant:
+ * - 'none': User has no special access
+ * - 'scheduled': Grant starts in a future date
+ * - 'active': Currently within the active validity window (or lifetime)
+ * - 'expired': End date has passed
+ * - 'revoked': Manually revoked by an administrator
+ * - 'cancelled': Cancelled before activation
  */
-export function hasSpecialAccessActive(user: UserProfile | null | undefined): boolean {
-  if (!user || !user.specialAccess) return false;
-  const sa = user.specialAccess;
-  if (!sa.enabled || sa.status === 'revoked') return false;
+export function getSpecialAccessComputedStatus(
+  user: UserProfile | null | undefined
+): SpecialAccessStatus | 'none' {
+  if (!user || !user.specialAccess || !user.specialAccess.enabled) {
+    return 'none';
+  }
 
-  // Lifetime access has no expiration date
+  const sa = user.specialAccess;
+
+  if (sa.status === 'revoked' || sa.status === 'cancelled') {
+    return sa.status;
+  }
+
+  // Lifetime access has no expiration
   if (sa.accessType === 'lifetime' || !sa.expiresAt) {
-    return true;
+    return 'active';
   }
 
   const now = Date.now();
-  const start = sa.startsAt ? new Date(sa.startsAt.includes('T') ? sa.startsAt : sa.startsAt + 'T00:00:00').getTime() : 0;
-  const end = new Date(sa.expiresAt.includes('T') ? sa.expiresAt : sa.expiresAt + 'T23:59:59').getTime();
 
-  return !isNaN(end) && now >= start && now <= end;
+  // Parse start of day (00:00:00) and end of day (23:59:59) in local time
+  const startDateStr = sa.startsAt ? (sa.startsAt.includes('T') ? sa.startsAt : `${sa.startsAt}T00:00:00`) : '';
+  const endDateStr = sa.expiresAt ? (sa.expiresAt.includes('T') ? sa.expiresAt : `${sa.expiresAt}T23:59:59`) : '';
+
+  const start = startDateStr ? new Date(startDateStr).getTime() : 0;
+  const end = endDateStr ? new Date(endDateStr).getTime() : NaN;
+
+  if (isNaN(end)) return 'none';
+
+  if (now < start) {
+    return 'scheduled';
+  }
+
+  if (now > end) {
+    return 'expired';
+  }
+
+  return 'active';
 }
 
 /**
- * Universally checks if a user has access to a specific feature key based on their subscription plan,
- * special access grants, permissions configuration, or role.
+ * Returns remaining days of Special Access or 'lifetime'
+ */
+export function getSpecialAccessDaysRemaining(
+  user: UserProfile | null | undefined
+): number | 'lifetime' | 0 {
+  if (!user || !user.specialAccess || !user.specialAccess.enabled) return 0;
+  const sa = user.specialAccess;
+
+  if (sa.status === 'revoked' || sa.status === 'cancelled') return 0;
+  if (sa.accessType === 'lifetime' || !sa.expiresAt) return 'lifetime';
+
+  const endDateStr = sa.expiresAt.includes('T') ? sa.expiresAt : `${sa.expiresAt}T23:59:59`;
+  const end = new Date(endDateStr).getTime();
+  if (isNaN(end)) return 0;
+
+  const diffMs = end - Date.now();
+  if (diffMs <= 0) return 0;
+
+  return Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+}
+
+/**
+ * Checks if the user has an active Special Access grant and optionally if a specific feature key is unlocked.
+ * Special Access acts as an authoritative override that unlocks Premium capabilities,
+ * completely independent of the commercial billing subscription.
+ */
+export function hasSpecialAccessActive(
+  user: UserProfile | null | undefined,
+  featureKey?: string
+): boolean {
+  if (!user) return false;
+  const status = getSpecialAccessComputedStatus(user);
+  if (status !== 'active') return false;
+
+  // If specific featureKey is requested, verify if grantedFeatures allows it
+  if (featureKey && user.specialAccess?.grantedFeatures && user.specialAccess.grantedFeatures.length > 0) {
+    const gf = user.specialAccess.grantedFeatures;
+    if (gf.includes('ALL_FEATURES') || gf.includes(featureKey)) {
+      return true;
+    }
+    return false;
+  }
+
+  return true;
+}
+
+/**
+ * Universally checks if a user has access to a specific feature key based on:
+ * 1. Super Admin / Owner privilege
+ * 2. Active Special Access grant
+ * 3. Commercial Subscription Plan (if active and unexpired)
+ * 4. Default Free Plan access
  */
 export function checkFeatureAccess(
   user: UserProfile | null | undefined,
@@ -47,8 +124,8 @@ export function checkFeatureAccess(
     return false;
   }
 
-  // 3. Special Exclusive Access: 100% unrestricted access across all current and future features
-  if (hasSpecialAccessActive(user)) {
+  // 3. Special Exclusive Access: Unlocks Premium features while active
+  if (hasSpecialAccessActive(user, featureKey)) {
     return true;
   }
 
@@ -58,12 +135,12 @@ export function checkFeatureAccess(
     user.subscriptionStatus === 'trial' ||
     user.status === 'active';
 
-  // If user has a paid plan, verify expiration date
+  // If user has a paid commercial plan, verify validity date
   if (userPlanId && userPlanId !== 'free' && isSubscriptionActive) {
     if (user.subscriptionExpiresAt) {
       const expiry = new Date(user.subscriptionExpiresAt).getTime();
       if (!isNaN(expiry) && expiry <= Date.now()) {
-        // Paid plan expired -> fallback smoothly to Free plan privileges!
+        // Paid plan expired -> fallback smoothly to Free plan privileges
         const targetFeature = SYSTEM_FEATURES.find((f) => f.key === featureKey);
         return Boolean(targetFeature?.defaultFree);
       }
@@ -76,22 +153,19 @@ export function checkFeatureAccess(
     );
 
     if (matchedPlan) {
-      // If plan has allFeaturesAccess = true
       if (matchedPlan.allFeaturesAccess) {
         return true;
       }
-
-      // If plan explicitly defines allowed features
       if (Array.isArray(matchedPlan.allowedFeatureKeys) && matchedPlan.allowedFeatureKeys.length > 0) {
         return matchedPlan.allowedFeatureKeys.includes(featureKey);
       }
     }
 
-    // Default Pro active subscription (if not specifically restricted) unlocks all features
+    // Default active Pro subscription unlocks all features
     return true;
   }
 
-  // 3. Free Plan / Unsubscribed Users: check if feature is defaultFree
+  // 4. Free Plan: check if feature is defaultFree
   const targetFeature = SYSTEM_FEATURES.find((f) => f.key === featureKey);
   return Boolean(targetFeature?.defaultFree);
 }
@@ -107,7 +181,7 @@ export function getUserMaxPdfMaps(
   if (
     user.role === 'super_admin' ||
     user.email?.toLowerCase() === 'alexandre1604981@gmail.com' ||
-    hasSpecialAccessActive(user)
+    hasSpecialAccessActive(user, 'pdf_maps_unlimited')
   ) {
     return 99999;
   }

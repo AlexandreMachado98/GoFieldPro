@@ -26,8 +26,8 @@ import {
   SystemFeature,
 } from '../../types';
 import { SYSTEM_FEATURES, ALL_FEATURE_KEYS, FEATURE_CATEGORIES } from '../../config/features';
-import { hasSpecialAccessActive } from '../../utils/featureAccess';
-import { SpecialAccessConfig } from '../../types';
+import { hasSpecialAccessActive, getSpecialAccessComputedStatus, getSpecialAccessDaysRemaining } from '../../utils/featureAccess';
+import { SpecialAccessConfig, SpecialAccessStatus } from '../../types';
 import { testAsaasConnection } from '../../utils/asaasGateway';
 import { recordAdminAuditLog, fetchAdminAuditLogs } from '../../utils/auditLogger';
 import { exportUsersToCsv, exportFinancialSummaryToCsv, exportAuditLogsToCsv } from '../../utils/adminExport';
@@ -251,6 +251,8 @@ export const AdminPanel: React.FC = () => {
   });
   const [grantSaReason, setGrantSaReason] = useState<string>('Cliente Parceiro');
   const [savingGrantSpecial, setSavingGrantSpecial] = useState(false);
+  const [grantConfirmationPending, setGrantConfirmationPending] = useState(false);
+  const [grantAllFeatures, setGrantAllFeatures] = useState(true);
 
   // Dedicated Special Access Tab States
   const [saTabTargetUid, setSaTabTargetUid] = useState<string>('');
@@ -934,10 +936,41 @@ export const AdminPanel: React.FC = () => {
     window.open(whatsappUrl, '_blank');
   };
 
-    // Handler: Unified Grant Special Access (Existing Client or Brand New Client)
-  const handleExecuteGrantSpecialAccess = async (e: React.FormEvent) => {
+    // Handler: Unified Grant Special Access with Confirmation & Security
+  const handleInitiateGrantSpecialAccess = (e: React.FormEvent) => {
     e.preventDefault();
 
+    if (grantModalClientMode === 'new') {
+      if (!grantNewUserName.trim()) {
+        notifyWarning('Nome Obrigatório', 'Informe o nome do novo cliente.');
+        return;
+      }
+      if (!grantNewUserEmail.trim() || !grantNewUserEmail.includes('@') || !grantNewUserEmail.includes('.')) {
+        notifyWarning('E-mail Inválido', 'Informe um e-mail válido para o novo cliente.');
+        return;
+      }
+      const exists = users.some((u) => (u.email || '').toLowerCase() === grantNewUserEmail.trim().toLowerCase());
+      if (exists) {
+        notifyError('E-mail Já Cadastrado', `O e-mail "${grantNewUserEmail}" já está cadastrado no sistema.`);
+        return;
+      }
+    } else {
+      if (!grantSelectedUserUid) {
+        notifyWarning('Selecione um Usuário', 'Por favor, escolha um usuário existente na lista.');
+        return;
+      }
+    }
+
+    if (grantSaType === 'custom' && grantSaExpiresAt && grantSaStartsAt && grantSaExpiresAt < grantSaStartsAt) {
+      notifyWarning('Data Inválida', 'A data de término não pode ser anterior à data de início.');
+      return;
+    }
+
+    // Open Confirmation Dialog
+    setGrantConfirmationPending(true);
+  };
+
+  const handleConfirmAndSaveSpecialAccess = async () => {
     let targetUid = '';
     let targetName = '';
     let targetEmail = '';
@@ -946,7 +979,7 @@ export const AdminPanel: React.FC = () => {
     let targetPlan: SubscriptionPlanType = 'free';
     let targetSubValue = 0;
     let targetRole: UserRole = 'surveyor';
-    let isCreatingNew = grantModalClientMode === 'new';
+    const isCreatingNew = grantModalClientMode === 'new';
 
     if (isCreatingNew) {
       targetName = grantNewUserName.trim();
@@ -956,32 +989,11 @@ export const AdminPanel: React.FC = () => {
       targetPlan = grantNewUserPlan;
       targetSubValue = Number(grantNewUserSubValue) || (grantNewUserPlan === 'free' ? 0 : 44.99);
       targetRole = grantNewUserRole;
-
-      if (!targetName) {
-        notifyWarning('Nome Obrigatório', 'Informe o nome do novo cliente.');
-        return;
-      }
-      if (!targetEmail || !targetEmail.includes('@') || !targetEmail.includes('.')) {
-        notifyWarning('E-mail Inválido', 'Informe um e-mail válido para o novo cliente.');
-        return;
-      }
-
-      // Check duplicate
-      const exists = users.some((u) => (u.email || '').toLowerCase() === targetEmail);
-      if (exists) {
-        notifyError('E-mail Já Cadastrado', `O e-mail "${targetEmail}" já está cadastrado no sistema.`);
-        return;
-      }
-
       targetUid = `user_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
     } else {
-      if (!grantSelectedUserUid) {
-        notifyWarning('Selecione um Cliente', 'Por favor, escolha um cliente existente na lista.');
-        return;
-      }
       const existingUser = users.find((u) => u.uid === grantSelectedUserUid);
       if (!existingUser) {
-        notifyError('Cliente Não Encontrado', 'O cliente selecionado não foi localizado.');
+        notifyError('Usuário Não Encontrado', 'O usuário selecionado não foi localizado.');
         return;
       }
       targetUid = existingUser.uid;
@@ -992,11 +1004,6 @@ export const AdminPanel: React.FC = () => {
       targetPlan = existingUser.subscriptionPlan || 'free';
       targetSubValue = existingUser.subscriptionValue || 0;
       targetRole = existingUser.role || 'surveyor';
-    }
-
-    if (grantSaType === 'custom' && grantSaExpiresAt && grantSaStartsAt && grantSaExpiresAt < grantSaStartsAt) {
-      notifyWarning('Data Inválida', 'A data de término não pode ser anterior à data de início.');
-      return;
     }
 
     setSavingGrantSpecial(true);
@@ -1014,15 +1021,20 @@ export const AdminPanel: React.FC = () => {
         finalExpiresAt = null; // Lifetime
       }
 
+      // Check if start date is in the future (scheduled) or today (active)
+      const startDateVal = grantSaStartsAt ? new Date(grantSaStartsAt + 'T00:00:00').getTime() : 0;
+      const initialStatus: SpecialAccessStatus = startDateVal > Date.now() ? 'scheduled' : 'active';
+
       const saConfig: SpecialAccessConfig = {
         enabled: true,
         accessType: grantSaType,
-        status: 'active',
+        status: initialStatus,
         startsAt: grantSaStartsAt,
         expiresAt: finalExpiresAt,
         grantedBy: profile?.email || profile?.name || 'Super Admin',
         grantedAt: nowIso,
         reason: grantSaReason.trim() || 'Concessão Administrativa de Acesso Especial',
+        grantedFeatures: grantAllFeatures ? ['ALL_FEATURES'] : ['pdf_maps_unlimited', 'field_rounds', 'fire_incidents', 'woodpile_cubage', 'kml_kmz_gpx', 'offline_tiles', 'technical_reports'],
       };
 
       if (isCreatingNew) {
@@ -1052,12 +1064,13 @@ export const AdminPanel: React.FC = () => {
           specialAccess: {
             enabled: true,
             accessType: saConfig.accessType,
-            status: 'active',
+            status: saConfig.status,
             startsAt: saConfig.startsAt,
             expiresAt: saConfig.expiresAt,
             grantedBy: saConfig.grantedBy,
             grantedAt: saConfig.grantedAt,
             reason: saConfig.reason,
+            grantedFeatures: saConfig.grantedFeatures,
           },
         };
 
@@ -1076,15 +1089,16 @@ export const AdminPanel: React.FC = () => {
         targetId: targetUid,
         targetName: targetName,
         newValue: saConfig,
-        reason: `Acesso Especial ${grantSaType.toUpperCase()} concedido para ${targetName} (${targetEmail}). Motivo: ${saConfig.reason}`,
+        reason: `Acesso Especial ${grantSaType.toUpperCase()} (${saConfig.status.toUpperCase()}) concedido para ${targetName} (${targetEmail}). Motivo: ${saConfig.reason}`,
       });
 
       notifySuccess(
         'Acesso Especial Concedido!',
-        `Acesso ${grantSaType === 'lifetime' ? 'Vitalício' : grantSaType === 'annual' ? 'Anual' : 'Personalizado'} liberado com sucesso para ${targetName}.`
+        `Acesso ${grantSaType === 'lifetime' ? 'Vitalício' : grantSaType === 'annual' ? 'Anual' : 'Personalizado'} (${initialStatus === 'scheduled' ? 'Agendado' : 'Ativo'}) configurado para ${targetName}.`
       );
 
       // Reset form
+      setGrantConfirmationPending(false);
       setGrantSelectedUserUid('');
       setGrantNewUserName('');
       setGrantNewUserEmail('');
@@ -1095,7 +1109,7 @@ export const AdminPanel: React.FC = () => {
       setIsGrantSpecialModalOpen(false);
     } catch (err: any) {
       console.error('Error granting special access:', err);
-      notifyError('Erro ao Conceder Acesso', 'Não foi possível registrar o acesso especial.');
+      notifyError('Erro ao Conceder Acesso', 'Não foi possível salvar o acesso especial no banco.');
     } finally {
       setSavingGrantSpecial(false);
     }
@@ -1868,20 +1882,20 @@ export const AdminPanel: React.FC = () => {
         </div>
       )}
 
-            {/* TAB: SPECIAL EXCLUSIVE & LIFETIME ACCESS */}
+                  {/* TAB: SPECIAL EXCLUSIVE & LIFETIME ACCESS */}
       {adminTab === 'special_access' && (
         <div className="space-y-6 animate-in fade-in">
           {/* Header & KPI Summary */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             <div className="bg-gradient-to-br from-amber-950/40 via-slate-900 to-slate-950 border border-amber-500/40 p-5 rounded-2xl shadow-xl space-y-1">
               <div className="flex items-center justify-between text-xs text-amber-400 font-bold">
-                <span>Total com Acesso Especial</span>
+                <span>Acessos Especiais Ativos</span>
                 <KeyRound className="w-4 h-4" />
               </div>
               <div className="text-2xl font-black text-white">
-                {users.filter((u) => hasSpecialAccessActive(u)).length} <span className="text-xs text-slate-400 font-normal">VIPs ativos</span>
+                {users.filter((u) => getSpecialAccessComputedStatus(u) === 'active').length} <span className="text-xs text-slate-400 font-normal">VIPs ativos</span>
               </div>
-              <p className="text-[11px] text-amber-300">100% dos recursos liberados sem limites</p>
+              <p className="text-[11px] text-amber-300">100% dos recursos Premium liberados</p>
             </div>
 
             <div className="bg-gradient-to-br from-yellow-950/30 via-slate-900 to-slate-950 border border-yellow-500/30 p-5 rounded-2xl shadow-xl space-y-1">
@@ -1890,31 +1904,34 @@ export const AdminPanel: React.FC = () => {
                 <Sparkles className="w-4 h-4" />
               </div>
               <div className="text-2xl font-black text-amber-300">
-                {users.filter((u) => hasSpecialAccessActive(u) && u.specialAccess?.accessType === 'lifetime').length} <span className="text-xs text-slate-400 font-normal">permanentes</span>
+                {users.filter((u) => getSpecialAccessComputedStatus(u) === 'active' && u.specialAccess?.accessType === 'lifetime').length} <span className="text-xs text-slate-400 font-normal">permanentes</span>
               </div>
               <p className="text-[11px] text-slate-400">Sem data de expiração</p>
             </div>
 
             <div className="bg-gradient-to-br from-sky-950/30 via-slate-900 to-slate-950 border border-sky-500/30 p-5 rounded-2xl shadow-xl space-y-1">
               <div className="flex items-center justify-between text-xs text-sky-400 font-bold">
-                <span>Acessos Anuais</span>
+                <span>Acessos Anuais / Temporários</span>
                 <Calendar className="w-4 h-4" />
               </div>
               <div className="text-2xl font-black text-sky-300">
-                {users.filter((u) => hasSpecialAccessActive(u) && u.specialAccess?.accessType === 'annual').length} <span className="text-xs text-slate-400 font-normal">vigência 1 ano</span>
+                {users.filter((u) => getSpecialAccessComputedStatus(u) === 'active' && u.specialAccess?.accessType !== 'lifetime').length} <span className="text-xs text-slate-400 font-normal">com vigência</span>
               </div>
-              <p className="text-[11px] text-slate-400">365 dias de acesso total</p>
+              <p className="text-[11px] text-slate-400">1 Ano ou período personalizado</p>
             </div>
 
             <div className="bg-gradient-to-br from-purple-950/30 via-slate-900 to-slate-950 border border-purple-500/30 p-5 rounded-2xl shadow-xl space-y-1">
               <div className="flex items-center justify-between text-xs text-purple-400 font-bold">
-                <span>Base Total de Clientes</span>
-                <Users className="w-4 h-4" />
+                <span>Agendados / Expirados</span>
+                <Clock className="w-4 h-4" />
               </div>
               <div className="text-2xl font-black text-purple-300">
-                {users.length} <span className="text-xs text-slate-400 font-normal">cadastrados</span>
+                {users.filter((u) => {
+                  const st = getSpecialAccessComputedStatus(u);
+                  return st === 'scheduled' || st === 'expired' || st === 'revoked';
+                }).length} <span className="text-xs text-slate-400 font-normal">no histórico</span>
               </div>
-              <p className="text-[11px] text-slate-400">Disponíveis para conceder acesso</p>
+              <p className="text-[11px] text-slate-400">Controle total de vigência</p>
             </div>
           </div>
 
@@ -1924,25 +1941,26 @@ export const AdminPanel: React.FC = () => {
               <div>
                 <h3 className="text-base sm:text-lg font-black text-white flex items-center gap-2">
                   <KeyRound className="w-5 h-5 text-amber-400" />
-                  <span>Painel de Concessão e Gestão de Acesso Especial</span>
+                  <span>Painel de Membros com Acesso Especial</span>
                 </h3>
                 <p className="text-xs text-slate-400">
-                  Selecione clientes cadastrados ou cadastre novos clientes para liberar acesso vitalício ou anual
+                  Conceda acesso temporário aos recursos Premium durante um período de vigência definido
                 </p>
               </div>
 
-              {/* MAIN PRIMARY BUTTON: + CONCEDER NOVO ACESSO */}
+              {/* PRIMARY ACTION BUTTON: + ADICIONAR MEMBRO */}
               <button
                 type="button"
                 onClick={() => {
                   setGrantModalClientMode('existing');
                   setGrantSelectedUserUid('');
+                  setGrantConfirmationPending(false);
                   setIsGrantSpecialModalOpen(true);
                 }}
-                className="px-5 py-3 rounded-2xl bg-gradient-to-r from-amber-500 via-yellow-500 to-amber-600 hover:from-amber-400 hover:to-yellow-400 text-slate-950 font-black text-xs sm:text-sm cursor-pointer shadow-lg shadow-amber-950/50 flex items-center justify-center gap-2 transition-all active:scale-95 shrink-0"
+                className="px-6 py-3.5 rounded-2xl bg-gradient-to-r from-amber-500 via-yellow-500 to-amber-600 hover:from-amber-400 hover:to-yellow-400 text-slate-950 font-black text-xs sm:text-sm cursor-pointer shadow-xl shadow-amber-950/60 flex items-center justify-center gap-2 transition-all active:scale-95 shrink-0"
               >
-                <Plus className="w-4 h-4 text-slate-950 stroke-[3]" />
-                <span>+ Conceder Novo Acesso</span>
+                <UserPlus className="w-4 h-4 text-slate-950 stroke-[3]" />
+                <span>+ ADICIONAR MEMBRO</span>
               </button>
             </div>
 
@@ -1951,7 +1969,7 @@ export const AdminPanel: React.FC = () => {
               <div className="flex items-center justify-between">
                 <label className="text-amber-300 font-extrabold uppercase tracking-wider text-xs flex items-center gap-2">
                   <UserCheck className="w-4 h-4 text-amber-400" />
-                  <span>🎯 Selecionar Cliente Cadastrado ({users.length} usuários na base):</span>
+                  <span>🎯 Selecionar Usuário para Ação Rápida ({users.length} usuários cadastrados):</span>
                 </label>
                 {saTabTargetUid && (
                   <button
@@ -1970,15 +1988,23 @@ export const AdminPanel: React.FC = () => {
                   onChange={(e) => setSaTabTargetUid(e.target.value)}
                   className="w-full bg-slate-900 border border-slate-700 hover:border-amber-400 rounded-xl px-4 py-3 text-white text-xs sm:text-sm font-bold focus:outline-none focus:border-amber-500 transition-colors cursor-pointer appearance-none shadow-md"
                 >
-                  <option value="">-- Clique aqui e selecione um cliente da lista ({users.length} disponíveis) --</option>
+                  <option value="">-- Clique aqui e selecione um usuário da lista ({users.length} disponíveis) --</option>
                   {users.map((client) => {
-                    const isVip = hasSpecialAccessActive(client);
-                    const vipText = isVip
-                      ? ` ★ [VIP: ${client.specialAccess?.accessType === 'lifetime' ? 'VITALÍCIO' : 'ANUAL'}]`
-                      : ' [Sem Acesso Especial]';
+                    const compStatus = getSpecialAccessComputedStatus(client);
+                    const statusText =
+                      compStatus === 'active'
+                        ? ` ★ [ACESSO ATIVO: ${client.specialAccess?.accessType === 'lifetime' ? 'VITALÍCIO' : 'TEMPORÁRIO'}]`
+                        : compStatus === 'scheduled'
+                        ? ' [AGENDADO]'
+                        : compStatus === 'expired'
+                        ? ' [EXPIRADO]'
+                        : compStatus === 'revoked'
+                        ? ' [REVOGADO]'
+                        : ' [Sem Acesso Especial]';
+
                     return (
                       <option key={client.uid} value={client.uid}>
-                        👤 {client.name} ({client.email}) | Empresa: {client.company || 'Particular'} | Plano: {(client.subscriptionPlan || 'Free').toUpperCase()}{vipText}
+                        👤 {client.name} ({client.email}) | Empresa: {client.company || 'Particular'} | Plano: {(client.subscriptionPlan || 'Free').toUpperCase()}{statusText}
                       </option>
                     );
                   })}
@@ -1992,7 +2018,8 @@ export const AdminPanel: React.FC = () => {
               {(() => {
                 const targetUser = users.find((u) => u.uid === saTabTargetUid);
                 if (!targetUser) return null;
-                const isCurrentlyVip = hasSpecialAccessActive(targetUser);
+                const compStatus = getSpecialAccessComputedStatus(targetUser);
+                const daysRemaining = getSpecialAccessDaysRemaining(targetUser);
 
                 return (
                   <div className="p-4 rounded-xl bg-slate-900 border border-amber-500/50 space-y-3 animate-in fade-in mt-3">
@@ -2001,17 +2028,34 @@ export const AdminPanel: React.FC = () => {
                         <img
                           src={targetUser.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(targetUser.name)}`}
                           alt={targetUser.name}
-                          className="w-10 h-10 rounded-xl bg-slate-800 border border-amber-500/40 object-cover"
+                          className="w-11 h-11 rounded-xl bg-slate-800 border border-amber-500/40 object-cover"
                         />
                         <div>
                           <div className="flex items-center gap-2">
                             <h4 className="text-sm font-black text-white">{targetUser.name}</h4>
-                            {isCurrentlyVip ? (
-                              <span className="px-2 py-0.5 rounded-full text-[9px] font-black uppercase bg-amber-500/20 text-amber-300 border border-amber-500/40 flex items-center gap-1">
+                            {compStatus === 'active' && (
+                              <span className="px-2 py-0.5 rounded-full text-[9px] font-black uppercase bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 flex items-center gap-1">
                                 <KeyRound className="w-2.5 h-2.5" />
-                                <span>VIP • {targetUser.specialAccess?.accessType === 'lifetime' ? 'Vitalício' : 'Anual'}</span>
+                                <span>Ativo • {daysRemaining === 'lifetime' ? 'Vitalício' : `${daysRemaining}d restantes`}</span>
                               </span>
-                            ) : (
+                            )}
+                            {compStatus === 'scheduled' && (
+                              <span className="px-2 py-0.5 rounded-full text-[9px] font-black uppercase bg-yellow-500/20 text-yellow-300 border border-yellow-500/40 flex items-center gap-1">
+                                <Clock className="w-2.5 h-2.5" />
+                                <span>Agendado para ${targetUser.specialAccess?.startsAt}</span>
+                              </span>
+                            )}
+                            {compStatus === 'expired' && (
+                              <span className="px-2 py-0.5 rounded-full text-[9px] font-black uppercase bg-rose-500/20 text-rose-300 border border-rose-500/40">
+                                Expirado
+                              </span>
+                            )}
+                            {compStatus === 'revoked' && (
+                              <span className="px-2 py-0.5 rounded-full text-[9px] font-black uppercase bg-slate-800 text-slate-400 border border-slate-700">
+                                Revogado
+                              </span>
+                            )}
+                            {compStatus === 'none' && (
                               <span className="px-2 py-0.5 rounded-full text-[9px] font-bold uppercase bg-slate-800 text-slate-400 border border-slate-700">
                                 Sem Acesso Especial
                               </span>
@@ -2020,7 +2064,7 @@ export const AdminPanel: React.FC = () => {
                           <div className="text-xs text-slate-400 mt-0.5 flex items-center gap-3">
                             <span>✉️ {targetUser.email}</span>
                             <span>🏢 {targetUser.company || 'Particular'}</span>
-                            <span className="text-emerald-400 font-bold">Plano: {(targetUser.subscriptionPlan || 'Free').toUpperCase()}</span>
+                            <span className="text-emerald-400 font-bold">Plano Original: {(targetUser.subscriptionPlan || 'Free').toUpperCase()}</span>
                           </div>
                         </div>
                       </div>
@@ -2033,11 +2077,11 @@ export const AdminPanel: React.FC = () => {
                         >
                           <KeyRound className="w-3.5 h-3.5" />
                           <span>
-                            {isCurrentlyVip ? 'Editar Acesso Especial' : 'Conceder Acesso Especial Agora'}
+                            {compStatus === 'active' || compStatus === 'scheduled' ? 'Editar Vigência / Recursos' : 'Conceder Acesso Especial'}
                           </span>
                         </button>
 
-                        {isCurrentlyVip && (
+                        {(compStatus === 'active' || compStatus === 'scheduled') && (
                           <button
                             type="button"
                             onClick={() => handleRevokeSpecialAccess(targetUser)}
@@ -2062,7 +2106,7 @@ export const AdminPanel: React.FC = () => {
                   type="text"
                   value={saTabSearchQuery}
                   onChange={(e) => setSaTabSearchQuery(e.target.value)}
-                  placeholder="Pesquisar cliente VIP por nome, e-mail, empresa ou motivo..."
+                  placeholder="Pesquisar membro por nome, e-mail, empresa ou motivo..."
                   className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-10 pr-4 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-amber-500 transition-colors"
                 />
               </div>
@@ -2085,7 +2129,7 @@ export const AdminPanel: React.FC = () => {
                     saTabFilter === 'lifetime' ? 'bg-yellow-600 text-slate-950 font-black shadow' : 'bg-slate-950 text-slate-400 hover:text-white'
                   }`}
                 >
-                  👑 Vitalícios ({users.filter((u) => hasSpecialAccessActive(u) && u.specialAccess?.accessType === 'lifetime').length})
+                  👑 Vitalícios ({users.filter((u) => getSpecialAccessComputedStatus(u) === 'active' && u.specialAccess?.accessType === 'lifetime').length})
                 </button>
                 <button
                   type="button"
@@ -2094,21 +2138,21 @@ export const AdminPanel: React.FC = () => {
                     saTabFilter === 'annual' ? 'bg-sky-600 text-white shadow' : 'bg-slate-950 text-slate-400 hover:text-white'
                   }`}
                 >
-                  📅 Anuais ({users.filter((u) => hasSpecialAccessActive(u) && u.specialAccess?.accessType === 'annual').length})
+                  📅 Anuais ({users.filter((u) => getSpecialAccessComputedStatus(u) === 'active' && u.specialAccess?.accessType === 'annual').length})
                 </button>
               </div>
             </div>
 
-            {/* TABLE OF CLIENTS WITH SPECIAL ACCESS */}
+            {/* TABLE OF MEMBERS WITH SPECIAL ACCESS */}
             <div className="overflow-x-auto rounded-2xl border border-slate-800">
               <table className="w-full text-left text-xs">
                 <thead className="bg-slate-950 text-slate-400 border-b border-slate-800 font-extrabold uppercase tracking-wider text-[10px]">
                   <tr>
-                    <th className="p-3.5">Cliente</th>
-                    <th className="p-3.5">Plano Comercial</th>
+                    <th className="p-3.5">Membro</th>
+                    <th className="p-3.5">Plano Original</th>
                     <th className="p-3.5">Tipo de Acesso</th>
-                    <th className="p-3.5">Início</th>
-                    <th className="p-3.5">Expiração</th>
+                    <th className="p-3.5">Vigência (Início → Fim)</th>
+                    <th className="p-3.5">Dias Restantes</th>
                     <th className="p-3.5">Status</th>
                     <th className="p-3.5">Concedido por / Motivo</th>
                     <th className="p-3.5 text-right">Ações</th>
@@ -2118,8 +2162,8 @@ export const AdminPanel: React.FC = () => {
                   {users
                     .filter((u) => {
                       if (!u.specialAccess) return false;
-                      if (saTabFilter === 'lifetime') return hasSpecialAccessActive(u) && u.specialAccess?.accessType === 'lifetime';
-                      if (saTabFilter === 'annual') return hasSpecialAccessActive(u) && u.specialAccess?.accessType === 'annual';
+                      if (saTabFilter === 'lifetime') return getSpecialAccessComputedStatus(u) === 'active' && u.specialAccess?.accessType === 'lifetime';
+                      if (saTabFilter === 'annual') return getSpecialAccessComputedStatus(u) === 'active' && u.specialAccess?.accessType === 'annual';
                       return true;
                     })
                     .filter((u) => {
@@ -2133,9 +2177,10 @@ export const AdminPanel: React.FC = () => {
                       );
                     })
                     .map((u) => {
-                      const isActive = hasSpecialAccessActive(u);
+                      const compStatus = getSpecialAccessComputedStatus(u);
                       const isLifetime = u.specialAccess?.accessType === 'lifetime';
                       const isAnnual = u.specialAccess?.accessType === 'annual';
+                      const daysRemaining = getSpecialAccessDaysRemaining(u);
 
                       return (
                         <tr key={u.uid} className="hover:bg-slate-850/60 transition-colors">
@@ -2158,33 +2203,43 @@ export const AdminPanel: React.FC = () => {
                                 : 'bg-purple-500/20 text-purple-300 border border-purple-500/40'
                             }`}>
                               <KeyRound className="w-3 h-3" />
-                              <span>{isLifetime ? '👑 Vitalício' : isAnnual ? '📅 Anual' : '⏱️ Personalizado'}</span>
+                              <span>{isLifetime ? '👑 Vitalício' : isAnnual ? '📅 1 Ano' : '⏱️ Custom'}</span>
                             </span>
                           </td>
                           <td className="p-3.5 text-slate-300 font-mono text-[11px]">
-                            {u.specialAccess?.startsAt || '—'}
+                            {isLifetime ? (
+                              <span className="text-amber-300 font-bold">Permanente (desde {u.specialAccess?.startsAt})</span>
+                            ) : (
+                              <span>{u.specialAccess?.startsAt} → {u.specialAccess?.expiresAt || '—'}</span>
+                            )}
                           </td>
                           <td className="p-3.5 font-mono text-[11px]">
                             {isLifetime ? (
-                              <span className="text-amber-400 font-black font-sans">Permanente</span>
-                            ) : (
-                              <span className="text-slate-300">
-                                {u.specialAccess?.expiresAt || '—'}
+                              <span className="text-amber-400 font-black font-sans">∞ Ilimitado</span>
+                            ) : compStatus === 'active' ? (
+                              <span className={typeof daysRemaining === 'number' && daysRemaining <= 3 ? 'text-orange-400 font-bold' : 'text-emerald-400 font-bold'}>
+                                {daysRemaining} dias
                               </span>
+                            ) : compStatus === 'scheduled' ? (
+                              <span className="text-yellow-400 font-bold">Em espera</span>
+                            ) : (
+                              <span className="text-slate-500">0 dias</span>
                             )}
                           </td>
                           <td className="p-3.5">
                             <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase inline-flex items-center gap-1 ${
-                              isActive
+                              compStatus === 'active'
                                 ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'
+                                : compStatus === 'scheduled'
+                                ? 'bg-yellow-500/20 text-yellow-300 border border-yellow-500/40'
                                 : 'bg-rose-500/20 text-rose-300 border border-rose-500/40'
                             }`}>
                               <span>●</span>
-                              <span>{isActive ? 'Ativo' : 'Revogado/Expirado'}</span>
+                              <span>{compStatus === 'active' ? 'Ativo' : compStatus === 'scheduled' ? 'Agendado' : compStatus === 'expired' ? 'Expirado' : 'Revogado'}</span>
                             </span>
                           </td>
                           <td className="p-3.5 text-slate-400 text-[11px] max-w-[200px] truncate">
-                            <div>{u.specialAccess?.reason || 'Cortesia/Parceria'}</div>
+                            <div className="font-semibold text-slate-300">{u.specialAccess?.reason || 'Parceria Comercial'}</div>
                             <div className="text-[10px] text-slate-500 truncate">Por: {u.specialAccess?.grantedBy}</div>
                           </td>
                           <td className="p-3.5 text-right space-x-2 whitespace-nowrap">
@@ -2195,7 +2250,7 @@ export const AdminPanel: React.FC = () => {
                             >
                               Editar
                             </button>
-                            {isActive && (
+                            {(compStatus === 'active' || compStatus === 'scheduled') && (
                               <button
                                 type="button"
                                 onClick={() => handleRevokeSpecialAccess(u)}
@@ -2214,9 +2269,9 @@ export const AdminPanel: React.FC = () => {
               {users.filter((u) => u.specialAccess).length === 0 && (
                 <div className="text-center py-12 text-slate-500 space-y-2">
                   <KeyRound className="w-8 h-8 text-slate-600 mx-auto" />
-                  <p className="text-sm font-bold text-slate-400">Nenhum cliente com Acesso Especial cadastrado</p>
+                  <p className="text-sm font-bold text-slate-400">Nenhum membro com Acesso Especial cadastrado</p>
                   <p className="text-xs text-slate-500">
-                    Clique no botão acima <span className="text-amber-400 font-bold">+ Conceder Novo Acesso</span> ou selecione um cliente no menu suspenso acima.
+                    Clique no botão acima <span className="text-amber-400 font-bold">+ ADICIONAR MEMBRO</span> para conceder acesso aos recursos Premium.
                   </p>
                 </div>
               )}
@@ -3747,13 +3802,10 @@ export const AdminPanel: React.FC = () => {
         </div>
       )}
 
-      {/* MODAL: CONCEDER NOVO ACESSO ESPECIAL (EXISTING OR NEW CLIENT) */}
+      {/* MODAL: CONCEDER NOVO ACESSO ESPECIAL / ADICIONAR MEMBRO */}
       {isGrantSpecialModalOpen && (
         <div className="fixed inset-0 z-[99999] bg-black/80 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
-          <form
-            onSubmit={handleExecuteGrantSpecialAccess}
-            className="bg-slate-900 border border-amber-500/50 w-full max-w-xl rounded-3xl shadow-2xl p-5 sm:p-6 space-y-4 animate-in fade-in my-8"
-          >
+          <div className="bg-slate-900 border border-amber-500/50 w-full max-w-xl rounded-3xl shadow-2xl p-5 sm:p-6 space-y-4 animate-in fade-in my-8">
             {/* Modal Header */}
             <div className="flex items-center justify-between border-b border-slate-800 pb-3">
               <div className="flex items-center gap-2.5">
@@ -3762,331 +3814,389 @@ export const AdminPanel: React.FC = () => {
                 </div>
                 <div>
                   <h3 className="text-base font-black text-white leading-tight">
-                    Conceder Acesso Especial
+                    {grantConfirmationPending ? 'Confirmar Concessão de Acesso Especial' : 'Adicionar Membro — Acesso Especial'}
                   </h3>
                   <p className="text-[11px] text-slate-400">
-                    Libere 100% das funcionalidades do aplicativo sem restrições
+                    {grantConfirmationPending ? 'Revise os dados antes de aplicar as permissões Premium' : 'Conceda acesso temporário ou vitalício aos recursos Premium'}
                   </p>
                 </div>
               </div>
               <button
                 type="button"
-                onClick={() => setIsGrantSpecialModalOpen(false)}
+                onClick={() => {
+                  setIsGrantSpecialModalOpen(false);
+                  setGrantConfirmationPending(false);
+                }}
                 className="p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 transition-colors cursor-pointer"
               >
                 <X className="w-4 h-4" />
               </button>
             </div>
 
-            <div className="space-y-4 text-xs">
-              {/* STEP 1: CLIENT SOURCE SELECTION (EXISTING OR NEW) */}
-              <div>
-                <label className="block text-slate-300 font-bold mb-2 uppercase tracking-wider text-[11px]">
-                  1. Seleção do Cliente
-                </label>
-                <div className="grid grid-cols-2 gap-2 bg-slate-950 p-1 rounded-2xl border border-slate-800">
+            {/* CONFIRMATION SCREEN */}
+            {grantConfirmationPending ? (
+              <div className="space-y-4 py-2 animate-in fade-in">
+                <div className="p-4 rounded-2xl bg-amber-950/30 border border-amber-500/40 space-y-3">
+                  <div className="flex items-center gap-2 text-amber-300 font-extrabold text-xs">
+                    <ShieldCheck className="w-4 h-4 text-amber-400" />
+                    <span>Resumo da Operação:</span>
+                  </div>
+
+                  <div className="text-xs space-y-2 text-slate-300">
+                    <div>
+                      <span className="text-slate-500 font-bold block text-[10px] uppercase">Usuário Beneficiado:</span>
+                      <span className="font-extrabold text-white text-sm">
+                        {grantModalClientMode === 'new' ? grantNewUserName : users.find((u) => u.uid === grantSelectedUserUid)?.name} (
+                        {grantModalClientMode === 'new' ? grantNewUserEmail : users.find((u) => u.uid === grantSelectedUserUid)?.email})
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2 pt-1">
+                      <div>
+                        <span className="text-slate-500 font-bold block text-[10px] uppercase">Tipo de Acesso:</span>
+                        <span className="font-bold text-amber-300 uppercase">
+                          {grantSaType === 'lifetime' ? '👑 Vitalício (Permanente)' : grantSaType === 'annual' ? '📅 Anual (365 Dias)' : '⏱️ Personalizado'}
+                        </span>
+                      </div>
+                      <div>
+                        <span className="text-slate-500 font-bold block text-[10px] uppercase">Período de Vigência:</span>
+                        <span className="font-mono text-slate-200">
+                          {grantSaType === 'lifetime' ? 'Sem expiração' : `De ${grantSaStartsAt} até ${grantSaExpiresAt || '—'}`}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div>
+                      <span className="text-slate-500 font-bold block text-[10px] uppercase">Recursos Liberados:</span>
+                      <span className="font-bold text-emerald-400">
+                        {grantAllFeatures ? '✓ Todos os Recursos Premium (Mapas Ilimitados, SST, Focos, Cubagem, KML/KMZ, Satélite Offline)' : 'Recursos Selecionados'}
+                      </span>
+                    </div>
+
+                    <div>
+                      <span className="text-slate-500 font-bold block text-[10px] uppercase">Motivo:</span>
+                      <span className="font-medium text-slate-300">{grantSaReason}</span>
+                    </div>
+                  </div>
+                </div>
+
+                <p className="text-[11px] text-slate-400 italic">
+                  * O usuário continuará pertencendo ao plano original no cadastro comercial e receberá notificação no próximo acesso.
+                </p>
+
+                <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-slate-800">
                   <button
                     type="button"
-                    onClick={() => setGrantModalClientMode('existing')}
-                    className={`py-2.5 rounded-xl font-black text-xs transition-all cursor-pointer flex items-center justify-center gap-2 ${
-                      grantModalClientMode === 'existing'
-                        ? 'bg-amber-500 text-slate-950 shadow-md'
-                        : 'text-slate-400 hover:text-white'
-                    }`}
+                    onClick={() => setGrantConfirmationPending(false)}
+                    disabled={savingGrantSpecial}
+                    className="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-750 text-slate-300 font-bold text-xs cursor-pointer"
                   >
-                    <span>● Cliente Existente</span>
+                    Voltar / Editar
                   </button>
                   <button
                     type="button"
-                    onClick={() => setGrantModalClientMode('new')}
-                    className={`py-2.5 rounded-xl font-black text-xs transition-all cursor-pointer flex items-center justify-center gap-2 ${
-                      grantModalClientMode === 'new'
-                        ? 'bg-amber-500 text-slate-950 shadow-md'
-                        : 'text-slate-400 hover:text-white'
-                    }`}
+                    onClick={handleConfirmAndSaveSpecialAccess}
+                    disabled={savingGrantSpecial}
+                    className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-black text-xs cursor-pointer shadow-lg shadow-emerald-950/50 flex items-center gap-1.5 transition-all active:scale-95 disabled:opacity-50"
                   >
-                    <span>+ Cadastrar Novo Cliente</span>
+                    {savingGrantSpecial ? (
+                      <>
+                        <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                        <span>Gravando Acesso...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Check className="w-3.5 h-3.5" />
+                        <span>CONFIRMAR E CONCEDER ACESSO</span>
+                      </>
+                    )}
                   </button>
                 </div>
               </div>
-
-              {/* MODE A: SELECT EXISTING CLIENT */}
-              {grantModalClientMode === 'existing' && (
-                <div className="space-y-3 p-3.5 bg-slate-950/80 rounded-2xl border border-slate-800 animate-in fade-in">
-                  <div className="relative">
-                    <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-                    <input
-                      type="text"
-                      value={grantSearchQuery}
-                      onChange={(e) => setGrantSearchQuery(e.target.value)}
-                      placeholder="Pesquisar cliente por nome ou e-mail..."
-                      className="w-full bg-slate-900 border border-slate-700 rounded-xl pl-9 pr-3 py-2 text-white text-xs placeholder-slate-500 focus:outline-none focus:border-amber-500"
-                    />
-                  </div>
-
-                  {/* Client Select Dropdown List */}
-                  <div className="space-y-1">
-                    <label className="block text-slate-400 font-bold uppercase tracking-wider text-[10px]">
-                      Selecione um cliente cadastrado da lista ({users.filter(u => u.status !== 'blocked').length}):
-                    </label>
-                    <select
-                      value={grantSelectedUserUid}
-                      onChange={(e) => setGrantSelectedUserUid(e.target.value)}
-                      className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2.5 text-white font-semibold text-xs focus:outline-none focus:border-amber-500 cursor-pointer"
-                      required
+            ) : (
+              <form onSubmit={handleInitiateGrantSpecialAccess} className="space-y-4 text-xs">
+                {/* STEP 1: CLIENT SOURCE SELECTION (EXISTING OR NEW) */}
+                <div>
+                  <label className="block text-slate-300 font-bold mb-2 uppercase tracking-wider text-[11px]">
+                    1. Seleção do Membro
+                  </label>
+                  <div className="grid grid-cols-2 gap-2 bg-slate-950 p-1 rounded-2xl border border-slate-800">
+                    <button
+                      type="button"
+                      onClick={() => setGrantModalClientMode('existing')}
+                      className={`py-2.5 rounded-xl font-black text-xs transition-all cursor-pointer flex items-center justify-center gap-2 ${
+                        grantModalClientMode === 'existing'
+                          ? 'bg-amber-500 text-slate-950 shadow-md'
+                          : 'text-slate-400 hover:text-white'
+                      }`}
                     >
-                      <option value="">-- Escolha o cliente na lista abaixo --</option>
-                      {users
-                        .filter((u) => u.status !== 'blocked')
-                        .filter((u) => {
-                          if (!grantSearchQuery.trim()) return true;
-                          const q = grantSearchQuery.toLowerCase();
-                          return u.name?.toLowerCase().includes(q) || u.email?.toLowerCase().includes(q);
-                        })
-                        .map((u) => {
-                          const isVip = hasSpecialAccessActive(u);
-                          return (
-                            <option key={u.uid} value={u.uid}>
-                              {u.name} ({u.email}) — Plano: {(u.subscriptionPlan || 'Free').toUpperCase()} {isVip ? '★ [VIP ATIVO]' : ''}
-                            </option>
-                          );
-                        })}
-                    </select>
+                      <span>● Membro Existente</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setGrantModalClientMode('new')}
+                      className={`py-2.5 rounded-xl font-black text-xs transition-all cursor-pointer flex items-center justify-center gap-2 ${
+                        grantModalClientMode === 'new'
+                          ? 'bg-amber-500 text-slate-950 shadow-md'
+                          : 'text-slate-400 hover:text-white'
+                      }`}
+                    >
+                      <span>+ Cadastrar Novo Membro</span>
+                    </button>
                   </div>
-
-                  {/* Summary Card for Selected Existing Client */}
-                  {(() => {
-                    const selUser = users.find((u) => u.uid === grantSelectedUserUid);
-                    if (!selUser) return null;
-                    const isAlreadyVip = hasSpecialAccessActive(selUser);
-
-                    return (
-                      <div className="p-3 bg-slate-900 rounded-xl border border-amber-500/40 space-y-2 animate-in fade-in">
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <div className="font-extrabold text-white text-xs">{selUser.name}</div>
-                            <div className="text-[11px] text-slate-400">{selUser.email}</div>
-                          </div>
-                          <div className="text-right">
-                            <span className="text-[9px] uppercase font-bold text-slate-400 block">Plano Atual:</span>
-                            <span className="text-emerald-400 font-bold text-xs uppercase">{selUser.subscriptionPlan || 'Gratuito'}</span>
-                          </div>
-                        </div>
-
-                        {isAlreadyVip && (
-                          <div className="p-2 bg-amber-950/40 rounded-lg border border-amber-500/40 text-[11px] text-amber-300 font-bold flex items-center gap-1.5">
-                            <KeyRound className="w-3.5 h-3.5 shrink-0" />
-                            <span>Este cliente já possui Acesso Especial ativo. Configurar abaixo irá atualizar a autorização.</span>
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })()}
                 </div>
-              )}
 
-              {/* MODE B: CREATE NEW CLIENT DIRECTLY */}
-              {grantModalClientMode === 'new' && (
-                <div className="space-y-3 p-3.5 bg-slate-950/80 rounded-2xl border border-slate-800 animate-in fade-in">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                    <div>
-                      <label className="block text-slate-300 font-bold mb-1 uppercase tracking-wider text-[10px]">
-                        Nome Completo *
-                      </label>
+                {/* MODE A: SELECT EXISTING CLIENT */}
+                {grantModalClientMode === 'existing' && (
+                  <div className="space-y-3 p-3.5 bg-slate-950/80 rounded-2xl border border-slate-800 animate-in fade-in">
+                    <div className="relative">
+                      <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
                       <input
                         type="text"
-                        value={grantNewUserName}
-                        onChange={(e) => setGrantNewUserName(e.target.value)}
-                        placeholder="Ex: Carlos Mendes"
-                        className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white text-xs focus:outline-none focus:border-amber-500"
-                        required={grantModalClientMode === 'new'}
+                        value={grantSearchQuery}
+                        onChange={(e) => setGrantSearchQuery(e.target.value)}
+                        placeholder="Pesquisar membro por nome ou e-mail..."
+                        className="w-full bg-slate-900 border border-slate-700 rounded-xl pl-9 pr-3 py-2 text-white text-xs placeholder-slate-500 focus:outline-none focus:border-amber-500"
                       />
                     </div>
 
-                    <div>
-                      <label className="block text-slate-300 font-bold mb-1 uppercase tracking-wider text-[10px]">
-                        E-mail de Acesso *
-                      </label>
-                      <input
-                        type="email"
-                        value={grantNewUserEmail}
-                        onChange={(e) => setGrantNewUserEmail(e.target.value.toLowerCase().trim())}
-                        placeholder="carlos@empresa.com"
-                        className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white text-xs focus:outline-none focus:border-amber-500"
-                        required={grantModalClientMode === 'new'}
-                      />
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                    <div>
-                      <label className="block text-slate-300 font-bold mb-1 uppercase tracking-wider text-[10px]">
-                        Empresa / Órgão
-                      </label>
-                      <input
-                        type="text"
-                        value={grantNewUserCompany}
-                        onChange={(e) => setGrantNewUserCompany(e.target.value)}
-                        placeholder="Ex: Agroflorestal Brasil"
-                        className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white text-xs focus:outline-none focus:border-amber-500"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-slate-300 font-bold mb-1 uppercase tracking-wider text-[10px]">
-                        Plano Comercial Inicial
+                    {/* Client Select Dropdown List */}
+                    <div className="space-y-1">
+                      <label className="block text-slate-400 font-bold uppercase tracking-wider text-[10px]">
+                        Selecione um membro cadastrado ({users.length}):
                       </label>
                       <select
-                        value={grantNewUserPlan}
-                        onChange={(e) => {
-                          const p = e.target.value as SubscriptionPlanType;
-                          setGrantNewUserPlan(p);
-                          if (p === 'free') setGrantNewUserSubValue(0);
-                          else if (p === 'pro_mensal') setGrantNewUserSubValue(44.99);
-                        }}
-                        className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-slate-200 text-xs focus:outline-none focus:border-amber-500"
+                        value={grantSelectedUserUid}
+                        onChange={(e) => setGrantSelectedUserUid(e.target.value)}
+                        className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2.5 text-white font-semibold text-xs focus:outline-none focus:border-amber-500 cursor-pointer"
+                        required
                       >
-                        <option value="free">Plano Gratuito (R$ 0,00)</option>
-                        <option value="pro_mensal">Plano Profissional Mensal (R$ 44,99)</option>
-                        <option value="equipe_mensal">Plano Equipe (R$ 129,90)</option>
-                        <option value="florestal_corporativo">Corporativo Florestal (R$ 399,00)</option>
+                        <option value="">-- Escolha o usuário na lista abaixo --</option>
+                        {users
+                          .filter((u) => u.status !== 'blocked')
+                          .filter((u) => {
+                            if (!grantSearchQuery.trim()) return true;
+                            const q = grantSearchQuery.toLowerCase();
+                            return u.name?.toLowerCase().includes(q) || u.email?.toLowerCase().includes(q);
+                          })
+                          .map((u) => {
+                            const isVip = hasSpecialAccessActive(u);
+                            return (
+                              <option key={u.uid} value={u.uid}>
+                                {u.name} ({u.email}) — Plano: {(u.subscriptionPlan || 'Free').toUpperCase()} {isVip ? '★ [VIP ATIVO]' : ''}
+                              </option>
+                            );
+                          })}
                       </select>
                     </div>
                   </div>
-                </div>
-              )}
+                )}
 
-              {/* STEP 2: SPECIAL ACCESS CONFIGURATION */}
-              <div className="p-3.5 bg-gradient-to-b from-amber-950/40 via-slate-950 to-slate-950 rounded-2xl border border-amber-500/40 space-y-3">
-                <div className="flex items-center gap-2 text-amber-300 font-black text-xs uppercase tracking-wider">
-                  <KeyRound className="w-4 h-4 text-amber-400" />
-                  <span>2. Configuração do Acesso Especial</span>
-                </div>
+                {/* MODE B: CREATE NEW CLIENT DIRECTLY */}
+                {grantModalClientMode === 'new' && (
+                  <div className="space-y-3 p-3.5 bg-slate-950/80 rounded-2xl border border-slate-800 animate-in fade-in">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                      <div>
+                        <label className="block text-slate-300 font-bold mb-1 uppercase tracking-wider text-[10px]">
+                          Nome Completo *
+                        </label>
+                        <input
+                          type="text"
+                          value={grantNewUserName}
+                          onChange={(e) => setGrantNewUserName(e.target.value)}
+                          placeholder="Ex: João Silva"
+                          className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white text-xs focus:outline-none focus:border-amber-500"
+                          required={grantModalClientMode === 'new'}
+                        />
+                      </div>
 
-                {/* Type Selection */}
-                <div className="grid grid-cols-3 gap-2">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setGrantSaType('lifetime');
-                      setGrantSaExpiresAt('');
-                    }}
-                    className={`p-2.5 rounded-xl border font-bold text-xs text-center transition-all cursor-pointer ${
-                      grantSaType === 'lifetime'
-                        ? 'bg-gradient-to-r from-amber-500/30 to-yellow-500/30 border-amber-400 text-amber-200 ring-2 ring-amber-500/40 shadow-lg'
-                        : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-200'
-                    }`}
-                  >
-                    <div className="font-black text-amber-300 text-xs">👑 Vitalício</div>
-                    <div className="text-[10px] text-slate-400">Permanente</div>
-                  </button>
+                      <div>
+                        <label className="block text-slate-300 font-bold mb-1 uppercase tracking-wider text-[10px]">
+                          E-mail de Acesso *
+                        </label>
+                        <input
+                          type="email"
+                          value={grantNewUserEmail}
+                          onChange={(e) => setGrantNewUserEmail(e.target.value.toLowerCase().trim())}
+                          placeholder="joao@empresa.com"
+                          className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white text-xs focus:outline-none focus:border-amber-500"
+                          required={grantModalClientMode === 'new'}
+                        />
+                      </div>
+                    </div>
 
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setGrantSaType('annual');
-                      const d = new Date();
-                      d.setFullYear(d.getFullYear() + 1);
-                      setGrantSaExpiresAt(d.toISOString().split('T')[0]);
-                    }}
-                    className={`p-2.5 rounded-xl border font-bold text-xs text-center transition-all cursor-pointer ${
-                      grantSaType === 'annual'
-                        ? 'bg-amber-500/20 border-amber-500 text-amber-300 ring-2 ring-amber-500/30 shadow'
-                        : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-200'
-                    }`}
-                  >
-                    <div className="font-extrabold text-white text-xs">📅 1 Ano</div>
-                    <div className="text-[10px] text-slate-400">365 dias</div>
-                  </button>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                      <div>
+                        <label className="block text-slate-300 font-bold mb-1 uppercase tracking-wider text-[10px]">
+                          Empresa / Órgão
+                        </label>
+                        <input
+                          type="text"
+                          value={grantNewUserCompany}
+                          onChange={(e) => setGrantNewUserCompany(e.target.value)}
+                          placeholder="Ex: Construtora / Fazenda"
+                          className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white text-xs focus:outline-none focus:border-amber-500"
+                        />
+                      </div>
 
-                  <button
-                    type="button"
-                    onClick={() => setGrantSaType('custom')}
-                    className={`p-2.5 rounded-xl border font-bold text-xs text-center transition-all cursor-pointer ${
-                      grantSaType === 'custom'
-                        ? 'bg-amber-500/20 border-amber-500 text-amber-300 ring-2 ring-amber-500/30 shadow'
-                        : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-200'
-                    }`}
-                  >
-                    <div className="font-extrabold text-white text-xs">⏱️ Personalizado</div>
-                    <div className="text-[10px] text-slate-400">Datas livres</div>
-                  </button>
-                </div>
+                      <div>
+                        <label className="block text-slate-300 font-bold mb-1 uppercase tracking-wider text-[10px]">
+                          Plano Comercial Inicial
+                        </label>
+                        <select
+                          value={grantNewUserPlan}
+                          onChange={(e) => setGrantNewUserPlan(e.target.value as SubscriptionPlanType)}
+                          className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-slate-200 text-xs focus:outline-none focus:border-amber-500"
+                        >
+                          <option value="free">Plano Gratuito (R$ 0,00)</option>
+                          <option value="pro_mensal">Plano Profissional Mensal (R$ 44,99)</option>
+                          <option value="equipe_mensal">Plano Equipe (R$ 129,90)</option>
+                          <option value="florestal_corporativo">Corporativo Florestal (R$ 399,00)</option>
+                        </select>
+                      </div>
+                    </div>
+                  </div>
+                )}
 
-                {/* Dates */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                {/* STEP 2: SPECIAL ACCESS CONFIGURATION */}
+                <div className="p-3.5 bg-gradient-to-b from-amber-950/40 via-slate-950 to-slate-950 rounded-2xl border border-amber-500/40 space-y-3">
+                  <div className="flex items-center gap-2 text-amber-300 font-black text-xs uppercase tracking-wider">
+                    <KeyRound className="w-4 h-4 text-amber-400" />
+                    <span>2. Configuração do Período & Recursos</span>
+                  </div>
+
+                  {/* Type Selection */}
+                  <div className="grid grid-cols-3 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setGrantSaType('lifetime');
+                        setGrantSaExpiresAt('');
+                      }}
+                      className={`p-2.5 rounded-xl border font-bold text-xs text-center transition-all cursor-pointer ${
+                        grantSaType === 'lifetime'
+                          ? 'bg-gradient-to-r from-amber-500/30 to-yellow-500/30 border-amber-400 text-amber-200 ring-2 ring-amber-500/40 shadow-lg'
+                          : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-200'
+                      }`}
+                    >
+                      <div className="font-black text-amber-300 text-xs">👑 Vitalício</div>
+                      <div className="text-[10px] text-slate-400">Permanente</div>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setGrantSaType('annual');
+                        const d = new Date();
+                        d.setFullYear(d.getFullYear() + 1);
+                        setGrantSaExpiresAt(d.toISOString().split('T')[0]);
+                      }}
+                      className={`p-2.5 rounded-xl border font-bold text-xs text-center transition-all cursor-pointer ${
+                        grantSaType === 'annual'
+                          ? 'bg-amber-500/20 border-amber-500 text-amber-300 ring-2 ring-amber-500/30 shadow'
+                          : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-200'
+                      }`}
+                    >
+                      <div className="font-extrabold text-white text-xs">📅 1 Ano</div>
+                      <div className="text-[10px] text-slate-400">365 dias</div>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setGrantSaType('custom')}
+                      className={`p-2.5 rounded-xl border font-bold text-xs text-center transition-all cursor-pointer ${
+                        grantSaType === 'custom'
+                          ? 'bg-amber-500/20 border-amber-500 text-amber-300 ring-2 ring-amber-500/30 shadow'
+                          : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-200'
+                      }`}
+                    >
+                      <div className="font-extrabold text-white text-xs">⏱️ Personalizado</div>
+                      <div className="text-[10px] text-slate-400">Datas livres</div>
+                    </button>
+                  </div>
+
+                  {/* Dates */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                    <div>
+                      <label className="block text-slate-300 font-bold mb-1 uppercase tracking-wider text-[10px]">
+                        Data de Início
+                      </label>
+                      <input
+                        type="date"
+                        value={grantSaStartsAt}
+                        onChange={(e) => setGrantSaStartsAt(e.target.value)}
+                        className="w-full bg-slate-900 border border-slate-700 rounded-xl px-2.5 py-1.5 text-white font-medium focus:outline-none focus:border-amber-500 text-xs"
+                        required
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-slate-300 font-bold mb-1 uppercase tracking-wider text-[10px]">
+                        Data de Término {grantSaType === 'lifetime' && '(Sem Expiração)'}
+                      </label>
+                      <input
+                        type="date"
+                        value={grantSaExpiresAt}
+                        onChange={(e) => setGrantSaExpiresAt(e.target.value)}
+                        disabled={grantSaType === 'lifetime'}
+                        className="w-full bg-slate-900 border border-slate-700 rounded-xl px-2.5 py-1.5 text-white font-medium focus:outline-none focus:border-amber-500 text-xs disabled:opacity-40"
+                        required={grantSaType !== 'lifetime'}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Resources selection */}
+                  <div className="p-3 bg-slate-950 rounded-xl border border-slate-800 space-y-1.5">
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={grantAllFeatures}
+                        onChange={(e) => setGrantAllFeatures(e.target.checked)}
+                        className="w-4 h-4 rounded text-amber-500 focus:ring-amber-500 bg-slate-900 border-slate-700"
+                      />
+                      <span className="font-bold text-white text-xs">☑ TODOS OS RECURSOS PREMIUM (Recomendado)</span>
+                    </label>
+                    <p className="text-[10px] text-slate-400 pl-6">
+                      Libera mapas PDF ilimitados, vistorias SST, focos de incêndio, cubagem de madeira, KML/KMZ e satélite offline.
+                    </p>
+                  </div>
+
+                  {/* Reason */}
                   <div>
                     <label className="block text-slate-300 font-bold mb-1 uppercase tracking-wider text-[10px]">
-                      Data de Início
+                      Motivo / Justificativa *
                     </label>
                     <input
-                      type="date"
-                      value={grantSaStartsAt}
-                      onChange={(e) => setGrantSaStartsAt(e.target.value)}
-                      className="w-full bg-slate-900 border border-slate-700 rounded-xl px-2.5 py-1.5 text-white font-medium focus:outline-none focus:border-amber-500 text-xs"
+                      type="text"
+                      value={grantSaReason}
+                      onChange={(e) => setGrantSaReason(e.target.value)}
+                      placeholder="Ex: Demonstração VIP, Parceria Comercial, Cortesia"
+                      className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-1.5 text-white text-xs focus:outline-none focus:border-amber-500"
                       required
                     />
                   </div>
-
-                  <div>
-                    <label className="block text-slate-300 font-bold mb-1 uppercase tracking-wider text-[10px]">
-                      Data de Expiração {grantSaType === 'lifetime' && '(Sem Expiração)'}
-                    </label>
-                    <input
-                      type="date"
-                      value={grantSaExpiresAt}
-                      onChange={(e) => setGrantSaExpiresAt(e.target.value)}
-                      disabled={grantSaType === 'lifetime'}
-                      className="w-full bg-slate-900 border border-slate-700 rounded-xl px-2.5 py-1.5 text-white font-medium focus:outline-none focus:border-amber-500 text-xs disabled:opacity-40"
-                      required={grantSaType !== 'lifetime'}
-                    />
-                  </div>
                 </div>
 
-                {/* Reason */}
-                <div>
-                  <label className="block text-slate-300 font-bold mb-1 uppercase tracking-wider text-[10px]">
-                    Motivo / Justificativa
-                  </label>
-                  <input
-                    type="text"
-                    value={grantSaReason}
-                    onChange={(e) => setGrantSaReason(e.target.value)}
-                    placeholder="Ex: Cliente Parceiro, Cortesia, Demonstração VIP"
-                    className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-1.5 text-white text-xs focus:outline-none focus:border-amber-500"
-                  />
-                </div>
-              </div>
-            </div>
-
-            {/* Modal Actions */}
-            <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-slate-800">
-              <button
-                type="button"
-                onClick={() => setIsGrantSpecialModalOpen(false)}
-                className="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-750 text-slate-300 font-bold text-xs cursor-pointer transition-colors"
-              >
-                Cancelar
-              </button>
-              <button
-                type="submit"
-                disabled={savingGrantSpecial}
-                className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-yellow-500 hover:from-amber-400 hover:to-yellow-400 text-slate-950 font-black text-xs cursor-pointer shadow-lg shadow-amber-950/50 flex items-center gap-1.5 transition-all active:scale-95 disabled:opacity-50"
-              >
-                {savingGrantSpecial ? (
-                  <>
-                    <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                    <span>Concedendo Acesso...</span>
-                  </>
-                ) : (
-                  <>
+                {/* Modal Actions */}
+                <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-slate-800">
+                  <button
+                    type="button"
+                    onClick={() => setIsGrantSpecialModalOpen(false)}
+                    className="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-750 text-slate-300 font-bold text-xs cursor-pointer transition-colors"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-yellow-500 hover:from-amber-400 hover:to-yellow-400 text-slate-950 font-black text-xs cursor-pointer shadow-lg shadow-amber-950/50 flex items-center gap-1.5 transition-all active:scale-95"
+                  >
                     <Check className="w-3.5 h-3.5" />
-                    <span>CONCEDER ACESSO</span>
-                  </>
-                )}
-              </button>
-            </div>
-          </form>
+                    <span>AVANÇAR PARA CONFIRMAÇÃO</span>
+                  </button>
+                </div>
+              </form>
+            )}
+          </div>
         </div>
       )}
 

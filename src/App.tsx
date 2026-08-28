@@ -26,6 +26,7 @@ import { AddWaypointModal } from './components/Waypoints/AddWaypointModal';
 import { LayerManagerModal } from './components/Layers/LayerManagerModal';
 import { MobileBottomNav } from './components/Navigation/MobileBottomNav';
 import { AppUpdateBanner } from './components/Common/AppUpdateBanner';
+import { SpecialAccessModal } from './components/Modals/SpecialAccessModal';
 import { Sparkles, Clock, AlertTriangle, ArrowRight, Lock } from 'lucide-react';
 import { getUserRawItem } from './utils/userStorage';
 
@@ -175,6 +176,7 @@ const MainAppContent: React.FC = () => {
 
       {/* Global Modals, Notifications & Auto-Update Banner */}
       <AppUpdateBanner />
+      <SpecialAccessModal onOpenUpgradeModal={() => openUpgradeModal('Acesso Premium')} />
       <AddWaypointModal />
       <LayerManagerModal />
       <SettingsModal isOpen={isSettingsModalOpen} onClose={() => setIsSettingsModalOpen(false)} />

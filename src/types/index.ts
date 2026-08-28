@@ -6,7 +6,7 @@ export type SubscriptionStatusType = 'active' | 'trial' | 'overdue' | 'suspended
 export type PaymentMethodType = 'pix' | 'boleto' | 'cartao' | 'transferencia' | 'cortesia';
 
 export type SpecialAccessType = 'annual' | 'custom' | 'lifetime';
-export type SpecialAccessStatus = 'active' | 'expired' | 'revoked' | 'scheduled';
+export type SpecialAccessStatus = 'scheduled' | 'active' | 'expired' | 'revoked' | 'cancelled';
 
 export interface SpecialAccessConfig {
   enabled: boolean;
@@ -16,7 +16,9 @@ export interface SpecialAccessConfig {
   expiresAt: string | null; // null represents lifetime / permanent
   grantedBy: string;
   grantedAt: string;
-  reason?: string;
+  reason: string;
+  grantedFeatures?: string[]; // ['ALL_FEATURES'] or specific keys
+  notifiedAt?: string;
   revokedAt?: string;
   revokedBy?: string;
   revokedReason?: string;

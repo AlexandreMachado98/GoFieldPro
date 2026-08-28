@@ -5,6 +5,7 @@ import { useAuth } from '../../context/AuthContext';
 import { FieldRound } from '../../types';
 import { APP_VERSION } from '../../config/version';
 import { generateFieldRoundsPdf } from '../../utils/fieldRoundsPdfReport';
+import { getSpecialAccessComputedStatus, getSpecialAccessDaysRemaining, hasSpecialAccessActive } from '../../utils/featureAccess';
 import { PwaInstallButton } from '../PWA/PwaInstallButton';
 import { 
   Gauge, 
@@ -30,6 +31,7 @@ import {
   Trees,
   Crown,
   Sparkles,
+  KeyRound,
   Compass,
   Navigation,
   HardDrive,
@@ -376,6 +378,37 @@ export const HomeDashboard: React.FC = () => {
 
         {/* PWA Install Banner */}
         <PwaInstallButton variant="banner" />
+
+        {/* SPECIAL ACCESS VIP STATUS BANNER */}
+        {profile && getSpecialAccessComputedStatus(profile) === 'active' && (
+          <div className="bg-gradient-to-r from-amber-950/50 via-yellow-950/30 to-slate-900 border border-amber-500/50 rounded-2xl p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-xl">
+            <div className="flex items-center gap-3.5">
+              <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-amber-500 to-yellow-600 text-slate-950 flex items-center justify-center shrink-0 shadow-lg shadow-amber-950/60 ring-2 ring-amber-400/40">
+                <Sparkles className="w-6 h-6 stroke-[2.5]" />
+              </div>
+              <div className="space-y-0.5">
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] font-black uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/40">
+                    ★ Acesso Especial Liberado
+                  </span>
+                  <span className="text-xs font-bold text-slate-400">
+                    Plano Original: {(profile.subscriptionPlan || 'Free').toUpperCase()}
+                  </span>
+                </div>
+                <h4 className="text-sm font-black text-white">
+                  {profile.specialAccess?.accessType === 'lifetime'
+                    ? 'Acesso Permanente a Todos os Recursos Premium'
+                    : `Recursos Premium Autorizados até ${profile.specialAccess?.expiresAt?.split('-').reverse().join('/')}`}
+                </h4>
+                <p className="text-[11px] text-slate-300">
+                  {profile.specialAccess?.accessType === 'lifetime'
+                    ? 'Concessão especial vitalícia autorizada pelo administrador.'
+                    : `Vigência: ${getSpecialAccessDaysRemaining(profile)} dias restantes com todos os recursos liberados.`}
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Plan Status & Welcome Notice */}
         <div className="bg-gradient-to-r from-slate-900/90 via-slate-900/60 to-slate-950 border border-slate-800 rounded-2xl p-3 sm:p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-md">
