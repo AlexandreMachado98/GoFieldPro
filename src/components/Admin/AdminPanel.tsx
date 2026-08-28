@@ -26,6 +26,8 @@ import {
   SystemFeature,
 } from '../../types';
 import { SYSTEM_FEATURES, ALL_FEATURE_KEYS, FEATURE_CATEGORIES } from '../../config/features';
+import { hasSpecialAccessActive } from '../../utils/featureAccess';
+import { SpecialAccessConfig } from '../../types';
 import { testAsaasConnection } from '../../utils/asaasGateway';
 import { recordAdminAuditLog, fetchAdminAuditLogs } from '../../utils/auditLogger';
 import { exportUsersToCsv, exportFinancialSummaryToCsv, exportAuditLogsToCsv } from '../../utils/adminExport';
@@ -48,6 +50,8 @@ import {
   Sparkles,
   UserPlus,
   Plus,
+  KeyRound,
+  Key,
   X,
   DollarSign,
   TrendingUp,
@@ -111,7 +115,9 @@ export const AdminPanel: React.FC = () => {
   const [users, setUsers] = useState<UserProfile[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [filterStatus, setFilterStatus] = useState<'all' | 'pending' | 'active' | 'blocked'>('all');
+  const [filterStatus, setFilterStatus] = useState<
+    'all' | 'pending' | 'active' | 'blocked' | 'special_access' | 'special_lifetime' | 'special_expiring'
+  >('all');
   const [subscriptionFilter, setSubscriptionFilter] = useState<'all' | 'active' | 'trial' | 'overdue' | 'suspended'>('all');
   const [searchQuery, setSearchQuery] = useState('');
 
@@ -221,6 +227,19 @@ export const AdminPanel: React.FC = () => {
   const [savingBlock, setSavingBlock] = useState(false);
 
   // Edit Subscription Modal State
+    // Special Access Modal State
+  const [specialAccessUser, setSpecialAccessUser] = useState<UserProfile | null>(null);
+  const [saEnabled, setSaEnabled] = useState<boolean>(true);
+  const [saType, setSaType] = useState<'annual' | 'custom' | 'lifetime'>('annual');
+  const [saStartsAt, setSaStartsAt] = useState<string>(() => new Date().toISOString().split('T')[0]);
+  const [saExpiresAt, setSaExpiresAt] = useState<string>(() => {
+    const nextYear = new Date();
+    nextYear.setFullYear(nextYear.getFullYear() + 1);
+    return nextYear.toISOString().split('T')[0];
+  });
+  const [saReason, setSaReason] = useState<string>('Cliente Parceiro');
+  const [savingSpecialAccess, setSavingSpecialAccess] = useState<boolean>(false);
+
   const [editingUserSubscription, setEditingUserSubscription] = useState<UserProfile | null>(null);
   const [subModalPlan, setSubModalPlan] = useState<SubscriptionPlanType>('pro_mensal');
   const [subModalStatus, setSubModalStatus] = useState<SubscriptionStatusType>('active');
@@ -878,7 +897,162 @@ export const AdminPanel: React.FC = () => {
     window.open(whatsappUrl, '_blank');
   };
 
-    // 1. Create Promo Coupon with robust validation and 100% clean object (no undefined)
+    // Special Access Management Handlers
+  const handleOpenSpecialAccessModal = (u: UserProfile) => {
+    setSpecialAccessUser(u);
+    if (u.specialAccess && u.specialAccess.enabled && u.specialAccess.status !== 'revoked') {
+      setSaEnabled(true);
+      setSaType(u.specialAccess.accessType || 'annual');
+      setSaStartsAt(u.specialAccess.startsAt ? u.specialAccess.startsAt.split('T')[0] : new Date().toISOString().split('T')[0]);
+      if (u.specialAccess.expiresAt) {
+        setSaExpiresAt(u.specialAccess.expiresAt.split('T')[0]);
+      } else {
+        const nextYear = new Date();
+        nextYear.setFullYear(nextYear.getFullYear() + 1);
+        setSaExpiresAt(nextYear.toISOString().split('T')[0]);
+      }
+      setSaReason(u.specialAccess.reason || 'Cliente Parceiro');
+    } else {
+      setSaEnabled(true);
+      setSaType('annual');
+      setSaStartsAt(new Date().toISOString().split('T')[0]);
+      const nextYear = new Date();
+      nextYear.setFullYear(nextYear.getFullYear() + 1);
+      setSaExpiresAt(nextYear.toISOString().split('T')[0]);
+      setSaReason('Cliente Parceiro');
+    }
+  };
+
+  const handleSaveSpecialAccess = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!specialAccessUser) return;
+
+    if (!saEnabled) {
+      handleRevokeSpecialAccess(specialAccessUser);
+      return;
+    }
+
+    if (saType === 'custom' && saExpiresAt && saStartsAt && saExpiresAt < saStartsAt) {
+      notifyWarning('Data Inválida', 'A data de término não pode ser anterior à data de início.');
+      return;
+    }
+
+    setSavingSpecialAccess(true);
+    try {
+      let finalExpiresAt: string | null = null;
+      if (saType === 'annual') {
+        const d = new Date(saStartsAt + 'T00:00:00');
+        d.setFullYear(d.getFullYear() + 1);
+        finalExpiresAt = d.toISOString().split('T')[0];
+      } else if (saType === 'custom') {
+        finalExpiresAt = saExpiresAt;
+      } else {
+        finalExpiresAt = null; // Lifetime
+      }
+
+      const saConfig: SpecialAccessConfig = {
+        enabled: true,
+        accessType: saType,
+        status: 'active',
+        startsAt: saStartsAt,
+        expiresAt: finalExpiresAt,
+        grantedBy: profile?.email || profile?.name || 'Super Admin',
+        grantedAt: new Date().toISOString(),
+        reason: saReason.trim() || 'Concessão Administrativa Especial',
+      };
+
+      const cleanPayload: any = {
+        specialAccess: {
+          enabled: true,
+          accessType: saConfig.accessType,
+          status: 'active',
+          startsAt: saConfig.startsAt,
+          expiresAt: saConfig.expiresAt,
+          grantedBy: saConfig.grantedBy,
+          grantedAt: saConfig.grantedAt,
+          reason: saConfig.reason,
+        },
+      };
+
+      await updateDoc(doc(db, 'users', specialAccessUser.uid), cleanPayload);
+      setUsers((prev) =>
+        prev.map((u) => (u.uid === specialAccessUser.uid ? { ...u, specialAccess: saConfig } : u))
+      );
+
+      await recordAdminAuditLog({
+        adminUid: profile?.uid || 'super_admin',
+        adminEmail: profile?.email || 'admin@am-tst.com.br',
+        adminName: profile?.name || 'Super Admin',
+        action: 'GRANT_SPECIAL_ACCESS',
+        targetType: 'user',
+        targetId: specialAccessUser.uid,
+        targetName: specialAccessUser.name || specialAccessUser.email,
+        newValue: saConfig,
+        reason: `Concessão de Acesso Especial ${saType.toUpperCase()} para ${specialAccessUser.name}. Motivo: ${saConfig.reason}`,
+      });
+
+      notifySuccess(
+        'Acesso Especial Concedido!',
+        `Acesso ${saType === 'lifetime' ? 'Vitalício' : saType === 'annual' ? 'Anual' : 'Personalizado'} liberado com sucesso para ${specialAccessUser.name}.`
+      );
+      setSpecialAccessUser(null);
+    } catch (err: any) {
+      console.error('Error saving special access:', err);
+      notifyError('Erro ao Salvar', 'Não foi possível salvar o acesso especial.');
+    } finally {
+      setSavingSpecialAccess(false);
+    }
+  };
+
+  const handleRevokeSpecialAccess = (user: UserProfile) => {
+    showConfirm({
+      title: `Revogar Acesso Especial de ${user.name}?`,
+      message: `Este usuário perderá imediatamente a autorização total e passará a responder pelas regras e limitações do seu plano normal (${user.subscriptionPlan || 'free'}).`,
+      type: 'danger',
+      confirmText: 'Sim, Revogar Acesso',
+      cancelText: 'Cancelar',
+      onConfirm: async () => {
+        try {
+          const cleanPayload: any = {
+            'specialAccess.enabled': false,
+            'specialAccess.status': 'revoked',
+            'specialAccess.revokedAt': new Date().toISOString(),
+            'specialAccess.revokedBy': profile?.email || 'Super Admin',
+          };
+
+          await updateDoc(doc(db, 'users', user.uid), cleanPayload);
+          setUsers((prev) =>
+            prev.map((u) =>
+              u.uid === user.uid && u.specialAccess
+                ? {
+                    ...u,
+                    specialAccess: { ...u.specialAccess, enabled: false, status: 'revoked' },
+                  }
+                : u
+            )
+          );
+
+          await recordAdminAuditLog({
+            adminUid: profile?.uid || 'super_admin',
+            adminEmail: profile?.email || 'admin@am-tst.com.br',
+            adminName: profile?.name || 'Super Admin',
+            action: 'REVOKE_SPECIAL_ACCESS',
+            targetType: 'user',
+            targetId: user.uid,
+            targetName: user.name || user.email,
+            reason: `Revogação de Acesso Especial de ${user.name}.`,
+          });
+
+          notifySuccess('Acesso Especial Revogado', `O acesso especial de ${user.name} foi revogado com sucesso.`);
+          if (specialAccessUser?.uid === user.uid) setSpecialAccessUser(null);
+        } catch (err) {
+          notifyError('Erro ao Revogar', 'Falha ao revogar acesso especial no banco.');
+        }
+      },
+    });
+  };
+
+  // 1. Create Promo Coupon with robust validation and 100% clean object (no undefined)
   const handleCreateCoupon = async (e: React.FormEvent) => {
     e.preventDefault();
     const cleanCode = newCouponCode.trim().toUpperCase().replace(/[^A-Z0-9_-]/g, '');
@@ -1068,6 +1242,14 @@ export const AdminPanel: React.FC = () => {
       if (filterStatus === 'pending') return u.status === 'pending';
       if (filterStatus === 'active') return u.status === 'active';
       if (filterStatus === 'blocked') return u.status === 'blocked';
+      if (filterStatus === 'special_access') return hasSpecialAccessActive(u);
+      if (filterStatus === 'special_lifetime') return hasSpecialAccessActive(u) && u.specialAccess?.accessType === 'lifetime';
+      if (filterStatus === 'special_expiring') {
+        if (!hasSpecialAccessActive(u) || !u.specialAccess?.expiresAt) return false;
+        const exp = new Date(u.specialAccess.expiresAt).getTime();
+        const diffDays = (exp - Date.now()) / (1000 * 60 * 60 * 24);
+        return diffDays >= 0 && diffDays <= 30;
+      }
       return true;
     })
     .filter((u) => {
@@ -1376,9 +1558,49 @@ export const AdminPanel: React.FC = () => {
                 Ativos ({users.filter((u) => u.status === 'active').length})
               </button>
               <button
+                onClick={() => setFilterStatus('special_access')}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold cursor-pointer transition-all flex items-center gap-1 ${
+                  filterStatus === 'special_access'
+                    ? 'bg-amber-600 text-white shadow-md'
+                    : 'bg-slate-950 text-amber-400/80 hover:text-amber-300'
+                }`}
+              >
+                <KeyRound className="w-3.5 h-3.5" />
+                <span>🔑 Acesso Especial ({users.filter((u) => hasSpecialAccessActive(u)).length})</span>
+              </button>
+              <button
+                onClick={() => setFilterStatus('special_lifetime')}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold cursor-pointer transition-all ${
+                  filterStatus === 'special_lifetime'
+                    ? 'bg-gradient-to-r from-amber-600 to-yellow-600 text-white shadow-md'
+                    : 'bg-slate-950 text-slate-400 hover:text-white'
+                }`}
+              >
+                👑 Vitalício ({users.filter((u) => hasSpecialAccessActive(u) && u.specialAccess?.accessType === 'lifetime').length})
+              </button>
+              <button
+                onClick={() => setFilterStatus('special_expiring')}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold cursor-pointer transition-all ${
+                  filterStatus === 'special_expiring'
+                    ? 'bg-orange-600 text-white shadow-md'
+                    : 'bg-slate-950 text-slate-400 hover:text-white'
+                }`}
+              >
+                ⏳ Expira em 30d (
+                {
+                  users.filter((u) => {
+                    if (!hasSpecialAccessActive(u) || !u.specialAccess?.expiresAt) return false;
+                    const exp = new Date(u.specialAccess.expiresAt).getTime();
+                    const diff = (exp - Date.now()) / (1000 * 60 * 60 * 24);
+                    return diff >= 0 && diff <= 30;
+                  }).length
+                }
+                )
+              </button>
+              <button
                 onClick={() => setFilterStatus('pending')}
                 className={`px-3 py-1.5 rounded-xl text-xs font-bold cursor-pointer transition-all ${
-                  filterStatus === 'pending' ? 'bg-amber-600 text-white shadow-md' : 'bg-slate-950 text-slate-400 hover:text-white'
+                  filterStatus === 'pending' ? 'bg-slate-800 text-slate-300 shadow-md' : 'bg-slate-950 text-slate-400 hover:text-white'
                 }`}
               >
                 Pendentes ({users.filter((u) => u.status === 'pending').length})
@@ -2480,6 +2702,253 @@ export const AdminPanel: React.FC = () => {
               >
                 {savingPlanChanges ? 'Salvando...' : 'Salvar Plano'}
               </button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {/* MODAL: SPECIAL EXCLUSIVE ACCESS */}
+      {specialAccessUser && (
+        <div className="fixed inset-0 z-[99999] bg-black/80 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4">
+          <form
+            onSubmit={handleSaveSpecialAccess}
+            className="bg-slate-900 border border-amber-500/40 w-full max-w-lg rounded-3xl shadow-2xl p-5 sm:p-6 space-y-4 animate-in fade-in"
+          >
+            {/* Header */}
+            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-amber-500/20 text-amber-400 border border-amber-500/30 flex items-center justify-center">
+                  <KeyRound className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-sm sm:text-base font-black text-white leading-tight flex items-center gap-1.5">
+                    <span>Acesso Especial Exclusivo</span>
+                    <span className="text-[10px] bg-amber-500/20 text-amber-300 px-2 py-0.2 rounded-full border border-amber-500/30">
+                      VIP
+                    </span>
+                  </h3>
+                  <p className="text-[11px] text-slate-400">
+                    Conceda acesso a 100% dos recursos sem alterar a cobrança do plano comercial.
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setSpecialAccessUser(null)}
+                className="p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 transition-colors cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Target User Info */}
+            <div className="bg-slate-950/80 p-3 rounded-2xl border border-slate-800 flex items-center justify-between text-xs">
+              <div>
+                <div className="font-bold text-white text-sm">{specialAccessUser.name}</div>
+                <div className="text-slate-400 text-[11px]">{specialAccessUser.email}</div>
+              </div>
+              <div className="text-right">
+                <span className="text-[10px] uppercase font-bold text-slate-400 block">Plano Atual:</span>
+                <span className="text-emerald-400 font-extrabold uppercase text-[11px]">
+                  {specialAccessUser.subscriptionPlan || 'Gratuito'}
+                </span>
+              </div>
+            </div>
+
+            <div className="space-y-3.5 text-xs">
+              {/* Question: Grant Special Access? */}
+              <div>
+                <label className="block text-slate-300 font-bold mb-1.5 uppercase tracking-wider text-[11px]">
+                  Conceder Acesso Especial?
+                </label>
+                <div className="grid grid-cols-2 gap-2 bg-slate-950 p-1 rounded-xl border border-slate-700">
+                  <button
+                    type="button"
+                    onClick={() => setSaEnabled(true)}
+                    className={`py-2 rounded-lg font-black text-xs transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+                      saEnabled
+                        ? 'bg-amber-600 text-white shadow-md'
+                        : 'text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    <Check className="w-3.5 h-3.5" />
+                    <span>Sim, Ativar Acesso</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setSaEnabled(false)}
+                    className={`py-2 rounded-lg font-black text-xs transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+                      !saEnabled
+                        ? 'bg-slate-800 text-rose-300 shadow-md border border-rose-500/30'
+                        : 'text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    <X className="w-3.5 h-3.5" />
+                    <span>Não / Revogar</span>
+                  </button>
+                </div>
+              </div>
+
+              {saEnabled && (
+                <div className="space-y-3.5 animate-in fade-in">
+                  {/* Access Type */}
+                  <div>
+                    <label className="block text-slate-300 font-bold mb-1.5 uppercase tracking-wider text-[11px]">
+                      Tipo de Acesso Especial *
+                    </label>
+                    <div className="grid grid-cols-3 gap-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSaType('annual');
+                          const d = new Date();
+                          d.setFullYear(d.getFullYear() + 1);
+                          setSaExpiresAt(d.toISOString().split('T')[0]);
+                        }}
+                        className={`p-2.5 rounded-xl border font-bold text-xs text-center transition-all cursor-pointer ${
+                          saType === 'annual'
+                            ? 'bg-amber-500/20 border-amber-500 text-amber-300 ring-2 ring-amber-500/30 shadow'
+                            : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-slate-200'
+                        }`}
+                      >
+                        <div className="font-extrabold text-white text-xs">1 Ano</div>
+                        <div className="text-[10px] text-slate-400 mt-0.5">365 dias</div>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => setSaType('custom')}
+                        className={`p-2.5 rounded-xl border font-bold text-xs text-center transition-all cursor-pointer ${
+                          saType === 'custom'
+                            ? 'bg-amber-500/20 border-amber-500 text-amber-300 ring-2 ring-amber-500/30 shadow'
+                            : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-slate-200'
+                        }`}
+                      >
+                        <div className="font-extrabold text-white text-xs">Personalizado</div>
+                        <div className="text-[10px] text-slate-400 mt-0.5">Datas livres</div>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSaType('lifetime');
+                          setSaExpiresAt('');
+                        }}
+                        className={`p-2.5 rounded-xl border font-bold text-xs text-center transition-all cursor-pointer ${
+                          saType === 'lifetime'
+                            ? 'bg-gradient-to-r from-amber-500/30 to-emerald-500/30 border-amber-400 text-amber-200 ring-2 ring-amber-500/40 shadow-lg'
+                            : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-slate-200'
+                        }`}
+                      >
+                        <div className="font-extrabold text-amber-300 text-xs">👑 Vitalício</div>
+                        <div className="text-[10px] text-slate-400 mt-0.5">Permanente</div>
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Dates */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-slate-300 font-bold mb-1 uppercase tracking-wider text-[11px]">
+                        Data de Início
+                      </label>
+                      <input
+                        type="date"
+                        value={saStartsAt}
+                        onChange={(e) => setSaStartsAt(e.target.value)}
+                        className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-white font-medium focus:outline-none focus:border-amber-500 transition-colors"
+                        required
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-slate-300 font-bold mb-1 uppercase tracking-wider text-[11px]">
+                        Data de Término {saType === 'lifetime' && '(Sem Expiração)'}
+                      </label>
+                      <input
+                        type="date"
+                        value={saExpiresAt}
+                        onChange={(e) => setSaExpiresAt(e.target.value)}
+                        disabled={saType === 'lifetime'}
+                        className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-white font-medium focus:outline-none focus:border-amber-500 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                        required={saType !== 'lifetime'}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Reason / Notes */}
+                  <div>
+                    <label className="block text-slate-300 font-bold mb-1 uppercase tracking-wider text-[11px]">
+                      Motivo / Justificativa
+                    </label>
+                    <input
+                      type="text"
+                      value={saReason}
+                      onChange={(e) => setSaReason(e.target.value)}
+                      placeholder="EX: Cliente Parceiro, Teste Interno, Cortesia, Equipe SST"
+                      className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-white text-xs focus:outline-none focus:border-amber-500 transition-colors"
+                    />
+                  </div>
+
+                  {/* Feature Unlocks Notice */}
+                  <div className="p-3 bg-slate-950/90 rounded-2xl border border-amber-500/20 space-y-1.5">
+                    <div className="text-[11px] font-bold text-amber-300 flex items-center gap-1.5">
+                      <Sparkles className="w-3.5 h-3.5" />
+                      <span>Benefícios Automáticos do Acesso Especial:</span>
+                    </div>
+                    <ul className="grid grid-cols-2 gap-1 text-[10px] text-slate-300 font-medium">
+                      <li className="flex items-center gap-1">✓ Mapas PDF Ilimitados</li>
+                      <li className="flex items-center gap-1">✓ Cubagem de Madeira (m³)</li>
+                      <li className="flex items-center gap-1">✓ Rondas SST & Odômetro</li>
+                      <li className="flex items-center gap-1">✓ Laudos Técnicos em PDF</li>
+                      <li className="flex items-center gap-1">✓ Focos de Incêndio</li>
+                      <li className="flex items-center gap-1">✓ Todas as Funções Futuras</li>
+                    </ul>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Actions */}
+            <div className="flex items-center justify-between gap-2 pt-3 border-t border-slate-800">
+              {specialAccessUser.specialAccess && specialAccessUser.specialAccess.enabled ? (
+                <button
+                  type="button"
+                  onClick={() => handleRevokeSpecialAccess(specialAccessUser)}
+                  className="px-3.5 py-2 rounded-xl bg-rose-950/60 hover:bg-rose-900/60 border border-rose-800 text-rose-300 font-bold text-xs cursor-pointer transition-colors"
+                >
+                  Revogar Acesso
+                </button>
+              ) : (
+                <div />
+              )}
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setSpecialAccessUser(null)}
+                  className="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-750 text-slate-300 font-bold text-xs cursor-pointer transition-colors"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={savingSpecialAccess}
+                  className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-yellow-500 hover:from-amber-400 hover:to-yellow-400 text-slate-950 font-black text-xs cursor-pointer shadow-lg shadow-amber-950/50 flex items-center gap-1.5 transition-all active:scale-95 disabled:opacity-50"
+                >
+                  {savingSpecialAccess ? (
+                    <>
+                      <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                      <span>Salvando...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Check className="w-3.5 h-3.5" />
+                      <span>Salvar Acesso Especial</span>
+                    </>
+                  )}
+                </button>
+              </div>
             </div>
           </form>
         </div>

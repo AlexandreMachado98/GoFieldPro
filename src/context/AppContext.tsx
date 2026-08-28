@@ -29,7 +29,7 @@ import {
   DEFAULT_PLANS,
   UserEntitlements,
 } from '../types';
-import { checkFeatureAccess, getUserMaxPdfMaps } from '../utils/featureAccess';
+import { checkFeatureAccess, getUserMaxPdfMaps, hasSpecialAccessActive } from '../utils/featureAccess';
 import {
   initialProjects,
   initialLayers,
@@ -328,6 +328,9 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       profile.email?.toLowerCase() === 'alexandre1604981@gmail.com';
 
     if (isSuperAdminOwner) return true;
+
+    // Special Exclusive Access grant: authoritative override that unlocks all features & limits
+    if (hasSpecialAccessActive(profile)) return true;
 
     // 1. If user account is blocked, pending or suspended
     if (

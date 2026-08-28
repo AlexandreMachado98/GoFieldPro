@@ -2,8 +2,30 @@ import { UserProfile, PlanItemConfig } from '../types';
 import { SYSTEM_FEATURES, ALL_FEATURE_KEYS } from '../config/features';
 
 /**
+ * Checks if the user has an active Special Access grant (Lifetime, Annual, or Custom within valid date range).
+ * Special Access acts as an authoritative override that grants 100% feature access and unlimited limits,
+ * completely independent of the user's commercial billing plan.
+ */
+export function hasSpecialAccessActive(user: UserProfile | null | undefined): boolean {
+  if (!user || !user.specialAccess) return false;
+  const sa = user.specialAccess;
+  if (!sa.enabled || sa.status === 'revoked') return false;
+
+  // Lifetime access has no expiration date
+  if (sa.accessType === 'lifetime' || !sa.expiresAt) {
+    return true;
+  }
+
+  const now = Date.now();
+  const start = sa.startsAt ? new Date(sa.startsAt.includes('T') ? sa.startsAt : sa.startsAt + 'T00:00:00').getTime() : 0;
+  const end = new Date(sa.expiresAt.includes('T') ? sa.expiresAt : sa.expiresAt + 'T23:59:59').getTime();
+
+  return !isNaN(end) && now >= start && now <= end;
+}
+
+/**
  * Universally checks if a user has access to a specific feature key based on their subscription plan,
- * permissions configuration, or role.
+ * special access grants, permissions configuration, or role.
  */
 export function checkFeatureAccess(
   user: UserProfile | null | undefined,
@@ -23,6 +45,11 @@ export function checkFeatureAccess(
   // 2. Blocked users have 0 access
   if (user.status === 'blocked' || user.subscriptionStatus === 'suspended') {
     return false;
+  }
+
+  // 3. Special Exclusive Access: 100% unrestricted access across all current and future features
+  if (hasSpecialAccessActive(user)) {
+    return true;
   }
 
   const userPlanId = user.subscriptionPlan;
@@ -77,7 +104,11 @@ export function getUserMaxPdfMaps(
   plansConfig?: PlanItemConfig[]
 ): number {
   if (!user) return 2;
-  if (user.role === 'super_admin' || user.email?.toLowerCase() === 'alexandre1604981@gmail.com') {
+  if (
+    user.role === 'super_admin' ||
+    user.email?.toLowerCase() === 'alexandre1604981@gmail.com' ||
+    hasSpecialAccessActive(user)
+  ) {
     return 99999;
   }
   if (checkFeatureAccess(user, 'pdf_maps_unlimited', plansConfig)) {

@@ -5,6 +5,7 @@ import { useUpdate } from '../context/UpdateContext';
 import { APP_VERSION } from '../config/version';
 import { Language } from '../types';
 import { PwaInstallButton } from './PWA/PwaInstallButton';
+import { hasSpecialAccessActive } from '../utils/featureAccess';
 import {
   Folder,
   Wifi,
@@ -244,12 +245,16 @@ export const Topbar: React.FC = () => {
                       <span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded-full border ${
                         profile?.role === 'super_admin'
                           ? 'bg-purple-500/20 text-purple-300 border-purple-500/40'
-                          : isProUser
+                          : hasSpecialAccessActive(profile)
                           ? 'bg-amber-500/20 text-amber-300 border-amber-500/40'
+                          : isProUser
+                          ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
                           : 'bg-sky-500/20 text-sky-300 border-sky-500/30'
                       }`}>
                         {profile?.role === 'super_admin'
                           ? 'Super Admin'
+                          : hasSpecialAccessActive(profile)
+                          ? '🔑 Acesso Especial'
                           : isProUser
                           ? 'Plano Pro'
                           : 'Plano Free'}

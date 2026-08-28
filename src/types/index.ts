@@ -5,6 +5,23 @@ export type SubscriptionPlanType = 'free' | 'free_trial' | 'pro_mensal' | 'equip
 export type SubscriptionStatusType = 'active' | 'trial' | 'overdue' | 'suspended' | 'canceled';
 export type PaymentMethodType = 'pix' | 'boleto' | 'cartao' | 'transferencia' | 'cortesia';
 
+export type SpecialAccessType = 'annual' | 'custom' | 'lifetime';
+export type SpecialAccessStatus = 'active' | 'expired' | 'revoked' | 'scheduled';
+
+export interface SpecialAccessConfig {
+  enabled: boolean;
+  accessType: SpecialAccessType;
+  status: SpecialAccessStatus;
+  startsAt: string;
+  expiresAt: string | null; // null represents lifetime / permanent
+  grantedBy: string;
+  grantedAt: string;
+  reason?: string;
+  revokedAt?: string;
+  revokedBy?: string;
+  revokedReason?: string;
+}
+
 export interface UserProfile {
   uid: string;
   email: string;
@@ -34,6 +51,9 @@ export interface UserProfile {
   blockType?: 'overdue' | 'security' | 'requested' | 'deactivated';
   blockedAt?: string;
   blockedBy?: string;
+
+  // Special Exclusive Access (Independent of Commercial Plan)
+  specialAccess?: SpecialAccessConfig;
 }
 
 export interface AdminAuditLog {
