@@ -466,11 +466,7 @@ export const AdminPanel: React.FC = () => {
       localStorage.setItem('gofield_billing_config', JSON.stringify(newConfig));
       localStorage.setItem('gofield_custom_plans', JSON.stringify(plans));
 
-      try {
-        await setDoc(doc(db, 'system_config', 'billing'), newConfig, { merge: true });
-      } catch (cloudErr) {
-        console.warn('Firestore write notice (saved locally):', cloudErr);
-      }
+      await setDoc(doc(db, 'system_config', 'billing'), newConfig, { merge: true });
 
       await recordAdminAuditLog({
         adminUid: profile?.uid || 'super_admin',
@@ -509,9 +505,7 @@ export const AdminPanel: React.FC = () => {
     setBillingConfig(updatedConfig);
     localStorage.setItem('gofield_billing_config', JSON.stringify(updatedConfig));
 
-    try {
-      await setDoc(doc(db, 'system_config', 'billing'), updatedConfig, { merge: true });
-    } catch (err) {}
+    await setDoc(doc(db, 'system_config', 'billing'), updatedConfig, { merge: true });
 
     await recordAdminAuditLog({
       adminUid: profile?.uid || 'super_admin',
@@ -549,9 +543,7 @@ export const AdminPanel: React.FC = () => {
     setBillingConfig(updatedConfig);
     localStorage.setItem('gofield_billing_config', JSON.stringify(updatedConfig));
 
-    try {
-      await setDoc(doc(db, 'system_config', 'billing'), updatedConfig, { merge: true });
-    } catch (err) {}
+    await setDoc(doc(db, 'system_config', 'billing'), updatedConfig, { merge: true });
 
     notifySuccess('Ordem Atualizada', 'A ordem de exibição dos planos na vitrine foi salva.');
   };
@@ -572,9 +564,7 @@ export const AdminPanel: React.FC = () => {
     setBillingConfig(updatedConfig);
     localStorage.setItem('gofield_billing_config', JSON.stringify(updatedConfig));
 
-    try {
-      await setDoc(doc(db, 'system_config', 'billing'), updatedConfig, { merge: true });
-    } catch (err) {}
+    await setDoc(doc(db, 'system_config', 'billing'), updatedConfig, { merge: true });
 
     await recordAdminAuditLog({
       adminUid: profile?.uid || 'super_admin',
@@ -693,9 +683,7 @@ export const AdminPanel: React.FC = () => {
       setBillingConfig(updatedConfig);
       localStorage.setItem('gofield_billing_config', JSON.stringify(updatedConfig));
 
-      try {
-        await setDoc(doc(db, 'system_config', 'billing'), updatedConfig, { merge: true });
-      } catch (cloudErr) {}
+      await setDoc(doc(db, 'system_config', 'billing'), updatedConfig, { merge: true });
 
       notifySuccess('Plano Salvo com Sucesso!', `O plano "${planModalName}" foi salvo.`);
       setEditingPlan(null);
