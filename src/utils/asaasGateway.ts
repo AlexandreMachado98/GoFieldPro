@@ -74,12 +74,22 @@ export async function asaasApiRequest(
     body: options.body ? JSON.stringify(options.body) : undefined,
   };
 
-  // 1. Try Direct Fetch to Asaas first
+  // 1. Try local dev proxy first if running via Vite server
+  try {
+    const isSandbox = config?.asaasEnvironment === 'sandbox';
+    const proxyPath = isSandbox ? `/api/asaas-sandbox-proxy${cleanEndpoint}` : `/api/asaas-proxy${cleanEndpoint}`;
+    const proxyRes = await fetch(proxyPath, fetchOptions);
+    if (proxyRes.status !== 404) {
+      return proxyRes;
+    }
+  } catch {}
+
+  // 2. Try Direct Fetch to Asaas
   try {
     const directRes = await fetch(targetUrl, fetchOptions);
     return directRes;
   } catch (directErr: any) {
-    // 2. Fallback: Secure CORS Bridge Relay
+    // 3. Fallback: Secure CORS Bridge Relay
     console.warn('[Asaas] Direct browser CORS blocked, using HTTPS bridge relay...');
     try {
       const relayUrl = `https://corsproxy.io/?${encodeURIComponent(targetUrl)}`;

@@ -21,6 +21,26 @@ export default defineConfig(() => {
       hmr: process.env.DISABLE_HMR !== 'true',
       // Disable file watching when DISABLE_HMR is true to save CPU during agent edits.
       watch: process.env.DISABLE_HMR === 'true' ? null : {},
+      proxy: {
+        '/api/asaas-proxy': {
+          target: 'https://api.asaas.com/v3',
+          changeOrigin: true,
+          secure: false,
+          rewrite: (path) => path.replace(/^\/api\/asaas-proxy/, ''),
+          headers: {
+            'User-Agent': 'GoFieldPro/2.6.0',
+          },
+        },
+        '/api/asaas-sandbox-proxy': {
+          target: 'https://sandbox.asaas.com/api/v3',
+          changeOrigin: true,
+          secure: false,
+          rewrite: (path) => path.replace(/^\/api\/asaas-sandbox-proxy/, ''),
+          headers: {
+            'User-Agent': 'GoFieldPro/2.6.0',
+          },
+        },
+      },
     },
   };
 });
