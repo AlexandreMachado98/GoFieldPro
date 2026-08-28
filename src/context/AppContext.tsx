@@ -269,19 +269,42 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     };
   });
 
+  // Real-time synchronization of Official System Billing & Plans Configuration
   useEffect(() => {
-    const billDocRef = doc(db, 'system_config', 'billing');
-    const unsub = onSnapshot(billDocRef, (snap) => {
-      if (snap.exists()) {
-        const data = snap.data() as SystemBillingConfig;
-        setBillingConfig((prev) => ({ ...prev, ...data }));
-        localStorage.setItem('gofield_billing_config', JSON.stringify(data));
-        if (data.plans && Array.isArray(data.plans) && data.plans.length > 0) {
-          localStorage.setItem('gofield_custom_plans', JSON.stringify(data.plans));
-        }
+    let unsub: (() => void) | null = null;
+
+    const setupBillingListener = () => {
+      try {
+        const billDocRef = doc(db, 'system_config', 'billing');
+        unsub = onSnapshot(
+          billDocRef,
+          (snap) => {
+            if (snap.exists()) {
+              const data = snap.data() as SystemBillingConfig;
+              setBillingConfig((prev) => ({ ...prev, ...data }));
+              localStorage.setItem('gofield_billing_config', JSON.stringify(data));
+              if (data.plans && Array.isArray(data.plans) && data.plans.length > 0) {
+                localStorage.setItem('gofield_custom_plans', JSON.stringify(data.plans));
+              }
+              // Broadcast update event to all active UI components
+              window.dispatchEvent(new CustomEvent('gofield_plans_updated', { detail: data }));
+            }
+          },
+          (err) => {
+            console.warn('Billing config listener notice:', err.message);
+            setTimeout(setupBillingListener, 3000);
+          }
+        );
+      } catch (e) {
+        console.warn('Error setting up billing listener:', e);
       }
-    }, (err) => console.warn('Billing config listener notice:', err.message));
-    return () => unsub();
+    };
+
+    setupBillingListener();
+
+    return () => {
+      if (unsub) unsub();
+    };
   }, []);
 
   useEffect(() => {
