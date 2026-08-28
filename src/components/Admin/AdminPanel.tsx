@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import {
   collection,
   onSnapshot,
@@ -228,6 +228,7 @@ export const AdminPanel: React.FC = () => {
 
   // Edit Subscription Modal State
     // Special Access Modal State
+  const [selectedActiveUserUid, setSelectedActiveUserUid] = useState<string>('');
   const [specialAccessUser, setSpecialAccessUser] = useState<UserProfile | null>(null);
   const [saEnabled, setSaEnabled] = useState<boolean>(true);
   const [saType, setSaType] = useState<'annual' | 'custom' | 'lifetime'>('annual');
@@ -1391,6 +1392,16 @@ export const AdminPanel: React.FC = () => {
   const averageTicket = activePayingUsers.length > 0 ? totalMrr / activePayingUsers.length : 44.99;
   const churnRate = users.length > 0 ? (blockedUsers.length / users.length) * 100 : 0;
 
+  // Selected Active User Object
+  const selectedActiveUser = useMemo(() => {
+    if (!selectedActiveUserUid) return null;
+    return users.find((u) => u.uid === selectedActiveUserUid) || null;
+  }, [users, selectedActiveUserUid]);
+
+  const activeClientsList = useMemo(() => {
+    return users.filter((u) => u.status === 'active' && u.subscriptionStatus !== 'suspended');
+  }, [users]);
+
   // Filtered Users List
   const filteredUsers = users
     .filter((u) => {
@@ -1787,8 +1798,17 @@ export const AdminPanel: React.FC = () => {
                 <tbody className="divide-y divide-slate-800/60">
                   {filteredUsers.map((u) => {
                     const isBlocked = u.status === 'blocked' || u.subscriptionStatus === 'suspended';
+                    const isSelected = selectedActiveUserUid === u.uid;
                     return (
-                      <tr key={u.uid} className="hover:bg-slate-800/40 transition-colors">
+                      <tr
+                        key={u.uid}
+                        onClick={() => setSelectedActiveUserUid(isSelected ? '' : u.uid)}
+                        className={`transition-colors cursor-pointer ${
+                          isSelected
+                            ? 'bg-sky-950/40 ring-1 ring-inset ring-sky-500/50'
+                            : 'hover:bg-slate-800/40'
+                        }`}
+                      >
                         <td className="p-3.5">
                           <div className="font-bold text-white">{u.name}</div>
                           <div className="text-[11px] text-slate-400">{u.email}</div>
