@@ -23,11 +23,16 @@ import {
   ChevronRight, 
   ArrowRight,
   Image as ImageIcon,
-  Check,
-  Edit2,
-  Trash2,
-  X,
+  Check, 
+  Edit2, 
+  Trash2, 
+  X, 
   Trees,
+  Crown,
+  Sparkles,
+  Compass,
+  Navigation,
+  HardDrive,
 } from 'lucide-react';
 
 export const HomeDashboard: React.FC = () => {
@@ -371,6 +376,115 @@ export const HomeDashboard: React.FC = () => {
 
         {/* PWA Install Banner */}
         <PwaInstallButton variant="banner" />
+
+        {/* Plan Status & Welcome Notice */}
+        <div className="bg-gradient-to-r from-slate-900/90 via-slate-900/60 to-slate-950 border border-slate-800 rounded-2xl p-3 sm:p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-md">
+          <div className="flex items-center gap-3">
+            <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${
+              isProUser
+                ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
+                : 'bg-sky-500/20 text-sky-400 border border-sky-500/30'
+            }`}>
+              {isProUser ? <Crown className="w-5 h-5" /> : <Sparkles className="w-5 h-5" />}
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="font-extrabold text-white text-xs sm:text-sm">
+                  {isProUser ? 'Plano Profissional Ativo' : 'Plano Gratuito Ativo'}
+                </span>
+                <span className={`text-[9px] font-black uppercase px-2 py-0.2 rounded-full border ${
+                  isProUser
+                    ? 'bg-amber-500/20 text-amber-300 border-amber-500/40'
+                    : 'bg-sky-500/20 text-sky-300 border-sky-500/30'
+                }`}>
+                  {isProUser ? 'Recursos Ilimitados' : 'Até 2 Mapas PDF'}
+                </span>
+              </div>
+              <p className="text-[11px] text-slate-400 mt-0.5">
+                {isProUser
+                  ? 'Você possui acesso a todos os mapas, cubagem florestal, relatórios técnicos e rondas SST.'
+                  : 'Navegação GPS, marcação de pontos e até 2 mapas PDF ativos liberados sem custos.'}
+              </p>
+            </div>
+          </div>
+
+          {!isProUser && (
+            <button
+              onClick={() => openUpgradeModal('Assinatura Pro')}
+              className="bg-gradient-to-r from-emerald-500 via-teal-500 to-sky-500 hover:from-emerald-400 hover:to-sky-400 text-slate-950 font-black px-3.5 py-2 rounded-xl text-xs flex items-center justify-center gap-1.5 transition-all shadow-md active:scale-95 cursor-pointer shrink-0"
+            >
+              <Crown className="w-3.5 h-3.5" />
+              <span>Fazer Upgrade Pro</span>
+            </button>
+          )}
+        </div>
+
+        {/* Quick Access Action Cards */}
+        <div className="space-y-2">
+          <div className="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5 px-0.5">
+            <Compass className="w-3.5 h-3.5 text-sky-400" />
+            <span>Primeiros Passos & Ações Rápidas de Campo</span>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+            {/* Card 1: GPS Navigation */}
+            <button
+              type="button"
+              onClick={() => setActiveTab('map')}
+              className="p-3.5 rounded-2xl bg-slate-900/90 hover:bg-slate-850 border border-slate-800 hover:border-sky-500/50 text-left transition-all group flex items-start gap-3 shadow cursor-pointer active:scale-98"
+            >
+              <div className="w-9 h-9 rounded-xl bg-sky-500/15 text-sky-400 border border-sky-500/30 flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform">
+                <Navigation className="w-4 h-4" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <h3 className="font-extrabold text-white text-xs sm:text-sm group-hover:text-sky-300 transition-colors">
+                  Mapa GPS de Navegação
+                </h3>
+                <p className="text-[11px] text-slate-400 mt-0.5 leading-snug">
+                  Navegue em tempo real, marque waypoints e grave seus trajetos.
+                </p>
+              </div>
+            </button>
+
+            {/* Card 2: PDF Maps */}
+            <button
+              type="button"
+              onClick={() => setActiveTab('pdf_maps')}
+              className="p-3.5 rounded-2xl bg-slate-900/90 hover:bg-slate-850 border border-slate-800 hover:border-emerald-500/50 text-left transition-all group flex items-start gap-3 shadow cursor-pointer active:scale-98"
+            >
+              <div className="w-9 h-9 rounded-xl bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform">
+                <FileText className="w-4 h-4" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <h3 className="font-extrabold text-white text-xs sm:text-sm group-hover:text-emerald-300 transition-colors">
+                  Plantas & Mapas em PDF
+                </h3>
+                <p className="text-[11px] text-slate-400 mt-0.5 leading-snug">
+                  Importe e visualize projetos e plantas georreferenciadas.
+                </p>
+              </div>
+            </button>
+
+            {/* Card 3: Offline Mode */}
+            <button
+              type="button"
+              onClick={() => setActiveTab('offline')}
+              className="p-3.5 rounded-2xl bg-slate-900/90 hover:bg-slate-850 border border-slate-800 hover:border-purple-500/50 text-left transition-all group flex items-start gap-3 shadow cursor-pointer active:scale-98"
+            >
+              <div className="w-9 h-9 rounded-xl bg-purple-500/15 text-purple-400 border border-purple-500/30 flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform">
+                <HardDrive className="w-4 h-4" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <h3 className="font-extrabold text-white text-xs sm:text-sm group-hover:text-purple-300 transition-colors">
+                  Mapas & Dados Offline
+                </h3>
+                <p className="text-[11px] text-slate-400 mt-0.5 leading-snug">
+                  Baixe áreas para trabalhar sem sinal de internet no campo.
+                </p>
+              </div>
+            </button>
+          </div>
+        </div>
 
         {/* Real-time Field Telemetry Summary Bar (Rodada de Campo) */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">

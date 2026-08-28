@@ -365,10 +365,10 @@ export const LoginScreen: React.FC = () => {
             {/* Header / Mode Indicator */}
             <div className="flex items-center justify-between mb-3 border-b border-slate-800 pb-2.5">
               <h2 className="text-base sm:text-lg font-bold text-white">
-                {viewMode === 'login' ? 'Realizar Login' : 'Solicitar Cadastro'}
+                {viewMode === 'login' ? 'Realizar Login' : 'Criar Conta Gratuita'}
               </h2>
-              <span className="text-[10px] sm:text-[11px] font-semibold text-sky-400 bg-sky-950/60 border border-sky-800/60 px-2.5 py-0.5 rounded-full">
-                {viewMode === 'login' ? 'Login' : 'Novo Cadastro'}
+              <span className="text-[10px] sm:text-[11px] font-semibold text-emerald-400 bg-emerald-950/60 border border-emerald-800/60 px-2.5 py-0.5 rounded-full">
+                {viewMode === 'login' ? 'Acesso' : '100% Gratuito'}
               </span>
             </div>
 
@@ -596,7 +596,7 @@ export const LoginScreen: React.FC = () => {
                   </>
                 ) : (
                   <>
-                    <span>{viewMode === 'login' ? 'Realizar Login' : 'Solicitar Cadastro'}</span>
+                    <span>{viewMode === 'login' ? 'Realizar Login' : 'Criar Minha Conta Gratuita'}</span>
                     <ArrowRight className="w-4 h-4" />
                   </>
                 )}
@@ -612,10 +612,10 @@ export const LoginScreen: React.FC = () => {
                   setError('');
                   setSuccess('');
                 }}
-                className="text-xs font-semibold text-slate-400 hover:text-sky-400 transition-colors"
+                className="text-xs font-semibold text-slate-400 hover:text-emerald-400 transition-colors"
               >
                 {viewMode === 'login'
-                  ? 'Não tem conta? Solicitar cadastro'
+                  ? 'Não tem conta? Criar conta gratuita'
                   : 'Já possui cadastro? Realizar login'}
               </button>
 

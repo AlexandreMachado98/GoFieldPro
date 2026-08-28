@@ -53,6 +53,7 @@ export const Topbar: React.FC = () => {
     openUpgradeModal,
     notifyInfo,
     notifySuccess,
+    isProUser,
   } = useApp();
 
   const { profile, logout } = useAuth();
@@ -237,10 +238,39 @@ export const Topbar: React.FC = () => {
               </button>
               {isUserDropdownOpen && (
                 <div className="absolute top-full right-0 mt-2 w-64 bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl z-[96000] p-2 animate-in fade-in slide-in-from-top-2 space-y-1">
-                  <div className="px-3 py-2 border-b border-slate-800 mb-1 bg-slate-950/50 rounded-xl">
-                    <div className="text-xs font-bold text-white">{profile?.name}</div>
+                  <div className="px-3 py-2.5 border-b border-slate-800 mb-1 bg-slate-950/60 rounded-xl space-y-1">
+                    <div className="flex items-center justify-between gap-1">
+                      <div className="text-xs font-bold text-white truncate">{profile?.name}</div>
+                      <span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded-full border ${
+                        profile?.role === 'super_admin'
+                          ? 'bg-purple-500/20 text-purple-300 border-purple-500/40'
+                          : isProUser
+                          ? 'bg-amber-500/20 text-amber-300 border-amber-500/40'
+                          : 'bg-sky-500/20 text-sky-300 border-sky-500/30'
+                      }`}>
+                        {profile?.role === 'super_admin'
+                          ? 'Super Admin'
+                          : isProUser
+                          ? 'Plano Pro'
+                          : 'Plano Free'}
+                      </span>
+                    </div>
                     <div className="text-[10px] text-slate-400 truncate">{profile?.email}</div>
-                    <div className="text-[10px] text-sky-400 uppercase mt-1 font-semibold">{profile?.role.replace('_', ' ')}</div>
+                    {!isProUser && profile?.role !== 'super_admin' && (
+                      <div className="pt-1 flex items-center justify-between text-[10px] text-slate-400 border-t border-slate-800/80 mt-1">
+                        <span>Limite: 2 Mapas PDF</span>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            closeAllDropdowns();
+                            openUpgradeModal('Upgrade Pro');
+                          }}
+                          className="text-amber-400 font-bold hover:underline cursor-pointer"
+                        >
+                          Fazer Upgrade
+                        </button>
+                      </div>
+                    )}
                   </div>
 
                   {/* 1. Botão de Instalar App (PWA) no menu do perfil */}
