@@ -1612,6 +1612,48 @@ export const AdminPanel: React.FC = () => {
                 />
               </div>
 
+              {/* Período de Cobrança: Mensal ou Anual */}
+              <div className="col-span-2">
+                <label className="block text-slate-400 font-bold mb-1">Período de Cobrança *</label>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setPlanModalPeriod('/mês')}
+                    className={`py-2 px-3 rounded-xl border text-xs font-black flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+                      planModalPeriod === '/mês'
+                        ? 'bg-purple-600 border-purple-400 text-white shadow-md'
+                        : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    <Calendar className="w-3.5 h-3.5" />
+                    <span>Mensal (/mês)</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPlanModalPeriod('/ano')}
+                    className={`py-2 px-3 rounded-xl border text-xs font-black flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+                      planModalPeriod === '/ano'
+                        ? 'bg-purple-600 border-purple-400 text-white shadow-md'
+                        : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    <Sparkles className="w-3.5 h-3.5 text-amber-300" />
+                    <span>Anual (/ano)</span>
+                  </button>
+                </div>
+              </div>
+
+              <div className="col-span-2">
+                <label className="block text-slate-400 font-bold mb-1">Selo / Etiqueta de Desconto</label>
+                <input
+                  type="text"
+                  value={planModalBadge}
+                  onChange={(e) => setPlanModalBadge(e.target.value)}
+                  placeholder="Ex: 54% OFF • LANÇAMENTO ou ECONOMIZE 20% NO ANUAL"
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white font-bold"
+                />
+              </div>
+
               <div className="col-span-2">
                 <label className="block text-slate-400 font-bold mb-1">Benefícios (1 por linha)</label>
                 <textarea
