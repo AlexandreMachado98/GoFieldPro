@@ -108,7 +108,7 @@ export const AdminPanel: React.FC = () => {
 
   // Navigation subtabs inside SuperAdmin
   const [adminTab, setAdminTab] = useState<
-    'dashboard' | 'users' | 'subscriptions' | 'plans' | 'coupons' | 'audit_and_settings'
+    'dashboard' | 'users' | 'special_access' | 'subscriptions' | 'plans' | 'coupons' | 'audit_and_settings'
   >('dashboard');
 
   // Users State
@@ -229,6 +229,10 @@ export const AdminPanel: React.FC = () => {
   // Edit Subscription Modal State
     // Special Access Modal State
   const [selectedActiveUserUid, setSelectedActiveUserUid] = useState<string>('');
+  // Dedicated Special Access Tab States
+  const [saTabTargetUid, setSaTabTargetUid] = useState<string>('');
+  const [saTabSearchQuery, setSaTabSearchQuery] = useState<string>('');
+  const [saTabFilter, setSaTabFilter] = useState<'all' | 'lifetime' | 'annual' | 'custom' | 'revoked' | 'expiring'>('all');
   const [specialAccessUser, setSpecialAccessUser] = useState<UserProfile | null>(null);
   const [saEnabled, setSaEnabled] = useState<boolean>(true);
   const [saType, setSaType] = useState<'annual' | 'custom' | 'lifetime'>('annual');
@@ -1509,7 +1513,7 @@ export const AdminPanel: React.FC = () => {
         </div>
 
         {/* 6 Subtabs Navigation Buttons */}
-        <div className="grid grid-cols-2 sm:grid-cols-6 gap-2 pt-2 border-t border-slate-800/80">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-2 pt-2 border-t border-slate-800/80">
           <button
             onClick={() => setAdminTab('dashboard')}
             className={`py-2.5 px-3 rounded-xl font-bold text-xs flex items-center justify-center gap-2 transition-all cursor-pointer ${
@@ -1532,6 +1536,18 @@ export const AdminPanel: React.FC = () => {
           >
             <Users className="w-4 h-4" />
             <span>Clientes ({users.length})</span>
+          </button>
+
+          <button
+            onClick={() => setAdminTab('special_access')}
+            className={`py-2.5 px-3 rounded-xl font-bold text-xs flex items-center justify-center gap-2 transition-all cursor-pointer ${
+              adminTab === 'special_access'
+                ? 'bg-gradient-to-r from-amber-500 to-yellow-500 text-slate-950 font-black shadow-lg shadow-amber-950/50'
+                : 'bg-slate-950/60 hover:bg-slate-800 text-amber-300/80 hover:text-amber-300 border border-amber-500/30'
+            }`}
+          >
+            <KeyRound className="w-4 h-4" />
+            <span>Acesso Especial ({users.filter((u) => hasSpecialAccessActive(u)).length})</span>
           </button>
 
           <button
