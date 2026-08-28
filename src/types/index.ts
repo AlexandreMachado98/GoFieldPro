@@ -24,25 +24,46 @@ export interface UserProfile {
   subscriptionPlan?: SubscriptionPlanType;
   subscriptionStatus?: SubscriptionStatusType;
   subscriptionExpiresAt?: string; // ISO Date String
-  subscriptionValue?: number; // Valor mensal em BRL ex: 290
+  subscriptionValue?: number; // Valor mensal em BRL ex: 44.99
   paymentMethod?: PaymentMethodType;
   billingNotes?: string;
   maxUsersAllowed?: number;
   lastPaymentDate?: string;
+  blockReason?: string;
+  blockType?: 'overdue' | 'security' | 'requested' | 'deactivated';
+  blockedAt?: string;
+  blockedBy?: string;
+}
+
+export interface AdminAuditLog {
+  id: string;
+  adminUid: string;
+  adminEmail: string;
+  adminName: string;
+  action: string;
+  targetType: 'user' | 'plan' | 'coupon' | 'billing' | 'system';
+  targetId: string;
+  targetName?: string;
+  previousValue?: any;
+  newValue?: any;
+  reason: string;
+  createdAt: string;
 }
 
 export interface PromoCoupon {
   id: string;
   code: string;
+  discountType?: 'percent' | 'fixed';
   discountPercent?: number;
   discountFixed?: number;
+  validFrom?: string;
   validUntil: string;
+  applicablePlans?: string[];
   maxUses: number;
   usedCount: number;
   active: boolean;
   notes?: string;
 }
-
 
 export interface UserEntitlements {
   isPro: boolean;
@@ -74,57 +95,24 @@ export interface PlanItemConfig {
 export const DEFAULT_PLANS: PlanItemConfig[] = [
   {
     id: 'pro',
-    name: 'Plano Profissional',
+    name: 'Plano Profissional Completo',
     tag: 'Individual',
-    originalPrice: 149,
-    price: 97,
-    discountBadge: '35% OFF',
+    originalPrice: 97.99,
+    price: 44.99,
+    discountBadge: '54% OFF • LANÇAMENTO',
     billingPeriod: '/mês',
     features: [
       '1 Operador de Campo',
       'Mapas PDF e GPS Ilimitados',
       'Medição de Pilha de Madeira (m³)',
-      'Relatórios Técnicos em PDF com Fotos',
-    ],
-    highlight: false,
-    activeInShowcase: true,
-  },
-  {
-    id: 'equipe',
-    name: 'Plano Equipe',
-    tag: 'Mais Popular',
-    originalPrice: 390,
-    price: 289,
-    discountBadge: 'Economize R$ 101/mês',
-    billingPeriod: '/mês',
-    features: [
-      'Até 5 Técnicos de Campo',
-      'Painel de Gestão da Frota & Odômetro',
-      'Cubagem Florestal e Laudos em Lote',
-      'Backup e Sincronização em Nuvem',
+      'Relatórios Técnicos AM TST em PDF',
+      'Rastreamento e Odômetro em Tempo Real',
+      'Navegação e Mapas 100% Offline'
     ],
     highlight: true,
     activeInShowcase: true,
   },
-  {
-    id: 'florestal',
-    name: 'Florestal & Usinas',
-    tag: 'Corporativo',
-    originalPrice: 950,
-    price: 690,
-    discountBadge: '27% OFF',
-    billingPeriod: '/mês',
-    features: [
-      '15 a 30 Operadores simultâneos',
-      'Logotipo da Empresa nos Laudos PDF',
-      'Contratos e Faturamento PJ',
-      'Treinamento e Suporte VIP Prioritário',
-    ],
-    highlight: false,
-    activeInShowcase: true,
-  },
 ];
-
 
 export interface SystemBillingConfig {
   pixKey: string;
@@ -142,8 +130,12 @@ export interface SystemBillingConfig {
   asaasEnvironment?: 'sandbox' | 'production';
   asaasWebhookSecret?: string;
   asaasWalletId?: string;
+  maintenanceMode?: boolean;
+  maintenanceMessage?: string;
+  allowNewSignups?: boolean;
+  enableAiAssistant?: boolean;
+  enableGpsSimulation?: boolean;
 }
-
 
 export type Language = 'pt' | 'en' | 'es';
 
