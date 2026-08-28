@@ -153,7 +153,7 @@ const AuthenticatedApp: React.FC = () => {
   }, [profile?.status, profile?.uid, profile?.role]);
 
   // If the user's account is pending approval or blocked (and not the owner super_admin)
-  if (profile && profile.role !== 'super_admin' && profile.status === 'blocked') {
+  if (profile && profile.role !== 'super_admin' && (profile.status === 'pending' || profile.status === 'blocked')) {
     return <PendingApprovalScreen />;
   }
 

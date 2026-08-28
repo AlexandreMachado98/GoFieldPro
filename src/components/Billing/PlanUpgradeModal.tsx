@@ -422,12 +422,12 @@ export const PlanUpgradeModal: React.FC = () => {
                         {isGeneratingPix && selectedPlanId === plan.id ? (
                           <>
                             <Loader2 className="w-4 h-4 animate-spin" />
-                            <span>Gerando PIX...</span>
+                            <span>Gerando PIX Asaas...</span>
                           </>
                         ) : (
                           <>
                             <Zap className="w-4 h-4 fill-current text-slate-950" />
-                            <span>Assinar {plan.name} • R$ {plan.price.toFixed(2).replace('.', ',')}</span>
+                            <span>Pagar via PIX • Liberar Acesso Imediato (R$ {plan.price.toFixed(2).replace('.', ',')})</span>
                             <ArrowRight className="w-4 h-4 ml-1" />
                           </>
                         )}
