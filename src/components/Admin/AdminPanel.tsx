@@ -367,9 +367,9 @@ export const AdminPanel: React.FC = () => {
   useEffect(() => {
     if (profile?.role !== 'super_admin') return;
 
-    const loadBillingAndPlansConfig = async () => {
-      try {
-        const configDoc = await getDoc(doc(db, 'system_config', 'billing'));
+    const unsubBilling = onSnapshot(
+      doc(db, 'system_config', 'billing'),
+      (configDoc) => {
         if (configDoc.exists()) {
           const data = configDoc.data() as SystemBillingConfig;
           setBillingConfig((prev) => ({ ...prev, ...data }));
@@ -379,10 +379,9 @@ export const AdminPanel: React.FC = () => {
             localStorage.setItem('gofield_custom_plans', JSON.stringify(data.plans));
           }
         }
-      } catch (e) {
-        console.warn('Could not load billing config from Firestore', e);
-      }
-    };
+      },
+      (err) => console.warn('Real-time billing config listener notice:', err)
+    );
 
     const unsubCoupons = onSnapshot(
       collection(db, 'coupons'),
@@ -402,7 +401,7 @@ export const AdminPanel: React.FC = () => {
       setIsLoadingLogs(false);
     };
 
-    loadBillingAndPlansConfig();
+    
     
     loadLogs();
   }, [profile]);
@@ -456,7 +455,14 @@ export const AdminPanel: React.FC = () => {
     e.preventDefault();
     setSavingBilling(true);
     try {
-      const newConfig = { ...billingConfig, plans };
+      const proPlan = plans.find((p) => p.id === 'pro') || plans.find((p) => p.id !== 'free');
+      const newConfig: SystemBillingConfig = {
+        ...billingConfig,
+        plans,
+        proLaunchPrice: proPlan ? proPlan.price : billingConfig.proLaunchPrice,
+        proOriginalPrice: proPlan ? proPlan.originalPrice : billingConfig.proOriginalPrice,
+        proDiscountBadge: proPlan?.discountBadge || billingConfig.proDiscountBadge,
+      };
       localStorage.setItem('gofield_billing_config', JSON.stringify(newConfig));
       localStorage.setItem('gofield_custom_plans', JSON.stringify(plans));
 
@@ -673,7 +679,15 @@ export const AdminPanel: React.FC = () => {
 
       setPlans(updatedPlans);
       localStorage.setItem('gofield_custom_plans', JSON.stringify(updatedPlans));
-      const updatedConfig = { ...billingConfig, plans: updatedPlans };
+      
+      const proPlan = updatedPlans.find((p) => p.id === 'pro') || updatedPlans.find((p) => p.id !== 'free');
+      const updatedConfig: SystemBillingConfig = {
+        ...billingConfig,
+        plans: updatedPlans,
+        proLaunchPrice: proPlan ? proPlan.price : billingConfig.proLaunchPrice,
+        proOriginalPrice: proPlan ? proPlan.originalPrice : billingConfig.proOriginalPrice,
+        proDiscountBadge: proPlan?.discountBadge || billingConfig.proDiscountBadge,
+      };
       setBillingConfig(updatedConfig);
       localStorage.setItem('gofield_billing_config', JSON.stringify(updatedConfig));
 

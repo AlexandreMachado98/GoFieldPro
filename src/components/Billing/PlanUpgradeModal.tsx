@@ -1,3 +1,4 @@
+import { getPlanEffectivePrice, formatCurrencyBRL } from '../../utils/commercialVisibility';
 import React, { useState, useEffect, useMemo } from 'react';
 import {
   X,
@@ -195,7 +196,8 @@ export const PlanUpgradeModal: React.FC = () => {
       );
 
       if (isAsaasConfigured && profile) {
-        const finalPrice = calculateFinalPrice(planToBuy.price);
+        const effectivePrice = getPlanEffectivePrice(planToBuy).price;
+        const finalPrice = calculateFinalPrice(effectivePrice);
         const asaasResult = await createAsaasPixPayment(profile, finalPrice, billingConfig);
 
         if (asaasResult && asaasResult.pixPayload) {
@@ -214,7 +216,7 @@ export const PlanUpgradeModal: React.FC = () => {
       const fallbackPayload = generatePixEmvPayload({
         pixKey,
         beneficiaryName: beneficiary,
-        amount: calculateFinalPrice(planToBuy.price),
+        amount: calculateFinalPrice(getPlanEffectivePrice(planToBuy).price),
         cityName: 'BRASILIA',
               });
 
@@ -410,39 +412,45 @@ export const PlanUpgradeModal: React.FC = () => {
                         <h3 className="font-extrabold text-white text-base sm:text-lg">{plan.name}</h3>
 
                         {/* Pricing Box */}
-                        <div className="my-2.5 bg-slate-950/70 p-2.5 rounded-xl border border-slate-800/80">
-                          {appliedCoupon && !isFree ? (
-                            <div>
-                              <div className="text-[10px] text-slate-400 line-through font-mono">
-                                R$ {plan.price.toFixed(2).replace('.', ',')}
-                              </div>
-                              <div className="flex items-baseline gap-1">
-                                <span className="text-xl sm:text-2xl font-black font-mono text-emerald-400">
-                                  R$ {calculateFinalPrice(plan.price).toFixed(2).replace('.', ',')}
-                                </span>
-                                <span className="text-[10px] text-slate-400 font-medium">
-                                  {plan.billingPeriod || '/mês'}
-                                </span>
-                              </div>
-                            </div>
-                          ) : (
-                            <div>
-                              {plan.originalPrice > plan.price && (
-                                <div className="text-[10px] text-slate-400 line-through font-mono">
-                                  R$ {plan.originalPrice.toFixed(2)}
+                        {(() => {
+                          const eff = getPlanEffectivePrice(plan);
+                          const finalVal = calculateFinalPrice(eff.price);
+                          return (
+                            <div className="my-2.5 bg-slate-950/70 p-2.5 rounded-xl border border-slate-800/80">
+                              {appliedCoupon && !isFree ? (
+                                <div>
+                                  <div className="text-[10px] text-slate-400 line-through font-mono">
+                                    {formatCurrencyBRL(eff.price)}
+                                  </div>
+                                  <div className="flex items-baseline gap-1">
+                                    <span className="text-xl sm:text-2xl font-black font-mono text-emerald-400">
+                                      {formatCurrencyBRL(finalVal)}
+                                    </span>
+                                    <span className="text-[10px] text-slate-400 font-medium">
+                                      {plan.billingPeriod || '/mês'}
+                                    </span>
+                                  </div>
+                                </div>
+                              ) : (
+                                <div>
+                                  {eff.originalPrice > eff.price && (
+                                    <div className="text-[10px] text-slate-400 line-through font-mono">
+                                      {formatCurrencyBRL(eff.originalPrice)}
+                                    </div>
+                                  )}
+                                  <div className="flex items-baseline gap-1">
+                                    <span className={`text-xl sm:text-2xl font-black font-mono ${isFree ? 'text-sky-400' : 'text-emerald-400'}`}>
+                                      {formatCurrencyBRL(eff.price)}
+                                    </span>
+                                    <span className="text-[10px] text-slate-400 font-medium">
+                                      {plan.billingPeriod || (isFree ? '/sempre' : '/mês')}
+                                    </span>
+                                  </div>
                                 </div>
                               )}
-                              <div className="flex items-baseline gap-1">
-                                <span className={`text-xl sm:text-2xl font-black font-mono ${isFree ? 'text-sky-400' : 'text-emerald-400'}`}>
-                                  R$ {plan.price.toFixed(2).replace('.', ',')}
-                                </span>
-                                <span className="text-[10px] text-slate-400 font-medium">
-                                  {plan.billingPeriod || (isFree ? '/sempre' : '/mês')}
-                                </span>
-                              </div>
                             </div>
-                          )}
-                        </div>
+                          );
+                        })()}
 
                         {/* Features List */}
                         <ul className="space-y-1.5 text-xs text-slate-300 mb-4">
@@ -526,7 +534,7 @@ export const PlanUpgradeModal: React.FC = () => {
               <div>
                 <h3 className="text-xl font-extrabold text-white">Pagamento Instantâneo via PIX</h3>
                 <p className="text-xs text-slate-400 mt-1">
-                  Plano: <strong className="text-white">{currentPaidPlan.name}</strong> • Valor: <strong className="text-emerald-400 font-mono">R$ {currentPaidPlan.price.toFixed(2).replace('.', ',')}</strong>
+                  Plano: <strong className="text-white">{currentPaidPlan.name}</strong> • Valor: <strong className="text-emerald-400 font-mono">{formatCurrencyBRL(calculateFinalPrice(getPlanEffectivePrice(currentPaidPlan).price))}</strong>
                 </p>
               </div>
 
