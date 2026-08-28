@@ -30,65 +30,7 @@ import {
   generatePixEmvPayload,
   getPixQrCodeImageUrl,
 } from '../../utils/asaasGateway';
-import { PlanItemConfig } from '../../types';
-
-const FALLBACK_PLANS: PlanItemConfig[] = [
-  {
-    id: 'pro',
-    name: 'Plano Profissional',
-    tag: 'Individual',
-    originalPrice: 97.99,
-    price: 44.99,
-    discountBadge: '54% OFF • LANÇAMENTO',
-    billingPeriod: '/mês',
-    features: [
-      'Mapas PDF e GPS Ilimitados',
-      'Medição de Pilha de Madeira (m³)',
-      'Mapas Satélite Offline',
-      'Exportação KML, KMZ & GPX',
-      'Laudos Periciais em PDF com Fotos',
-      'Rondas & Odômetro Ilimitados',
-    ],
-    highlight: true,
-    activeInShowcase: true,
-  },
-  {
-    id: 'equipe',
-    name: 'Plano Equipe Topografia',
-    tag: 'Mais Popular',
-    originalPrice: 390.00,
-    price: 289.00,
-    discountBadge: 'Economize R$ 101/mês',
-    billingPeriod: '/mês',
-    features: [
-      'Até 5 Técnicos de Campo',
-      'Painel de Gestão da Frota & Odômetro',
-      'Cubagem Florestal e Laudos em Lote',
-      'Backup e Sincronização em Nuvem',
-      'Exportação Ilimitada em Alta Resolução',
-    ],
-    highlight: false,
-    activeInShowcase: true,
-  },
-  {
-    id: 'florestal',
-    name: 'Florestal & Usinas',
-    tag: 'Corporativo',
-    originalPrice: 950.00,
-    price: 690.00,
-    discountBadge: '27% OFF',
-    billingPeriod: '/mês',
-    features: [
-      '15 a 30 Operadores simultâneos',
-      'Logotipo da Empresa nos Laudos PDF',
-      'Contratos e Faturamento PJ',
-      'Treinamento e Suporte VIP Prioritário',
-      'Backup Dedicado e SLA Garantido',
-    ],
-    highlight: false,
-    activeInShowcase: true,
-  },
-];
+import { PlanItemConfig, DEFAULT_PLANS } from '../../types';
 
 export const PlanUpgradeModal: React.FC = () => {
   const {
@@ -114,43 +56,13 @@ export const PlanUpgradeModal: React.FC = () => {
 
   // Active showcase plans strictly filtered by Admin configuration
   const availablePlans = useMemo(() => {
-    let rawPlans: PlanItemConfig[] = [];
-
-    if (billingConfig?.plans && Array.isArray(billingConfig.plans) && billingConfig.plans.length > 0) {
-      rawPlans = billingConfig.plans;
-    } else {
-      try {
-        const savedBilling = localStorage.getItem('gofield_billing_config');
-        if (savedBilling) {
-          const parsedBilling = JSON.parse(savedBilling);
-          if (parsedBilling.plans && Array.isArray(parsedBilling.plans) && parsedBilling.plans.length > 0) {
-            rawPlans = parsedBilling.plans;
-          }
-        }
-        if (rawPlans.length === 0) {
-          const local = localStorage.getItem('gofield_custom_plans');
-          if (local) {
-            const parsed = JSON.parse(local);
-            if (Array.isArray(parsed) && parsed.length > 0) rawPlans = parsed;
-          }
-        }
-      } catch {}
-    }
-
-    if (rawPlans.length === 0) {
-      rawPlans = FALLBACK_PLANS;
-    }
+    const rawPlans = (billingConfig?.plans && Array.isArray(billingConfig.plans) && billingConfig.plans.length > 0)
+      ? billingConfig.plans
+      : DEFAULT_PLANS;
 
     // Filter STRICTLY by activeInShowcase !== false
-    const filtered = rawPlans.filter((p) => p.activeInShowcase !== false);
-    
-    // If the admin hid everything except 1 plan, return EXACTLY that 1 plan!
-    if (filtered.length > 0) {
-      return filtered;
-    }
-
-    // Safety fallback: only return the primary plan if all were hidden
-    return [rawPlans[0] || FALLBACK_PLANS[0]];
+    const filtered = rawPlans.filter((p) => p.activeInShowcase !== false && (p as any).activeInShowcase !== 'false');
+    return filtered.length > 0 ? filtered : [rawPlans[0]];
   }, [billingConfig, billingConfig?.plans]);
 
   // Selected plan state
@@ -170,7 +82,7 @@ export const PlanUpgradeModal: React.FC = () => {
   }, [availablePlans, selectedPlanId]);
 
   const currentPlan = useMemo(() => {
-    return availablePlans.find((p) => p.id === selectedPlanId) || availablePlans[0] || FALLBACK_PLANS[0];
+    return availablePlans.find((p) => p.id === selectedPlanId) || availablePlans[0] || DEFAULT_PLANS[0];
   }, [availablePlans, selectedPlanId]);
 
   const originalPrice = currentPlan.originalPrice || (currentPlan.price * 1.5);

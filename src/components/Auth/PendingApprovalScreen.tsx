@@ -28,7 +28,7 @@ import {
 } from 'lucide-react';
 import { doc, getDoc, updateDoc, collection, getDocs, onSnapshot } from 'firebase/firestore';
 import { db } from '../../lib/firebase';
-import { SystemBillingConfig, PlanItemConfig, PromoCoupon } from '../../types';
+import { SystemBillingConfig, PlanItemConfig, PromoCoupon, DEFAULT_PLANS } from '../../types';
 import { ApprovalCelebrationScreen } from './ApprovalCelebrationScreen';
 import { LegalPoliciesModal } from '../Legal/LegalPoliciesModal';
 import {
@@ -37,64 +37,6 @@ import {
   generatePixEmvPayload,
   getPixQrCodeImageUrl,
 } from '../../utils/asaasGateway';
-
-const FALLBACK_PLANS: PlanItemConfig[] = [
-  {
-    id: 'pro',
-    name: 'Plano Profissional',
-    tag: 'Individual',
-    originalPrice: 97.99,
-    price: 44.99,
-    discountBadge: '54% OFF • LANÇAMENTO',
-    billingPeriod: '/mês',
-    features: [
-      'Mapas PDF e GPS Ilimitados',
-      'Medição de Pilha de Madeira (m³)',
-      'Mapas Satélite Offline',
-      'Exportação KML, KMZ & GPX',
-      'Laudos Periciais em PDF com Fotos',
-      'Rondas & Odômetro Ilimitados',
-    ],
-    highlight: false,
-    activeInShowcase: true,
-  },
-  {
-    id: 'equipe',
-    name: 'Plano Equipe Topografia',
-    tag: 'Mais Popular',
-    originalPrice: 390.0,
-    price: 289.0,
-    discountBadge: 'Economize R$ 101/mês',
-    billingPeriod: '/mês',
-    features: [
-      'Até 5 Técnicos de Campo',
-      'Painel de Gestão da Frota & Odômetro',
-      'Cubagem Florestal e Laudos em Lote',
-      'Backup e Sincronização em Nuvem',
-      'Exportação Ilimitada em Alta Resolução',
-    ],
-    highlight: true,
-    activeInShowcase: true,
-  },
-  {
-    id: 'florestal',
-    name: 'Florestal & Usinas',
-    tag: 'Corporativo',
-    originalPrice: 950.0,
-    price: 690.0,
-    discountBadge: '27% OFF',
-    billingPeriod: '/mês',
-    features: [
-      '15 a 30 Operadores simultâneos',
-      'Logotipo da Empresa nos Laudos PDF',
-      'Contratos e Faturamento PJ',
-      'Treinamento e Suporte VIP Prioritário',
-      'Backup Dedicado e SLA Garantido',
-    ],
-    highlight: false,
-    activeInShowcase: true,
-  },
-];
 
 export const PendingApprovalScreen: React.FC = () => {
   const { profile, logout, refreshProfile } = useAuth();
@@ -118,15 +60,15 @@ export const PendingApprovalScreen: React.FC = () => {
         }
       }
       const saved = localStorage.getItem('gofield_custom_plans');
-      return saved ? JSON.parse(saved) : FALLBACK_PLANS;
+      return saved ? JSON.parse(saved) : DEFAULT_PLANS;
     } catch {
-      return FALLBACK_PLANS;
+      return DEFAULT_PLANS;
     }
   });
 
   const visiblePlans = useMemo(() => {
-    const active = plans.filter((p) => p.activeInShowcase !== false);
-    return active.length > 0 ? active : [plans[0] || FALLBACK_PLANS[0]];
+    const active = plans.filter((p) => p.activeInShowcase !== false && (p as any).activeInShowcase !== 'false');
+    return active.length > 0 ? active : [plans[0] || DEFAULT_PLANS[0]];
   }, [plans]);
 
   const [selectedPlanId, setSelectedPlanId] = useState<string>(() => {
@@ -275,7 +217,7 @@ export const PendingApprovalScreen: React.FC = () => {
     setCouponError('');
   };
 
-  const selectedPlan = visiblePlans.find((p) => p.id === selectedPlanId) || visiblePlans[0] || FALLBACK_PLANS[0];
+  const selectedPlan = visiblePlans.find((p) => p.id === selectedPlanId) || visiblePlans[0] || DEFAULT_PLANS[0];
 
   const basePrice = selectedPlan.price;
   let finalPrice = basePrice;

@@ -26,6 +26,7 @@ import {
   FireIncident,
   AppSettings,
   SystemBillingConfig,
+  DEFAULT_PLANS,
 } from '../types';
 import {
   initialProjects,
@@ -243,7 +244,11 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     try {
       const saved = localStorage.getItem('gofield_billing_config');
       if (saved) {
-        return JSON.parse(saved);
+        const parsed = JSON.parse(saved);
+        if (!parsed.plans || !Array.isArray(parsed.plans) || parsed.plans.length === 0) {
+          parsed.plans = DEFAULT_PLANS;
+        }
+        return parsed;
       }
     } catch {}
     return {
@@ -257,6 +262,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       proOriginalPrice: 97.99,
       proLaunchPrice: 44.99,
       proDiscountBadge: '54% OFF • LANÇAMENTO',
+      plans: DEFAULT_PLANS,
     };
   });
 

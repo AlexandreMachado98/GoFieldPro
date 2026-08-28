@@ -57,6 +57,60 @@ export interface PlanItemConfig {
   description?: string;
 }
 
+export const DEFAULT_PLANS: PlanItemConfig[] = [
+  {
+    id: 'pro',
+    name: 'Plano Profissional',
+    tag: 'Individual',
+    originalPrice: 149,
+    price: 97,
+    discountBadge: '35% OFF',
+    billingPeriod: '/mês',
+    features: [
+      '1 Operador de Campo',
+      'Mapas PDF e GPS Ilimitados',
+      'Medição de Pilha de Madeira (m³)',
+      'Relatórios Técnicos em PDF com Fotos',
+    ],
+    highlight: false,
+    activeInShowcase: true,
+  },
+  {
+    id: 'equipe',
+    name: 'Plano Equipe',
+    tag: 'Mais Popular',
+    originalPrice: 390,
+    price: 289,
+    discountBadge: 'Economize R$ 101/mês',
+    billingPeriod: '/mês',
+    features: [
+      'Até 5 Técnicos de Campo',
+      'Painel de Gestão da Frota & Odômetro',
+      'Cubagem Florestal e Laudos em Lote',
+      'Backup e Sincronização em Nuvem',
+    ],
+    highlight: true,
+    activeInShowcase: true,
+  },
+  {
+    id: 'florestal',
+    name: 'Florestal & Usinas',
+    tag: 'Corporativo',
+    originalPrice: 950,
+    price: 690,
+    discountBadge: '27% OFF',
+    billingPeriod: '/mês',
+    features: [
+      '15 a 30 Operadores simultâneos',
+      'Logotipo da Empresa nos Laudos PDF',
+      'Contratos e Faturamento PJ',
+      'Treinamento e Suporte VIP Prioritário',
+    ],
+    highlight: false,
+    activeInShowcase: true,
+  },
+];
+
 
 export interface SystemBillingConfig {
   pixKey: string;
