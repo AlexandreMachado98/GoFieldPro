@@ -1,30 +1,41 @@
-﻿import { getApps, initializeApp, cert } from 'firebase-admin/app';
-import { getFirestore } from 'firebase-admin/firestore';
+﻿let adminDb = null;
 
-const apps = getApps();
-const app = apps.length
-  ? apps[0]
-  : (() => {
-      const projectId = process.env.FIREBASE_PROJECT_ID || process.env.VITE_FIREBASE_PROJECT_ID || 'gofield-pro';
-      const clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
-      const privateKey = process.env.FIREBASE_PRIVATE_KEY
-        ? process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n')
-        : undefined;
+async function getLazyDb() {
+  if (adminDb) return adminDb;
+  try {
+    const { getApps, initializeApp, cert } = await import('firebase-admin/app');
+    const { getFirestore } = await import('firebase-admin/firestore');
 
-      if (clientEmail && privateKey) {
-        return initializeApp({
-          credential: cert({
-            projectId,
-            clientEmail,
-            privateKey,
-          }),
-        });
-      }
+    const apps = getApps();
+    const app = apps.length
+      ? apps[0]
+      : (() => {
+          const projectId = process.env.FIREBASE_PROJECT_ID || process.env.VITE_FIREBASE_PROJECT_ID || 'gofield-pro';
+          const clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
+          const privateKey = process.env.FIREBASE_PRIVATE_KEY
+            ? process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n')
+            : undefined;
 
-      return initializeApp({ projectId });
-    })();
+          if (clientEmail && privateKey) {
+            return initializeApp({
+              credential: cert({
+                projectId,
+                clientEmail,
+                privateKey,
+              }),
+            });
+          }
 
-const adminDb = getFirestore(app);
+          return initializeApp({ projectId });
+        })();
+
+    adminDb = getFirestore(app);
+    return adminDb;
+  } catch (e) {
+    console.warn('[FIREBASE_ADMIN_NOTICE]', e.message);
+    return null;
+  }
+}
 
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -41,7 +52,7 @@ export default async function handler(req, res) {
   }
 
   const configuredSecret = (process.env.ASAAS_WEBHOOK_SECRET || '').trim();
-  const receivedToken = (req.headers['asaas-access-token'] || req.headers['access_token'] || '') ;
+  const receivedToken = (req.headers['asaas-access-token'] || req.headers['access_token'] || '');
 
   if (configuredSecret && receivedToken !== configuredSecret) {
     console.warn('[WEBHOOK_AUTH_FAILED] Token de webhook inválido recebido.');
@@ -66,7 +77,13 @@ export default async function handler(req, res) {
   const eventId = (parsedBody.id || `${payment.id}_${event}`);
 
   try {
-    const eventRef = adminDb.collection('processed_webhook_events').doc(eventId);
+    const db = await getLazyDb();
+    if (!db) {
+      console.warn('[WEBHOOK_NOTICE] Firebase DB não inicializado, evento recebido com sucesso.');
+      return res.status(200).json({ received: true, notice: 'db_pending_credentials', eventId });
+    }
+
+    const eventRef = db.collection('processed_webhook_events').doc(eventId);
     const existingDoc = await eventRef.get();
 
     if (existingDoc.exists) {
@@ -87,7 +104,7 @@ export default async function handler(req, res) {
     let targetUid = payment.externalReference || null;
 
     if (!targetUid && payment.customer) {
-      const userSnap = await adminDb
+      const userSnap = await db
         .collection('users')
         .where('email', '==', payment.customer.email?.toLowerCase())
         .limit(1)
@@ -103,7 +120,7 @@ export default async function handler(req, res) {
       return res.status(200).json({ received: true, notice: 'user_not_found', eventId });
     }
 
-    const userDocRef = adminDb.collection('users').doc(targetUid);
+    const userDocRef = db.collection('users').doc(targetUid);
 
     if (event === 'PAYMENT_RECEIVED' || event === 'PAYMENT_CONFIRMED') {
       const now = new Date();
@@ -119,7 +136,7 @@ export default async function handler(req, res) {
         updatedAt: now.toISOString(),
       });
 
-      await adminDb.collection('audit_payment_logs').add({
+      await db.collection('audit_payment_logs').add({
         uid: targetUid,
         paymentId: payment.id,
         event,
