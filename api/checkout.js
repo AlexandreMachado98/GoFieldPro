@@ -1,5 +1,5 @@
 ﻿// Autoritative Plans & Prices (enforced server-side)
-const AUTHORITATIVE_PLANS: Record<string, { name: string; price: number; durationDays: number }> = {
+const AUTHORITATIVE_PLANS = {
   pro_anual: {
     name: 'GoField Pro — Plano Anual',
     price: 99.98,
@@ -12,24 +12,17 @@ const AUTHORITATIVE_PLANS: Record<string, { name: string; price: number; duratio
   },
 };
 
-function getAsaasBaseUrl(): string {
+function getAsaasBaseUrl() {
   const env = process.env.ASAAS_ENVIRONMENT || 'production';
   return env === 'sandbox'
     ? 'https://sandbox.asaas.com/api/v3'
     : 'https://api.asaas.com/v3';
 }
 
-async function asaasServerRequest(
-  endpoint: string,
-  options: {
-    method?: string;
-    body?: any;
-    headers?: Record<string, string>;
-  } = {}
-): Promise<Response> {
-  const apiKey = process.env.ASAAS_API_KEY?.trim();
+async function asaasServerRequest(endpoint, options = {}) {
+  const apiKey = (process.env.ASAAS_API_KEY || '').trim();
   if (!apiKey) {
-    throw new Error('A chave de API do Asaas (ASAAS_API_KEY) ainda não foi cadastrada na Vercel.');
+    throw new Error('A chave de API do Asaas (ASAAS_API_KEY) ainda não foi cadastrada nas Environment Variables da Vercel.');
   }
 
   const baseUrl = getAsaasBaseUrl();
@@ -49,8 +42,8 @@ async function asaasServerRequest(
   return res;
 }
 
-export default async function handler(req: any, res: any) {
-  // CORS Headers
+export default async function handler(req, res) {
+  // Always set CORS headers
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, asaas-access-token');
@@ -76,13 +69,11 @@ export default async function handler(req: any, res: any) {
 
     const { uid, email, name, cpfCnpj, phone, planId = 'pro_anual' } = parsedBody || {};
 
-    if (!uid || typeof uid !== 'string' || uid.length < 3) {
-      return res.status(400).json({ error: 'INVALID_INPUT', message: 'E-mail ou UID do usuário é obrigatório.' });
+    if (!email || typeof email !== 'string' || !email.includes('@')) {
+      return res.status(400).json({ error: 'INVALID_INPUT', message: 'E-mail válido é obrigatório para vincular o plano.' });
     }
 
-    if (!email || typeof email !== 'string' || !email.includes('@')) {
-      return res.status(400).json({ error: 'INVALID_INPUT', message: 'E-mail válido é obrigatório.' });
-    }
+    const userUid = (uid || email).trim();
 
     const officialPlan = AUTHORITATIVE_PLANS[planId];
     if (!officialPlan) {
@@ -114,7 +105,7 @@ export default async function handler(req: any, res: any) {
           email: cleanEmail,
           cpfCnpj: cpfCnpj ? String(cpfCnpj).replace(/\D/g, '') : undefined,
           mobilePhone: phone ? String(phone).replace(/\D/g, '') : undefined,
-          externalReference: uid,
+          externalReference: userUid,
           notificationDisabled: false,
         },
       });
@@ -142,7 +133,7 @@ export default async function handler(req: any, res: any) {
         value: officialPlan.price,
         dueDate: dueDateStr,
         description: `Assinatura ${officialPlan.name} • AM TST`,
-        externalReference: uid,
+        externalReference: userUid,
         postalService: false,
       },
     });
@@ -186,11 +177,11 @@ export default async function handler(req: any, res: any) {
         expirationDate,
       },
     });
-  } catch (err: any) {
+  } catch (err) {
     console.error('[API_CHECKOUT_ERROR]', err);
     return res.status(500).json({
       error: 'SERVER_ERROR',
-      message: err.message || 'Falha ao processar checkout.',
+      message: err.message || 'Falha ao processar checkout no Asaas.',
     });
   }
 }
