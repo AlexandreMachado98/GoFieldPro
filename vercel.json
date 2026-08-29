@@ -2,15 +2,7 @@
   "version": 2,
   "rewrites": [
     {
-      "source": "/api/asaas-proxy/(.*)",
-      "destination": "https://api.asaas.com/v3/$1"
-    },
-    {
-      "source": "/api/asaas-sandbox-proxy/(.*)",
-      "destination": "https://sandbox.asaas.com/api/v3/$1"
-    },
-    {
-      "source": "/((?!assets/|icon|sw\\.js|version\\.json|manifest\\.json|.*\\..*).*)",
+      "source": "/((?!api/|assets/|icon|sw\\.js|version\\.json|manifest\\.json|.*\\..*).*)",
       "destination": "/index.html"
     }
   ],

@@ -31,7 +31,15 @@ export default async function handler(req: any, res: any) {
   }
 
   try {
-    const { uid, email, name, cpfCnpj, phone, planId = 'pro_anual' } = req.body || {};
+    let parsedBody = req.body;
+    if (typeof parsedBody === 'string') {
+      try {
+        parsedBody = JSON.parse(parsedBody);
+      } catch (e) {
+        parsedBody = {};
+      }
+    }
+    const { uid, email, name, cpfCnpj, phone, planId = 'pro_anual' } = parsedBody || {};
 
     // 2. Strict Input Validation
     if (!uid || typeof uid !== 'string' || uid.length < 5) {

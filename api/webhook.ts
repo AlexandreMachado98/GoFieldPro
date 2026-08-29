@@ -24,7 +24,16 @@ export default async function handler(req: any, res: any) {
     return res.status(401).json({ error: 'UNAUTHORIZED: Token de webhook inválido.' });
   }
 
-  const { event, payment } = req.body || {};
+  let parsedBody = req.body;
+  if (typeof parsedBody === 'string') {
+    try {
+      parsedBody = JSON.parse(parsedBody);
+    } catch (e) {
+      parsedBody = {};
+    }
+  }
+
+  const { event, payment } = parsedBody || {};
 
   if (!event || !payment) {
     return res.status(400).json({ error: 'INVALID_PAYLOAD: Evento ou dados do pagamento ausentes.' });
