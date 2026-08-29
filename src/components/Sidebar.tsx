@@ -234,10 +234,10 @@ export const Sidebar: React.FC = () => {
                   {!isCollapsed && (
                     <div className="flex items-center justify-between gap-2 w-full truncate">
                       <span className="truncate">{tab.label}</span>
-                      {(tab as any).isPremium && !isSuperAdmin && (
+                      {(tab as any).isPremium && !hasFeatureAccess(tab.id) && (
                         <span className="text-[9px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded-md bg-amber-500/20 text-amber-300 border border-amber-500/40 flex items-center gap-1 shadow-sm shrink-0">
                           <Lock className="w-2.5 h-2.5 text-amber-400" />
-                          PREMIUM
+                          PRO
                         </span>
                       )}
                     </div>
@@ -263,8 +263,8 @@ export const Sidebar: React.FC = () => {
             <button
               onClick={() => {
                 setIsMobileMenuOpen(false);
-                if (!isSuperAdmin) {
-                  openUpgradeModal('Cubagem Florestal (m³)');
+                if (!hasFeatureAccess('woodpile_cubage')) {
+                  openUpgradeModal('Cubagem Florestal de Madeira (m³)');
                   return;
                 }
                 setIsWoodpileModalOpen(true);
@@ -272,7 +272,7 @@ export const Sidebar: React.FC = () => {
               title={isSidebarCollapsed && !isMobileMenuOpen ? 'Cubagem Florestal (m³)' : undefined}
               className={`w-full flex items-center ${
                 isSidebarCollapsed && !isMobileMenuOpen ? 'justify-center p-2.5' : 'justify-between px-3.5 py-2.5'
-              } rounded-xl text-xs font-extrabold text-emerald-400 bg-emerald-950/40 border border-emerald-500/30 hover:bg-emerald-900/40 transition-all active:scale-98`}
+              } rounded-xl text-xs font-extrabold text-emerald-400 bg-emerald-950/40 border border-emerald-500/30 hover:bg-emerald-900/40 transition-all active:scale-98 cursor-pointer`}
             >
               <div className="flex items-center gap-3">
                 <Trees className="w-5 h-5 text-emerald-400 shrink-0" />
@@ -280,35 +280,12 @@ export const Sidebar: React.FC = () => {
               </div>
               {(!isSidebarCollapsed || isMobileMenuOpen) && (
                 <span className={`text-[9px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded-md border flex items-center gap-1 shadow-sm ${
-                  !isSuperAdmin 
+                  !hasFeatureAccess('woodpile_cubage')
                     ? 'bg-amber-500/20 text-amber-300 border-amber-500/40' 
                     : 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
                 }`}>
-                  {!isSuperAdmin && <Lock className="w-2.5 h-2.5 text-amber-400" />}
-                  {!isSuperAdmin ? 'PREMIUM' : 'm³'}
-                </span>
-              )}
-            </button>
-
-            {/* Planos & Assinatura Pro */}
-            <button
-              onClick={() => {
-                setIsMobileMenuOpen(false);
-                openUpgradeModal('Planos de Assinatura');
-              }}
-              title={isSidebarCollapsed && !isMobileMenuOpen ? 'Planos & Assinatura Pro' : undefined}
-              className={`w-full flex items-center ${
-                isSidebarCollapsed && !isMobileMenuOpen ? 'justify-center p-2.5' : 'justify-between px-3.5 py-2.5'
-              } rounded-xl text-xs font-black text-amber-300 bg-gradient-to-r from-amber-500/20 via-sky-500/20 to-amber-500/20 border border-amber-500/40 hover:from-amber-500/30 hover:to-sky-500/30 transition-all active:scale-98 cursor-pointer shadow-sm`}
-            >
-              <div className="flex items-center gap-3">
-                <Crown className="w-5 h-5 text-amber-400 shrink-0" />
-                {(!isSidebarCollapsed || isMobileMenuOpen) && <span>Planos & Assinaturas</span>}
-              </div>
-              {(!isSidebarCollapsed || isMobileMenuOpen) && (
-                <span className="text-[9px] uppercase font-black px-1.5 py-0.5 rounded-md bg-amber-500 text-slate-950 flex items-center gap-0.5 shadow">
-                  <Zap className="w-2.5 h-2.5 fill-current" />
-                  PRO
+                  {!hasFeatureAccess('woodpile_cubage') && <Lock className="w-2.5 h-2.5 text-amber-400" />}
+                  {!hasFeatureAccess('woodpile_cubage') ? 'PRO' : 'm³'}
                 </span>
               )}
             </button>
