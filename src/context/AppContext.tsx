@@ -5,6 +5,7 @@ import React, { createContext, useContext, useState, useEffect, useRef, ReactNod
 import { parseOdometerKm } from '../utils/geoUtils';
 import { saveAppState, loadAppState } from '../utils/stateStorage';
 import { getUserItem, setUserItem, removeUserItem } from '../utils/userStorage';
+import { locationTrackingService } from '../services/LocationTrackingService';
 import {
   ProjectFolder,
   LayerItem,
@@ -892,211 +893,53 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     requestCurrentLocation();
   }, [notifyInfo, requestCurrentLocation, currentUserId]);
 
-  const isRecordingTrackRef = useRef(isRecordingTrack);
-  isRecordingTrackRef.current = isRecordingTrack;
-
+  // Centralized LocationTrackingService Lifecycle (Single Active Watcher + Kinematic Filtering)
   useEffect(() => {
-    let watchId: number | null = null;
-    let simInterval: number | null = null;
-
-    const startGpsWatch = (highAccuracy: boolean) => {
-      if (!navigator.geolocation || isGpsSimulated) return null;
-      return navigator.geolocation.watchPosition(
-        (pos) => {
-          // If the user locked their position manually, do NOT overwrite it!
-          if (isManualGpsLockedRef.current) return;
-
-          const newLat = pos.coords.latitude;
-          const newLng = pos.coords.longitude;
-          const newAlt = pos.coords.altitude || 1250;
-          const newAcc = +(pos.coords.accuracy || 2.0).toFixed(1);
-
-          // Thermal & Battery Optimization: avoid state thrashing on sub-meter jitter when stationary
-          setCurrentGps((prev) => {
-            const dist = calculateDistanceMeters(prev.lat, prev.lng, newLat, newLng);
-            const timeDiff = Date.now() - prev.timestamp;
-            if (dist < 0.4 && Math.abs((prev.accuracy || 0) - newAcc) < 0.8 && timeDiff < 3000) {
-              return prev;
-            }
-            return {
-              lat: newLat,
-              lng: newLng,
-              altitude: newAlt,
-              accuracy: newAcc,
-              speed: pos.coords.speed || prev.speed || 0,
-              timestamp: Date.now(),
-            };
-          });
-          setHasGpsLock(true);
-        },
-        (err) => {
-          console.warn(`Geolocation watcher warning (highAccuracy=${highAccuracy}):`, err);
-          if (highAccuracy && watchId !== null && !isManualGpsLockedRef.current) {
-            navigator.geolocation.clearWatch(watchId);
-            watchId = startGpsWatch(false);
-          }
-        },
-        { 
-          enableHighAccuracy: highAccuracy, 
-          timeout: 15000, 
-          maximumAge: highAccuracy ? 2000 : 10000 
-        }
-      );
-    };
-
-    const stopGpsWatch = () => {
-      if (watchId !== null && navigator.geolocation) {
-        navigator.geolocation.clearWatch(watchId);
-        watchId = null;
-      }
-    };
-
-    const startSimulation = () => {
-      if (simInterval !== null) clearInterval(simInterval);
-      simInterval = window.setInterval(() => {
-        if (isManualGpsLockedRef.current || document.visibilityState === 'hidden') return;
-
-        setCurrentGps((prev) => {
-          const deltaLat = (Math.random() - 0.5) * 0.00015;
-          const deltaLng = (Math.random() - 0.5) * 0.00015;
-          return {
-            lat: prev.lat + deltaLat,
-            lng: prev.lng + deltaLng,
-            altitude: Math.round((prev.altitude || 1280) + (Math.random() - 0.5) * 2),
-            accuracy: +(1.2 + Math.random() * 0.8).toFixed(1),
-            timestamp: Date.now(),
-          };
-        });
-      }, 3000);
-    };
-
-    const stopSimulation = () => {
-      if (simInterval !== null) {
-        clearInterval(simInterval);
-        simInterval = null;
-      }
-    };
-
-    // Thermal & Battery Saver: Pause GPS when app is minimized/screen is off (unless recording track)
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === 'hidden') {
-        if (!isRecordingTrackRef.current) {
-          stopGpsWatch();
-          stopSimulation();
-        }
-      } else if (document.visibilityState === 'visible') {
-        if (!isGpsSimulated) {
-          if (!isManualGpsLockedRef.current) {
-            requestCurrentLocation();
-          }
-          if (watchId === null) {
-            watchId = startGpsWatch(true);
-          }
-        } else {
-          startSimulation();
-        }
-      }
-    };
-
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-
-    if (!isGpsSimulated && navigator.geolocation) {
-      if (!isManualGpsLockedRef.current) {
-        requestCurrentLocation();
-      }
-      watchId = startGpsWatch(true);
-    } else if (isGpsSimulated) {
-      startSimulation();
-    }
-
-    return () => {
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
-      stopGpsWatch();
-      stopSimulation();
-    };
-  }, [isGpsSimulated, requestCurrentLocation]);
-
-  // Continuous Track Points Accumulation during live recording
-  useEffect(() => {
-    if (!isRecordingTrack || isRecordingPaused) return;
-
-    setActiveTrack((curr) => {
-      if (!curr) return null;
-      const lastPoint = curr.points[curr.points.length - 1];
-      if (lastPoint) {
-        const distFromLastMeters = calculateDistanceMeters(
-          lastPoint.lat,
-          lastPoint.lng,
-          currentGps.lat,
-          currentGps.lng
-        );
-        // Smart GIS deadband: append point only if moved >= 3.0m (filters stationary GPS drift)
-        const moveThreshold = Math.max(3.0, (currentGps.accuracy || 3) * 0.4);
-        if (distFromLastMeters < moveThreshold) return curr;
-
-        const newPoint = {
-          lat: currentGps.lat,
-          lng: currentGps.lng,
-          altitude: currentGps.altitude || 1280,
-          speed: currentGps.speed || 3.8,
-          timestamp: Date.now(),
-        };
-
-        const distIncKm = distFromLastMeters / 1000;
-        const newTotalKm = +(curr.distanceKm + distIncKm).toFixed(3);
-        return {
-          ...curr,
-          points: [...curr.points, newPoint],
-          distanceKm: newTotalKm,
-          elevationGainM:
-            newPoint.altitude > lastPoint.altitude
-              ? curr.elevationGainM + Math.round(newPoint.altitude - lastPoint.altitude)
-              : curr.elevationGainM,
-          elevationLossM:
-            newPoint.altitude < lastPoint.altitude
-              ? curr.elevationLossM + Math.round(lastPoint.altitude - newPoint.altitude)
-              : curr.elevationLossM,
-        };
-      } else {
-        return {
-          ...curr,
-          points: [
-            {
-              lat: currentGps.lat,
-              lng: currentGps.lng,
-              altitude: currentGps.altitude || 1280,
-              speed: currentGps.speed || 3.8,
-              timestamp: Date.now(),
-            },
-          ],
-        };
-      }
+    locationTrackingService.setUserId(currentUserId);
+    locationTrackingService.startGpsWatch({
+      isSimulated: isGpsSimulated,
+      isManualLocked: isManualGpsLocked,
     });
-  }, [currentGps.lat, currentGps.lng, currentGps.altitude, isRecordingTrack, isRecordingPaused]);
 
-  // Duration Timer for active track (1-second tick)
-  useEffect(() => {
-    let timer: number | null = null;
-    if (isRecordingTrack && !isRecordingPaused) {
-      timer = window.setInterval(() => {
-        setActiveTrack((curr) => {
-          if (!curr) return null;
-          const newDuration = curr.durationSeconds + 1;
-          return {
-            ...curr,
-            durationSeconds: newDuration,
-            avgSpeedKmh:
-              newDuration > 0 && curr.distanceKm > 0
-                ? +((curr.distanceKm / (newDuration / 3600))).toFixed(1)
-                : curr.avgSpeedKmh,
-          };
-        });
-      }, 1000);
-    }
+    const unsubscribe = locationTrackingService.subscribe({
+      onGpsUpdate: (coord) => {
+        if (isManualGpsLockedRef.current) return;
+        setCurrentGps(coord);
+        setHasGpsLock(true);
+      },
+      onTrackPointAdded: (_pt, track) => {
+        setActiveTrack(track);
+      },
+      onTrackStatsUpdate: (track) => {
+        setActiveTrack(track);
+      },
+      onStatusChange: (status) => {
+        setIsRecordingTrack(status === 'recording' || status === 'paused');
+        setIsRecordingPaused(status === 'paused');
+      },
+    });
+
     return () => {
-      if (timer) clearInterval(timer);
+      unsubscribe();
     };
-  }, [isRecordingTrack, isRecordingPaused]);
+  }, [currentUserId, isGpsSimulated, isManualGpsLocked]);
+
+  // Restore Active Track Draft after crash/interruption
+  useEffect(() => {
+    (async () => {
+      if (!currentUserId) return;
+      const draft = await locationTrackingService.restoreTrackDraft();
+      if (draft) {
+        setActiveTrack(draft);
+        setIsRecordingTrack(true);
+        setIsRecordingPaused(true);
+        notifyInfo(
+          'Gravação Recuperada',
+          `Seu trajeto "${draft.name}" com ${draft.points.length} pontos foi restaurado do armazenamento local.`
+        );
+      }
+    })();
+  }, [currentUserId, notifyInfo]);
 
   // Recalculate Navigation Target HUD metrics whenever GPS updates
   useEffect(() => {
@@ -1255,25 +1098,29 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       tags: ['Operação de Campo', 'Rastreio Tempo Real'],
     };
 
+    locationTrackingService.startRecording(newTrack);
     setActiveTrack(newTrack);
     setIsRecordingTrack(true);
     setIsRecordingPaused(false);
   };
 
   const pauseTrackRecording = () => {
+    locationTrackingService.pauseRecording();
     setIsRecordingPaused(true);
   };
 
   const resumeTrackRecording = () => {
+    locationTrackingService.resumeRecording();
     setIsRecordingPaused(false);
   };
 
   const stopTrackRecording = (customName?: string, customColor?: string) => {
-    if (activeTrack) {
+    const finishedTrack = locationTrackingService.stopRecording() || activeTrack;
+    if (finishedTrack) {
       const finished: Track = {
-        ...activeTrack,
-        name: customName || activeTrack.name,
-        color: customColor || activeTrack.color,
+        ...finishedTrack,
+        name: customName || finishedTrack.name,
+        color: customColor || finishedTrack.color,
         endTime: new Date().toISOString(),
         visible: true,
         synced: !isOffline,

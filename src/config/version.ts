@@ -1,10 +1,10 @@
 // Centralized App Version and Build Metadata - Auto-generated at Build Time
-export const APP_VERSION = 'v2.6.47965';
-export const APP_BUILD_NUMBER = 1787965372724;
-export const APP_BUILD_DATE = '28/08/2026';
-export const APP_BUILD_TIME = '21:02:52';
-export const APP_RELEASE_TIMESTAMP = 1787965372724;
-export const APP_RELEASE_NAME = 'GoField Pro Tactical v2.6.47965';
+export const APP_VERSION = 'v2.6.48035';
+export const APP_BUILD_NUMBER = 1788035354651;
+export const APP_BUILD_DATE = '29/08/2026';
+export const APP_BUILD_TIME = '16:29:14';
+export const APP_RELEASE_TIMESTAMP = 1788035354651;
+export const APP_RELEASE_NAME = 'GoField Pro Tactical v2.6.48035';
 
 export interface ChangelogItem {
   version: string;
@@ -15,8 +15,8 @@ export interface ChangelogItem {
 
 export const APP_CHANGELOG: ChangelogItem[] = [
   {
-    version: 'v2.6.47965',
-    date: '28/08/2026',
+    version: 'v2.6.48035',
+    date: '29/08/2026',
     title: 'Atualização Contínua de Campo & Sincronização em Tempo Real',
     highlights: [
       'Garantia de atualização automática instantânea em cada deploy da Vercel.',

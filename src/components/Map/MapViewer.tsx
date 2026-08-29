@@ -100,6 +100,9 @@ export const MapViewer: React.FC = () => {
   const measureLayerGroupRef = useRef<L.FeatureGroup | null>(null);
   const userMarkerRef = useRef<L.Marker | null>(null);
   const userAccuracyCircleRef = useRef<L.Circle | null>(null);
+  const activeTrackShadowRef = useRef<L.Polyline | null>(null);
+  const activeTrackPolylineRef = useRef<L.Polyline | null>(null);
+  const activeTrackStartMarkerRef = useRef<L.Marker | null>(null);
   const hasAutoCenteredRef = useRef<boolean>(false);
   const userInteractedRef = useRef<boolean>(false);
   const lastProjectIdRef = useRef<string>(activeProject?.id || 'default');
@@ -347,53 +350,7 @@ export const MapViewer: React.FC = () => {
       }
     }
 
-    // 4. Render Active Recording Track Live
-    if (activeTrack && activeTrack.points.length >= 1) {
-      if (activeTrack.points.length > 1) {
-        const latLngs = activeTrack.points.map((p) => [p.lat, p.lng] as [number, number]);
-
-        // Shadow outline for sharp visibility
-        const shadowLine = L.polyline(latLngs, {
-          color: '#000000',
-          weight: 7,
-          opacity: 0.6,
-          lineCap: 'round',
-          lineJoin: 'round',
-        });
-        shadowLine.addTo(group);
-
-        // Glowing Active Neon Line
-        const activeLine = L.polyline(latLngs, {
-          color: activeTrack.color || '#ef4444',
-          weight: 4.5,
-          opacity: 1.0,
-          dashArray: isRecordingPaused ? '8, 8' : undefined,
-          lineCap: 'round',
-          lineJoin: 'round',
-        });
-        activeLine.addTo(group);
-      }
-
-      // Track Start Marker
-      if (activeTrack.points[0]) {
-        const startIcon = L.divIcon({
-          className: 'custom-track-start-pin',
-          html: `
-            <div style="background-color: #10b981; color: white; font-weight: 900; font-size: 10px; padding: 2px 6px; border-radius: 12px; border: 2px solid white; box-shadow: 0 2px 8px rgba(0,0,0,0.6); display: flex; align-items: center; gap: 3px; white-space: nowrap;">
-              <span>🟢 Início</span>
-            </div>
-          `,
-          iconSize: [60, 20],
-          iconAnchor: [30, 10],
-        });
-        L.marker([activeTrack.points[0].lat, activeTrack.points[0].lng], {
-          icon: startIcon,
-          zIndexOffset: 800,
-        }).addTo(group);
-      }
-    }
-
-    // 5. Render Project Waypoints (Alfinetes de Marcação)
+    // 4. Render Project Waypoints (Alfinetes de Marcação)
     for (const wp of waypoints) {
       const getCategoryInfo = (cat: Waypoint['category']) => {
         switch (cat) {
@@ -542,7 +499,84 @@ export const MapViewer: React.FC = () => {
         memberMarker.addTo(group);
       }
     }
-  }, [layers, waypoints, savedTracks, activeTrack, teamMembers, navTarget]);
+  }, [layers, waypoints, savedTracks, teamMembers, navTarget]);
+
+  // Dedicated Incremental Active Track Polyline Rendering (Zero Thrashing, O(1) Updates)
+  useEffect(() => {
+    if (!mapInstanceRef.current) return;
+    const map = mapInstanceRef.current;
+
+    // Clean up if track recording stopped
+    if (!activeTrack || !activeTrack.points || activeTrack.points.length === 0) {
+      if (activeTrackShadowRef.current) {
+        map.removeLayer(activeTrackShadowRef.current);
+        activeTrackShadowRef.current = null;
+      }
+      if (activeTrackPolylineRef.current) {
+        map.removeLayer(activeTrackPolylineRef.current);
+        activeTrackPolylineRef.current = null;
+      }
+      if (activeTrackStartMarkerRef.current) {
+        map.removeLayer(activeTrackStartMarkerRef.current);
+        activeTrackStartMarkerRef.current = null;
+      }
+      return;
+    }
+
+    const points = activeTrack.points;
+    const latLngs = points.map((p) => [p.lat, p.lng] as [number, number]);
+
+    // 1. Manage Start Marker
+    if (points.length >= 1 && !activeTrackStartMarkerRef.current) {
+      const startIcon = L.divIcon({
+        className: 'custom-track-start-pin',
+        html: `
+          <div style="background-color: #10b981; color: white; font-weight: 900; font-size: 10px; padding: 2px 6px; border-radius: 12px; border: 2px solid white; box-shadow: 0 2px 8px rgba(0,0,0,0.6); display: flex; align-items: center; gap: 3px; white-space: nowrap;">
+            <span>🟢 Início</span>
+          </div>
+        `,
+        iconSize: [60, 20],
+        iconAnchor: [30, 10],
+      });
+
+      activeTrackStartMarkerRef.current = L.marker([points[0].lat, points[0].lng], {
+        icon: startIcon,
+        zIndexOffset: 800,
+      }).addTo(map);
+    }
+
+    // 2. Manage Incremental Polylines
+    if (points.length >= 2) {
+      if (!activeTrackPolylineRef.current) {
+        // Instantiate Shadow Polyline
+        activeTrackShadowRef.current = L.polyline(latLngs, {
+          color: '#000000',
+          weight: 7,
+          opacity: 0.6,
+          lineCap: 'round',
+          lineJoin: 'round',
+        }).addTo(map);
+
+        // Instantiate Active Neon Polyline
+        activeTrackPolylineRef.current = L.polyline(latLngs, {
+          color: activeTrack.color || '#ef4444',
+          weight: 4.5,
+          opacity: 1.0,
+          dashArray: isRecordingPaused ? '8, 8' : undefined,
+          lineCap: 'round',
+          lineJoin: 'round',
+        }).addTo(map);
+      } else {
+        // High-Performance Incremental coordinate update without tearing down DOM
+        activeTrackShadowRef.current?.setLatLngs(latLngs);
+        activeTrackPolylineRef.current.setLatLngs(latLngs);
+        activeTrackPolylineRef.current.setStyle({
+          color: activeTrack.color || '#ef4444',
+          dashArray: isRecordingPaused ? '8, 8' : undefined,
+        });
+      }
+    }
+  }, [activeTrack, isRecordingPaused]);
 
   // Update Live Current GPS User Marker
   useEffect(() => {

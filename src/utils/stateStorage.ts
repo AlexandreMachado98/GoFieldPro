@@ -106,3 +106,37 @@ export async function purgeLegacyAppState(): Promise<void> {
     console.warn('Failed to purge legacy app state', e);
   }
 }
+
+/**
+ * Checkpoint and Recovery for Active Track Recording
+ */
+const ACTIVE_TRACK_KEY = 'geofield_active_track_draft';
+
+export async function saveActiveTrackDraft(track: any, userId?: string | null): Promise<void> {
+  if (!track) {
+    await clearActiveTrackDraft(userId);
+    return;
+  }
+  await saveAppState(ACTIVE_TRACK_KEY, track, userId);
+}
+
+export async function loadActiveTrackDraft<T>(userId?: string | null): Promise<T | null> {
+  return await loadAppState<T>(ACTIVE_TRACK_KEY, userId);
+}
+
+export async function clearActiveTrackDraft(userId?: string | null): Promise<void> {
+  try {
+    const finalKey = resolveKey(ACTIVE_TRACK_KEY, userId);
+    const db = await openStateDB();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(STORE_NAME, 'readwrite');
+      const store = tx.objectStore(STORE_NAME);
+      const request = store.delete(finalKey);
+      request.onsuccess = () => resolve();
+      request.onerror = () => reject(request.error);
+    });
+  } catch (e) {
+    console.warn('Failed to clear active track draft from IndexedDB', e);
+  }
+}
+
