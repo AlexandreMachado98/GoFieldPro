@@ -106,7 +106,7 @@ export default async function handler(req, res) {
       if (searchData.data && searchData.data.length > 0) {
         customerId = searchData.data[0].id;
         // Update existing customer with CPF/CNPJ and phone
-        await asaasServerRequest(`/customers/${customerId}`, {
+        const updateRes = await asaasServerRequest(`/customers/${customerId}`, {
           method: 'POST',
           body: {
             name: customerName,
@@ -115,6 +115,12 @@ export default async function handler(req, res) {
             externalReference: userUid,
           },
         });
+
+        if (!updateRes.ok) {
+          const updateErr = await updateRes.json().catch(() => ({}));
+          const desc = updateErr.errors?.[0]?.description || 'CPF/CNPJ inválido.';
+          return res.status(400).json({ error: 'ASAAS_CUSTOMER_ERROR', message: desc });
+        }
       }
     }
 
