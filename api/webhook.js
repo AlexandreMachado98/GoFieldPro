@@ -1,6 +1,32 @@
-import { adminDb } from './_lib/firebaseAdmin';
+﻿import { getApps, initializeApp, cert } from 'firebase-admin/app';
+import { getFirestore } from 'firebase-admin/firestore';
 
-export default async function handler(req: any, res: any) {
+const apps = getApps();
+const app = apps.length
+  ? apps[0]
+  : (() => {
+      const projectId = process.env.FIREBASE_PROJECT_ID || process.env.VITE_FIREBASE_PROJECT_ID || 'gofield-pro';
+      const clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
+      const privateKey = process.env.FIREBASE_PRIVATE_KEY
+        ? process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n')
+        : undefined;
+
+      if (clientEmail && privateKey) {
+        return initializeApp({
+          credential: cert({
+            projectId,
+            clientEmail,
+            privateKey,
+          }),
+        });
+      }
+
+      return initializeApp({ projectId });
+    })();
+
+const adminDb = getFirestore(app);
+
+export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, asaas-access-token, access_token');
@@ -9,15 +35,13 @@ export default async function handler(req: any, res: any) {
     return res.status(200).end();
   }
 
-  // 1. Enforce POST method
   if (req.method !== 'POST') {
     res.setHeader('Allow', 'POST');
     return res.status(405).json({ error: 'METHOD_NOT_ALLOWED' });
   }
 
-  // 2. Validate Asaas Webhook Security Token
-  const configuredSecret = process.env.ASAAS_WEBHOOK_SECRET?.trim();
-  const receivedToken = (req.headers['asaas-access-token'] || req.headers['access_token'] || '') as string;
+  const configuredSecret = (process.env.ASAAS_WEBHOOK_SECRET || '').trim();
+  const receivedToken = (req.headers['asaas-access-token'] || req.headers['access_token'] || '') ;
 
   if (configuredSecret && receivedToken !== configuredSecret) {
     console.warn('[WEBHOOK_AUTH_FAILED] Token de webhook inválido recebido.');
@@ -39,19 +63,16 @@ export default async function handler(req: any, res: any) {
     return res.status(400).json({ error: 'INVALID_PAYLOAD: Evento ou dados do pagamento ausentes.' });
   }
 
-  const eventId = (req.body.id || `${payment.id}_${event}`) as string;
+  const eventId = (parsedBody.id || `${payment.id}_${event}`);
 
   try {
-    // 3. Idempotency Check & Atomic Event Registration
     const eventRef = adminDb.collection('processed_webhook_events').doc(eventId);
     const existingDoc = await eventRef.get();
 
     if (existingDoc.exists) {
-      // Event was already safely processed -> avoid duplicate processing
       return res.status(200).json({ received: true, status: 'already_processed', eventId });
     }
 
-    // Save event record
     await eventRef.set({
       eventId,
       event,
@@ -63,11 +84,9 @@ export default async function handler(req: any, res: any) {
       receivedAt: new Date().toISOString(),
     });
 
-    // 4. Resolve Target User UID
-    let targetUid: string | null = payment.externalReference || null;
+    let targetUid = payment.externalReference || null;
 
     if (!targetUid && payment.customer) {
-      // Fallback: lookup user by email from customer details if externalReference was omitted
       const userSnap = await adminDb
         .collection('users')
         .where('email', '==', payment.customer.email?.toLowerCase())
@@ -86,10 +105,8 @@ export default async function handler(req: any, res: any) {
 
     const userDocRef = adminDb.collection('users').doc(targetUid);
 
-    // 5. Handle Payment Status Events
     if (event === 'PAYMENT_RECEIVED' || event === 'PAYMENT_CONFIRMED') {
       const now = new Date();
-      // Annual plan grant: 365 days
       const expiresAt = new Date(now.getTime() + 365 * 24 * 60 * 60 * 1000).toISOString();
 
       await userDocRef.update({
@@ -98,11 +115,10 @@ export default async function handler(req: any, res: any) {
         subscriptionExpiresAt: expiresAt,
         lastPaymentDate: now.toISOString(),
         subscriptionValue: payment.value || 99.98,
-        paymentMethod: payment.billingType?.toLowerCase() || 'pix',
+        paymentMethod: (payment.billingType || 'pix').toLowerCase(),
         updatedAt: now.toISOString(),
       });
 
-      // Write immutable audit log
       await adminDb.collection('audit_payment_logs').add({
         uid: targetUid,
         paymentId: payment.id,
@@ -114,7 +130,7 @@ export default async function handler(req: any, res: any) {
         source: 'asaas_webhook',
       });
 
-      console.log(`[WEBHOOK_SUCCESS] Assinatura Pro ativada com sucesso para usuário: ${targetUid}`);
+      console.log(`[WEBHOOK_SUCCESS] Assinatura Pro ativada para usuário: ${targetUid}`);
     } else if (event === 'PAYMENT_OVERDUE') {
       await userDocRef.update({
         subscriptionStatus: 'overdue',
@@ -128,7 +144,7 @@ export default async function handler(req: any, res: any) {
     }
 
     return res.status(200).json({ received: true, success: true, eventId, uid: targetUid });
-  } catch (err: any) {
+  } catch (err) {
     console.error('[WEBHOOK_PROCESSING_ERROR]', err);
     return res.status(500).json({ error: 'INTERNAL_ERROR', message: err.message });
   }
