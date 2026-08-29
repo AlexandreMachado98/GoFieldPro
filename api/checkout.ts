@@ -1,4 +1,4 @@
-﻿import { getOrCreateAsaasCustomerServer, createAsaasPixChargeServer } from './_lib/asaas';
+import { getOrCreateAsaasCustomerServer, createAsaasPixChargeServer } from './_lib/asaas';
 
 // Official authoritative pricing matrix (enforced server-side)
 const AUTHORITATIVE_PLANS: Record<string, { name: string; price: number; durationDays: number }> = {
@@ -15,6 +15,15 @@ const AUTHORITATIVE_PLANS: Record<string, { name: string; price: number; duratio
 };
 
 export default async function handler(req: any, res: any) {
+  // Set CORS headers to allow requests from AM TST site
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+
+  if (req.method === 'OPTIONS') {
+    return res.status(200).end();
+  }
+
   // 1. Enforce POST method
   if (req.method !== 'POST') {
     res.setHeader('Allow', 'POST');

@@ -1,6 +1,14 @@
-﻿import { adminDb } from './_lib/firebaseAdmin';
+import { adminDb } from './_lib/firebaseAdmin';
 
 export default async function handler(req: any, res: any) {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, asaas-access-token, access_token');
+
+  if (req.method === 'OPTIONS') {
+    return res.status(200).end();
+  }
+
   // 1. Enforce POST method
   if (req.method !== 'POST') {
     res.setHeader('Allow', 'POST');
