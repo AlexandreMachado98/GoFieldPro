@@ -1,4 +1,4 @@
-﻿// Autoritative Plans & Prices (enforced server-side)
+// Autoritative Plans & Prices (enforced server-side)
 const AUTHORITATIVE_PLANS = {
   pro_anual: {
     name: 'GoField Pro — Plano Anual',
@@ -75,6 +75,14 @@ export default async function handler(req, res) {
 
     const userUid = (uid || email).trim();
 
+    const cleanCpfCnpj = cpfCnpj ? String(cpfCnpj).replace(/\D/g, '') : '';
+    if (!cleanCpfCnpj || (cleanCpfCnpj.length !== 11 && cleanCpfCnpj.length !== 14)) {
+      return res.status(400).json({
+        error: 'INVALID_CPF_CNPJ',
+        message: 'Por favor, informe um CPF (11 dígitos) ou CNPJ (14 dígitos) válido para a emissão do PIX.',
+      });
+    }
+
     const officialPlan = AUTHORITATIVE_PLANS[planId];
     if (!officialPlan) {
       return res.status(400).json({
@@ -83,9 +91,12 @@ export default async function handler(req, res) {
       });
     }
 
-    // 1. Search or Create Asaas Customer
+    // 1. Search or Create/Update Asaas Customer
     let customerId = '';
     const cleanEmail = email.trim().toLowerCase();
+    const customerName = (name || cleanEmail.split('@')[0]).trim();
+    const cleanPhone = phone ? String(phone).replace(/\D/g, '') : undefined;
+
     const searchRes = await asaasServerRequest(`/customers?email=${encodeURIComponent(cleanEmail)}`, {
       method: 'GET',
     });
@@ -94,6 +105,16 @@ export default async function handler(req, res) {
       const searchData = await searchRes.json();
       if (searchData.data && searchData.data.length > 0) {
         customerId = searchData.data[0].id;
+        // Update existing customer with CPF/CNPJ and phone
+        await asaasServerRequest(`/customers/${customerId}`, {
+          method: 'POST',
+          body: {
+            name: customerName,
+            cpfCnpj: cleanCpfCnpj,
+            mobilePhone: cleanPhone,
+            externalReference: userUid,
+          },
+        });
       }
     }
 
@@ -101,10 +122,10 @@ export default async function handler(req, res) {
       const createRes = await asaasServerRequest('/customers', {
         method: 'POST',
         body: {
-          name: (name || cleanEmail.split('@')[0]).trim(),
+          name: customerName,
           email: cleanEmail,
-          cpfCnpj: cpfCnpj ? String(cpfCnpj).replace(/\D/g, '') : undefined,
-          mobilePhone: phone ? String(phone).replace(/\D/g, '') : undefined,
+          cpfCnpj: cleanCpfCnpj,
+          mobilePhone: cleanPhone,
           externalReference: userUid,
           notificationDisabled: false,
         },
