@@ -1247,6 +1247,18 @@ export const MapViewer: React.FC = () => {
         </div>
       )}
 
+      {/* Floating Open Tools Button (When Tools are hidden) */}
+      {!isToolsVisible && (
+        <button
+          onClick={() => setIsToolsVisible(true)}
+          className="absolute top-3 right-3 z-10 px-3 py-2 rounded-2xl bg-slate-900/95 backdrop-blur-md border border-sky-500/80 text-sky-400 font-extrabold text-xs flex items-center gap-1.5 shadow-2xl hover:bg-slate-800 active:scale-95 transition-all pointer-events-auto cursor-pointer animate-in fade-in"
+          title="Mostrar Ferramentas e Controles do Mapa"
+        >
+          <LayersIcon className="w-4 h-4 text-sky-400" />
+          <span>☰ Ferramentas</span>
+        </button>
+      )}
+
       {/* Floating Tactical Map Controls (Right Side) */}
       {isToolsVisible && (
         <div className="absolute top-3 right-3 z-10 flex flex-col gap-2 pointer-events-auto animate-in slide-in-from-right duration-200">

@@ -584,8 +584,9 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       title,
       message,
       type = 'info',
-      duration = 4500,
+      duration = 2800,
       silentInHistory = false,
+      silentToast = false,
       coordinates,
     }: {
       title: string;
@@ -593,19 +594,27 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       type?: ToastMessage['type'];
       duration?: number;
       silentInHistory?: boolean;
+      silentToast?: boolean;
       coordinates?: GeoCoordinate;
     }) => {
-      const id = `toast-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
-      const newToast: ToastMessage = {
-        id,
-        title,
-        message,
-        type,
-        duration,
-        createdAt: Date.now(),
-      };
+      // Prioritization: Only show visible on-screen toasts for important alerts and confirmations
+      if (!silentToast) {
+        const id = `toast-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
+        const newToast: ToastMessage = {
+          id,
+          title,
+          message,
+          type,
+          duration: type === 'error' ? 4500 : type === 'warning' ? 3500 : 2500,
+          createdAt: Date.now(),
+        };
 
-      setToasts((prev) => [newToast, ...prev.slice(0, 4)]);
+        // Keep maximum 2 toasts on screen and avoid duplicate spam
+        setToasts((prev) => {
+          if (prev.length > 0 && prev[0].title === title) return prev;
+          return [newToast, ...prev.slice(0, 1)];
+        });
+      }
 
       if (!silentInHistory) {
         const notif: FieldNotification = {
@@ -617,7 +626,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
           read: false,
           coordinates,
         };
-        setNotifications((prev) => [notif, ...prev]);
+        setNotifications((prev) => [notif, ...prev.slice(0, 49)]);
       }
     },
     []
@@ -628,15 +637,15 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     [notify]
   );
   const notifyError = useCallback(
-    (title: string, message: string) => notify({ title, message, type: 'error', duration: 5500 }),
+    (title: string, message: string) => notify({ title, message, type: 'error', duration: 4500 }),
     [notify]
   );
   const notifyWarning = useCallback(
-    (title: string, message: string) => notify({ title, message, type: 'warning' }),
+    (title: string, message: string) => notify({ title, message, type: 'warning', duration: 3500 }),
     [notify]
   );
   const notifyInfo = useCallback(
-    (title: string, message: string) => notify({ title, message, type: 'info' }),
+    (title: string, message: string) => notify({ title, message, type: 'info', silentToast: true }),
     [notify]
   );
 
