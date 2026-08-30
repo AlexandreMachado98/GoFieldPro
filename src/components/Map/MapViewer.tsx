@@ -31,6 +31,8 @@ import {
   Trash2,
   Clock,
   Gauge,
+  Eye,
+  EyeOff,
 } from 'lucide-react';
 import { MeasurementControlBar } from './MeasurementControlBar';
 import { PointDetailModal } from './PointDetailModal';
@@ -120,6 +122,7 @@ export const MapViewer: React.FC = () => {
   } | null>(null);
   const [isSummaryModalOpen, setIsSummaryModalOpen] = useState<boolean>(false);
   const [isOfflineModalOpen, setIsOfflineModalOpen] = useState<boolean>(false);
+  const [isToolsVisible, setIsToolsVisible] = useState<boolean>(true);
 
   // Ref to keep current measurement type, calibration state, and pin mode accessible in Leaflet event listeners
   const currentMeasureTypeRef = useRef<MeasurementPointType>(currentMeasureType);
@@ -1144,77 +1147,91 @@ export const MapViewer: React.FC = () => {
         </div>
       )}
 
+      {/* Floating Toggle Tools Button (When Tools are hidden) */}
+      {!isToolsVisible && (
+        <button
+          onClick={() => setIsToolsVisible(true)}
+          className="absolute top-3 right-3 z-20 px-3 py-2 rounded-2xl bg-slate-900/95 backdrop-blur-md border border-sky-500/80 text-sky-400 font-black text-xs flex items-center gap-1.5 shadow-2xl hover:bg-slate-800 active:scale-95 transition-all pointer-events-auto animate-in fade-in"
+          title="Mostrar Ferramentas do Mapa"
+        >
+          <LayersIcon className="w-4 h-4 text-sky-400" />
+          <span>☰ Ferramentas</span>
+        </button>
+      )}
+
       {/* Floating Tactical Top-Left Telemetry Bar */}
-      <div className="absolute top-3 left-3 z-10 flex flex-col gap-1.5 pointer-events-none">
-        <div className="pointer-events-auto bg-slate-900/90 backdrop-blur-md border border-slate-800 rounded-lg p-2.5 shadow-2xl text-xs text-slate-200 flex items-center gap-4">
-          <div className="flex items-center gap-2">
-            <div
-              className={`w-2.5 h-2.5 rounded-full ${
-                isManualGpsLocked
-                  ? 'bg-amber-400'
-                  : hasGpsLock
-                  ? 'bg-emerald-500 animate-pulse'
-                  : 'bg-amber-500 animate-ping'
-              }`}
-            ></div>
-            <div>
-              <div className="text-[10px] text-slate-400 uppercase font-semibold flex items-center gap-1.5">
-                {isManualGpsLocked ? '📌 Posição Calibrada' : 'Posição GPS Atual'}
+      {isToolsVisible && (
+        <div className="absolute top-3 left-3 z-10 flex flex-col gap-1.5 pointer-events-none animate-in fade-in duration-200">
+          <div className="pointer-events-auto bg-slate-900/90 backdrop-blur-md border border-slate-800 rounded-lg p-2.5 shadow-2xl text-xs text-slate-200 flex items-center gap-4">
+            <div className="flex items-center gap-2">
+              <div
+                className={`w-2.5 h-2.5 rounded-full ${
+                  isManualGpsLocked
+                    ? 'bg-amber-400'
+                    : hasGpsLock
+                    ? 'bg-emerald-500 animate-pulse'
+                    : 'bg-amber-500 animate-ping'
+                }`}
+              ></div>
+              <div>
+                <div className="text-[10px] text-slate-400 uppercase font-semibold flex items-center gap-1.5">
+                  {isManualGpsLocked ? '📌 Posição Calibrada' : 'Posição GPS Atual'}
+                </div>
+                {hasGpsLock ? (
+                  <div className="font-mono font-bold text-slate-100">
+                    {currentGps.lat.toFixed(5)}°, {currentGps.lng.toFixed(5)}°
+                  </div>
+                ) : (
+                  <div className="text-xs text-amber-400 font-mono flex items-center gap-1.5">
+                    <Loader2 className="w-3 h-3 animate-spin" /> Conectando GPS...
+                  </div>
+                )}
               </div>
+            </div>
+
+            {isManualGpsLocked && (
+              <button
+                onClick={unlockDeviceGps}
+                title="Alternar para GPS Automático do Dispositivo"
+                className="text-[10px] bg-slate-800 hover:bg-slate-700 text-sky-400 font-bold px-2 py-1 rounded border border-slate-700 transition-colors flex items-center gap-1"
+              >
+                <span>🛰️ Usar GPS Automático</span>
+              </button>
+            )}
+
+            <div className="h-6 w-px bg-slate-800"></div>
+
+            <div className="hidden sm:block">
+              <div className="text-[10px] text-slate-400 uppercase font-semibold">UTM Fuso 23S</div>
               {hasGpsLock ? (
-                <div className="font-mono font-bold text-slate-100">
-                  {currentGps.lat.toFixed(5)}°, {currentGps.lng.toFixed(5)}°
+                <div className="font-mono text-slate-200">
+                  E: {currentUtm.easting} N: {currentUtm.northing}
                 </div>
               ) : (
-                <div className="text-xs text-amber-400 font-mono flex items-center gap-1.5">
-                  <Loader2 className="w-3 h-3 animate-spin" /> Conectando GPS...
+                <div className="text-xs text-slate-400">---</div>
+              )}
+            </div>
+
+            <div className="h-6 w-px bg-slate-800 hidden sm:block"></div>
+
+            <div>
+              <div className="text-[10px] text-slate-400 uppercase font-semibold">
+                Altitude / Precisão
+              </div>
+              {hasGpsLock ? (
+                <div className="font-mono text-sky-400 font-bold">
+                  {currentGps.altitude}m{' '}
+                  <span className="text-[10px] text-slate-400 font-normal">
+                    ±{currentGps.accuracy}m
+                  </span>
                 </div>
+              ) : (
+                <div className="text-xs text-slate-400">---</div>
               )}
             </div>
           </div>
-
-          {isManualGpsLocked && (
-            <button
-              onClick={unlockDeviceGps}
-              title="Alternar para GPS Automático do Dispositivo"
-              className="text-[10px] bg-slate-800 hover:bg-slate-700 text-sky-400 font-bold px-2 py-1 rounded border border-slate-700 transition-colors flex items-center gap-1"
-            >
-              <span>🛰️ Usar GPS Automático</span>
-            </button>
-          )}
-
-          <div className="h-6 w-px bg-slate-800"></div>
-
-          <div className="hidden sm:block">
-            <div className="text-[10px] text-slate-400 uppercase font-semibold">UTM Fuso 23S</div>
-            {hasGpsLock ? (
-              <div className="font-mono text-slate-200">
-                E: {currentUtm.easting} N: {currentUtm.northing}
-              </div>
-            ) : (
-              <div className="text-xs text-slate-400">---</div>
-            )}
-          </div>
-
-          <div className="h-6 w-px bg-slate-800 hidden sm:block"></div>
-
-          <div>
-            <div className="text-[10px] text-slate-400 uppercase font-semibold">
-              Altitude / Precisão
-            </div>
-            {hasGpsLock ? (
-              <div className="font-mono text-sky-400 font-bold">
-                {currentGps.altitude}m{' '}
-                <span className="text-[10px] text-slate-400 font-normal">
-                  ±{currentGps.accuracy}m
-                </span>
-              </div>
-            ) : (
-              <div className="text-xs text-slate-400">---</div>
-            )}
-          </div>
         </div>
-      </div>
+      )}
 
       {/* Active GPS Manual Calibration Overlay Banner */}
       {isCalibratingGps && (
@@ -1231,7 +1248,16 @@ export const MapViewer: React.FC = () => {
       )}
 
       {/* Floating Tactical Map Controls (Right Side) */}
-      <div className="absolute top-3 right-3 z-10 flex flex-col gap-2 pointer-events-auto">
+      {isToolsVisible && (
+        <div className="absolute top-3 right-3 z-10 flex flex-col gap-2 pointer-events-auto animate-in slide-in-from-right duration-200">
+          {/* Toggle Hide Tools */}
+          <button
+            onClick={() => setIsToolsVisible(false)}
+            title="Ocultar Ferramentas do Mapa"
+            className="w-10 h-10 rounded-lg bg-slate-900/90 hover:bg-slate-800 text-slate-400 hover:text-white border border-slate-800 shadow-xl flex items-center justify-center transition-all hover:scale-105 active:scale-95"
+          >
+            <EyeOff className="w-4 h-4" />
+          </button>
         <button
           id="btn-center-gps"
           onClick={centerOnGps}
@@ -1411,6 +1437,7 @@ export const MapViewer: React.FC = () => {
           <Download className="w-5 h-5" />
         </button>
       </div>
+      )}
 
       {/* Floating Bottom Quick Action Button: Mark Waypoint & Track */}
       {currentRole !== 'auditor' && (

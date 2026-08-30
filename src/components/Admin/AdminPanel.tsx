@@ -86,6 +86,7 @@ import {
   ChevronDown,
   ChevronRight,
   ChevronUp,
+  ArrowLeft,
 } from 'lucide-react';
 
 const DEFAULT_BILLING_CONFIG: SystemBillingConfig = {
@@ -107,7 +108,7 @@ const DEFAULT_BILLING_CONFIG: SystemBillingConfig = {
 
 export const AdminPanel: React.FC = () => {
   const { profile } = useAuth();
-  const { notifySuccess, notifyError, notifyInfo, notifyWarning, showConfirm, billingConfig, setBillingConfig } = useApp();
+  const { notifySuccess, notifyError, notifyInfo, notifyWarning, showConfirm, billingConfig, setBillingConfig, setActiveTab } = useApp();
 
   // Navigation subtabs inside SuperAdmin
   const [adminTab, setAdminTab] = useState<
@@ -1735,11 +1736,18 @@ export const AdminPanel: React.FC = () => {
       <div className="bg-slate-900 border border-slate-800 p-4 sm:p-6 rounded-3xl shadow-2xl space-y-4">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 mb-2">
+              <button
+                onClick={() => setActiveTab('map')}
+                className="flex items-center gap-1.5 px-3 py-1 rounded-xl bg-slate-950 border border-slate-700 hover:bg-slate-800 hover:border-slate-600 text-slate-300 hover:text-white text-xs font-bold transition-all active:scale-95 cursor-pointer shadow-sm"
+              >
+                <ArrowLeft className="w-3.5 h-3.5 text-emerald-400" />
+                <span>← Voltar ao Mapa</span>
+              </button>
               <span className="text-[10px] font-black uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
                 👑 Super Administrador Central
               </span>
-              <span className="text-xs text-slate-400 font-bold">• AM TST Saúde & Segurança</span>
+              <span className="text-xs text-slate-400 font-bold hidden sm:inline">• AM TST Saúde & Segurança</span>
             </div>
             <h1 className="text-xl sm:text-2xl font-black text-white tracking-tight mt-1 flex items-center gap-2">
               <UserCog className="w-6 h-6 text-sky-400 shrink-0" />

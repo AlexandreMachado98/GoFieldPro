@@ -20,7 +20,8 @@ import {
   ChevronRight,
   ExternalLink,
   Droplets,
-  Share2
+  Share2,
+  ArrowLeft
 } from 'lucide-react';
 import { FireIncident, FireIncidentStatus } from '../../types';
 import { useApp } from '../../context/AppContext';
@@ -188,7 +189,14 @@ export const FireIncidentsPanel: React.FC = () => {
         {/* Header Banner */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-slate-800/80">
           <div>
-            <div className="flex items-center gap-2 mb-1">
+            <div className="flex items-center gap-2 mb-2">
+              <button
+                onClick={() => setActiveTab('map')}
+                className="flex items-center gap-1.5 px-3 py-1 rounded-xl bg-slate-900 border border-slate-700 hover:bg-slate-800 hover:border-slate-600 text-slate-300 hover:text-white text-xs font-bold transition-all active:scale-95 cursor-pointer shadow-sm"
+              >
+                <ArrowLeft className="w-3.5 h-3.5 text-rose-400" />
+                <span>← Voltar ao Mapa</span>
+              </button>
               <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wider bg-rose-500/10 text-rose-400 border border-rose-500/20 flex items-center gap-1">
                 <Flame className="w-3 h-3 text-rose-400" />
                 Brigada & Monitoramento Florestal

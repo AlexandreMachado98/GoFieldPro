@@ -34,7 +34,9 @@ import {
   LocateFixed,
   Sliders,
   Ruler,
-  Lock
+  Lock,
+  ArrowLeft,
+  EyeOff
 } from 'lucide-react';
 import L from 'leaflet';
 import * as pdfjsLib from 'pdfjs-dist';
@@ -174,6 +176,7 @@ export const PdfMapNavigator: React.FC = () => {
     notifyWarning,
     notifyInfo,
     showConfirm,
+    setActiveTab,
   } = useApp();
   
   // Storage state
@@ -183,6 +186,9 @@ export const PdfMapNavigator: React.FC = () => {
 
   // Tools mode: 'pan', 'add_point', 'draw_track', 'record_track', 'measure', 'woodpile'
   const [activeTool, setActiveTool] = useState<'pan' | 'add_point' | 'draw_track' | 'record_track' | 'measure' | 'woodpile'>('pan');
+
+  // Retractable Tools Panel
+  const [isToolsPanelOpen, setIsToolsPanelOpen] = useState<boolean>(true);
 
   // Woodpile Specific Submode & Form State
   const [woodpileSubMode, setWoodpileSubMode] = useState<'point' | 'measure'>('point');
@@ -606,39 +612,6 @@ export const PdfMapNavigator: React.FC = () => {
             const coords = currentDoc
               ? pdfToGps(lat, lng, currentDoc)
               : { lat: -23.542, lng: -46.638 };
-
-            // If clicking near the start point (< 35px in PDF sheet) and length >= 2, snap to close loop
-            if (pts.length >= 2) {
-              const startPt = pts[0];
-              if (typeof startPt.pdfX === 'number' && typeof startPt.pdfY === 'number') {
-                const distPx = Math.hypot(lat - startPt.pdfX, lng - startPt.pdfY);
-                if (distPx < 35) {
-                  const isAlreadyClosed =
-                    pts.length >= 3 &&
-                    pts[0].lat === pts[pts.length - 1].lat &&
-                    pts[0].lng === pts[pts.length - 1].lng;
-
-                  if (!isAlreadyClosed) {
-                    const closePt: MeasurementPoint = {
-                      id: `pdf-meas-close-${Date.now()}`,
-                      lat: startPt.lat,
-                      lng: startPt.lng,
-                      pdfX: startPt.pdfX,
-                      pdfY: startPt.pdfY,
-                      altitude: startPt.altitude || 1280,
-                      type: 'stop',
-                      label: `Fechamento (${startPt.label || 'Ponto 1'})`,
-                      notes: 'Vértice conectado exatamente ao início para fechamento de perímetro',
-                      photos: [],
-                      timestamp: Date.now(),
-                    };
-                    setMeasurementPoints((prev) => [...prev, closePt]);
-                    notifySuccess('Perímetro Fechado', 'Traçado conectado com precisão ao ponto inicial.');
-                    return;
-                  }
-                }
-              }
-            }
 
             const type = currentMeasureTypeRef.current || 'standard';
             const ptIndex = pts.length;
@@ -2318,44 +2291,68 @@ export const PdfMapNavigator: React.FC = () => {
       {/* Top Floating App Bar */}
       <div className="absolute top-2.5 left-2.5 right-2.5 z-[1000] flex items-center justify-between pointer-events-none gap-2">
         
-        {/* Left: Document Info, Drawer Opener & Page Navigation */}
-        <div className="bg-slate-900/95 backdrop-blur-md border border-slate-700/80 rounded-2xl px-3 py-1.5 shadow-2xl flex items-center gap-2 pointer-events-auto">
+        {/* Left: Voltar ao Mapa & Document Info */}
+        <div className="flex items-center gap-1.5 pointer-events-auto">
           <button
-            onClick={() => setIsDrawerOpen(true)}
-            className="flex items-center gap-1.5 text-xs font-extrabold text-white hover:text-emerald-400 transition-colors"
-            title="Abrir Camadas, Mapas, Pontos e Rotas"
+            onClick={() => setActiveTab('map')}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-2xl bg-slate-900/95 backdrop-blur-md border border-slate-700/80 text-slate-200 hover:text-white hover:bg-slate-800 text-xs font-extrabold shadow-2xl transition-all active:scale-95"
+            title="Retornar ao Mapa Principal"
           >
-            <List className="w-4 h-4 shrink-0 text-emerald-400 shrink-0" />
-            <span className="truncate max-w-[110px] sm:max-w-[180px]">
-              {activeDoc ? activeDoc.name : 'Nenhum Mapa'}
-            </span>
+            <ArrowLeft className="w-4 h-4 text-sky-400" />
+            <span className="hidden sm:inline">Mapa Principal</span>
           </button>
 
-          {activeDoc && activeDoc.pageCount > 1 && (
-            <div className="flex items-center gap-1 border-l border-slate-700 pl-2">
-              <button
-                onClick={() => handlePageChange(activeDoc.currentPage - 1)}
-                disabled={activeDoc.currentPage === 0}
-                className="p-1 rounded-lg bg-slate-800 text-slate-300 hover:text-white disabled:opacity-30"
-              >
-                <ChevronLeft className="w-3.5 h-3.5" />
-              </button>
-              <span className="text-[11px] font-bold text-slate-300">
-                {activeDoc.currentPage + 1}/{activeDoc.pageCount}
+          <div className="bg-slate-900/95 backdrop-blur-md border border-slate-700/80 rounded-2xl px-3 py-1.5 shadow-2xl flex items-center gap-2">
+            <button
+              onClick={() => setIsDrawerOpen(true)}
+              className="flex items-center gap-1.5 text-xs font-extrabold text-white hover:text-emerald-400 transition-colors"
+              title="Abrir Camadas, Mapas, Pontos e Rotas"
+            >
+              <List className="w-4 h-4 shrink-0 text-emerald-400 shrink-0" />
+              <span className="truncate max-w-[100px] sm:max-w-[170px]">
+                {activeDoc ? activeDoc.name : 'Nenhum Mapa'}
               </span>
-              <button
-                onClick={() => handlePageChange(activeDoc.currentPage + 1)}
-                disabled={activeDoc.currentPage >= activeDoc.pageCount - 1}
-                className="p-1 rounded-lg bg-slate-800 text-slate-300 hover:text-white disabled:opacity-30"
-              >
-                <ChevronRight className="w-3.5 h-3.5" />
-              </button>
-            </div>
-          )}
+            </button>
+
+            {activeDoc && activeDoc.pageCount > 1 && (
+              <div className="flex items-center gap-1 border-l border-slate-700 pl-2">
+                <button
+                  onClick={() => handlePageChange(activeDoc.currentPage - 1)}
+                  disabled={activeDoc.currentPage === 0}
+                  className="p-1 rounded-lg bg-slate-800 text-slate-300 hover:text-white disabled:opacity-30"
+                >
+                  <ChevronLeft className="w-3.5 h-3.5" />
+                </button>
+                <span className="text-[11px] font-bold text-slate-300">
+                  {activeDoc.currentPage + 1}/{activeDoc.pageCount}
+                </span>
+                <button
+                  onClick={() => handlePageChange(activeDoc.currentPage + 1)}
+                  disabled={activeDoc.currentPage >= activeDoc.pageCount - 1}
+                  className="p-1 rounded-lg bg-slate-800 text-slate-300 hover:text-white disabled:opacity-30"
+                >
+                  <ChevronRight className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            )}
+          </div>
         </div>
 
-        {/* Center / Right Tactical Toolbar (GPS, Calibration, Export & Zoom Controls) */}
+        {/* Center / Right Tactical Toolbar (GPS, Calibration, Toggle Tools, Zoom Controls) */}
         <div className="flex items-center gap-1.5 pointer-events-auto">
+          {/* Toggle Tools Button */}
+          <button
+            onClick={() => setIsToolsPanelOpen(!isToolsPanelOpen)}
+            className={`flex items-center gap-1 px-2.5 py-1.5 rounded-2xl border text-xs font-extrabold shadow-2xl transition-all active:scale-95 ${
+              isToolsPanelOpen
+                ? 'bg-slate-900/95 backdrop-blur-md border-slate-700/80 text-slate-300 hover:text-white hover:bg-slate-800'
+                : 'bg-emerald-600 border-emerald-400 text-white shadow-emerald-950/60 ring-2 ring-emerald-400/50'
+            }`}
+            title={isToolsPanelOpen ? 'Ocultar Ferramentas' : 'Mostrar Ferramentas'}
+          >
+            {isToolsPanelOpen ? <EyeOff className="w-4 h-4 text-slate-400" /> : <Eye className="w-4 h-4 text-white" />}
+            <span className="hidden md:inline">{isToolsPanelOpen ? 'Ocultar' : 'Ferramentas'}</span>
+          </button>
           
           {/* GPS Live Tracking Toggle Button */}
           <button
@@ -2713,9 +2710,21 @@ export const PdfMapNavigator: React.FC = () => {
           </div>
         )}
 
+        {/* Floating Open Tools Button (When Tools are hidden) */}
+        {activeDoc && !isToolsPanelOpen && (
+          <button
+            onClick={() => setIsToolsPanelOpen(true)}
+            className="absolute right-3 top-16 z-[1000] px-3 py-2 rounded-2xl bg-slate-900/95 backdrop-blur-md border border-emerald-500/80 text-emerald-400 font-extrabold text-xs flex items-center gap-1.5 shadow-2xl hover:bg-slate-800 active:scale-95 transition-all pointer-events-auto animate-in fade-in"
+            title="Mostrar Ferramentas do Mapa"
+          >
+            <Layers className="w-4 h-4 text-emerald-400" />
+            <span>☰ Ferramentas</span>
+          </button>
+        )}
+
         {/* Lateral Tactical Action Dock (Right Side - Thumb Ergonomic, z-[1000]) */}
-        {activeDoc && (
-          <div className="absolute right-2.5 top-1/2 -translate-y-1/2 z-[1000] flex flex-col items-end gap-2 pointer-events-none max-h-[calc(100dvh-5rem)]">
+        {activeDoc && isToolsPanelOpen && (
+          <div className="absolute right-2.5 top-1/2 -translate-y-1/2 z-[1000] flex flex-col items-end gap-2 pointer-events-none max-h-[calc(100dvh-5rem)] animate-in slide-in-from-right duration-200">
             
             {/* Context Sub-Tool Bar (Drawing Actions - positioned to the left of the dock) */}
             {activeTool === 'draw_track' && currentTrackPoints.length > 0 && (
