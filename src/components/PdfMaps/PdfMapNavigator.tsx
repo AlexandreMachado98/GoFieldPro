@@ -2497,23 +2497,6 @@ export const PdfMapNavigator: React.FC = () => {
             )}
           </div>
         </div>
-
-        {/* Right: Clean Single Toggle for Tools */}
-        <div className="flex items-center gap-1.5 pointer-events-auto">
-          {/* Toggle Tools Button */}
-          <button
-            onClick={() => setIsToolsPanelOpen(!isToolsPanelOpen)}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-2xl border text-xs font-black shadow-2xl transition-all active:scale-95 cursor-pointer ${
-              isToolsPanelOpen
-                ? 'bg-slate-900/95 backdrop-blur-md border-slate-700 text-slate-300 hover:text-white'
-                : 'bg-gradient-to-r from-emerald-600 to-teal-600 border-emerald-400 text-white shadow-emerald-950/60 ring-2 ring-emerald-400/50'
-            }`}
-            title={isToolsPanelOpen ? 'Ocultar Ferramentas' : 'Abrir Ferramentas'}
-          >
-            {isToolsPanelOpen ? <EyeOff className="w-4 h-4 text-slate-400" /> : <Layers className="w-4 h-4 text-white" />}
-            <span>{isToolsPanelOpen ? 'Ocultar' : '☰ Ferramentas'}</span>
-          </button>
-        </div>
       </div>
 
       {/* Target Navigation Live HUD */}
@@ -2790,17 +2773,17 @@ export const PdfMapNavigator: React.FC = () => {
         {activeDoc && !isToolsPanelOpen && (
           <button
             onClick={() => setIsToolsPanelOpen(true)}
-            className="absolute right-3 top-16 z-[1000] px-3 py-2 rounded-2xl bg-slate-900/95 backdrop-blur-md border border-emerald-500/80 text-emerald-400 font-extrabold text-xs flex items-center gap-1.5 shadow-2xl hover:bg-slate-800 active:scale-95 transition-all pointer-events-auto animate-in fade-in"
-            title="Mostrar Ferramentas do Mapa"
+            className="absolute right-3 top-3 z-[1000] px-3 py-2 rounded-xl bg-slate-900/95 backdrop-blur-md border border-slate-700/80 hover:border-emerald-500/80 text-slate-200 hover:text-white font-extrabold text-xs flex items-center gap-1.5 shadow-2xl transition-all active:scale-95 pointer-events-auto cursor-pointer"
+            title="Abrir Barra de Ferramentas"
           >
             <Layers className="w-4 h-4 text-emerald-400" />
-            <span>☰ Ferramentas</span>
+            <span>Ferramentas</span>
           </button>
         )}
 
-        {/* Lateral Tactical Action Dock (Right Side - Thumb Ergonomic, z-[1000]) */}
+        {/* Lateral Tactical Action Dock (Right Side - Sleek & Ultra-Compact) */}
         {activeDoc && isToolsPanelOpen && (
-          <div className="absolute right-2.5 top-1/2 -translate-y-1/2 z-[1000] flex flex-col items-end gap-2 pointer-events-none max-h-[calc(100dvh-5rem)] animate-in slide-in-from-right duration-200">
+          <div className="absolute right-3 top-3 z-[1000] flex flex-col items-end gap-2 pointer-events-none max-h-[calc(100dvh-4.5rem)] animate-in slide-in-from-right duration-200">
             
             {/* Context Sub-Tool Bar (Drawing Actions - positioned to the left of the dock) */}
             {activeTool === 'draw_track' && currentTrackPoints.length > 0 && (
@@ -2811,7 +2794,7 @@ export const PdfMapNavigator: React.FC = () => {
                   </span>
                   <button
                     onClick={() => setCurrentTrackPoints((prev) => prev.slice(0, -1))}
-                    className="p-2 bg-slate-800 text-slate-200 rounded-xl hover:bg-slate-700 active:scale-95"
+                    className="p-2 bg-slate-800 text-slate-200 rounded-xl hover:bg-slate-700 active:scale-95 cursor-pointer"
                     title="Desfazer último vértice"
                   >
                     <Undo2 className="w-4 h-4" />
@@ -2820,7 +2803,7 @@ export const PdfMapNavigator: React.FC = () => {
                 <div className="flex items-center gap-1">
                   <button
                     onClick={() => setIsTrackModalOpen(true)}
-                    className="px-3 py-2 bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs rounded-xl shadow flex items-center gap-1 active:scale-95"
+                    className="px-3 py-2 bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs rounded-xl shadow flex items-center gap-1 active:scale-95 cursor-pointer"
                   >
                     <Check className="w-4 h-4" />
                     Salvar
@@ -2830,7 +2813,7 @@ export const PdfMapNavigator: React.FC = () => {
                       setCurrentTrackPoints([]);
                       setActiveTool('pan');
                     }}
-                    className="px-2.5 py-2 bg-slate-800 text-slate-300 font-bold text-xs rounded-xl hover:bg-slate-700 active:scale-95"
+                    className="px-2.5 py-2 bg-slate-800 text-slate-300 font-bold text-xs rounded-xl hover:bg-slate-700 active:scale-95 cursor-pointer"
                   >
                     Cancelar
                   </button>
@@ -2873,7 +2856,7 @@ export const PdfMapNavigator: React.FC = () => {
                       console.warn('Error recording point:', err);
                     }
                   }}
-                  className="w-full sm:w-auto px-3 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-xl flex items-center justify-center gap-1 active:scale-95"
+                  className="w-full sm:w-auto px-3 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-xl flex items-center justify-center gap-1 active:scale-95 cursor-pointer"
                 >
                   <Plus className="w-4 h-4" />
                   + Ponto
@@ -2882,7 +2865,7 @@ export const PdfMapNavigator: React.FC = () => {
                 <div className="flex items-center gap-1 w-full sm:w-auto justify-between">
                   <button
                     onClick={() => setIsRecordingPaused(!isRecordingPaused)}
-                    className="p-2 bg-slate-800 text-slate-200 rounded-xl active:scale-95"
+                    className="p-2 bg-slate-800 text-slate-200 rounded-xl active:scale-95 cursor-pointer"
                     title={isRecordingPaused ? 'Retomar' : 'Pausar'}
                   >
                     {isRecordingPaused ? <Play className="w-4 h-4 text-emerald-400" /> : <Pause className="w-4 h-4 text-amber-400" />}
@@ -2890,7 +2873,7 @@ export const PdfMapNavigator: React.FC = () => {
 
                   <button
                     onClick={handleStopAndSaveLiveRecording}
-                    className="px-3 py-2 bg-rose-600 hover:bg-rose-500 text-white font-black text-xs rounded-xl shadow flex items-center gap-1 active:scale-95"
+                    className="px-3 py-2 bg-rose-600 hover:bg-rose-500 text-white font-black text-xs rounded-xl shadow flex items-center gap-1 active:scale-95 cursor-pointer"
                   >
                     <Square className="w-4 h-4" />
                     Finalizar
@@ -2899,75 +2882,42 @@ export const PdfMapNavigator: React.FC = () => {
               </div>
             )}
 
-            {/* Main Lateral Vertical Navigation Rail */}
-            <div className="bg-slate-900/95 backdrop-blur-md border border-slate-700/90 rounded-2xl p-1.5 shadow-2xl flex flex-col gap-1.5 pointer-events-auto">
-              
-              {/* Navegar */}
+            {/* Sleek Compact Tactical GIS Tool Rail */}
+            <div className="bg-slate-900/95 backdrop-blur-md border border-slate-700/80 rounded-2xl p-1 shadow-2xl flex flex-col gap-1 pointer-events-auto items-center">
+              {/* Ocultar / Fechar */}
               <button
-                onClick={() => {
-                  setActiveTool('pan');
-                  setCurrentTrackPoints([]);
-                }}
-                title="Modo Navegação Livre"
-                className={`flex flex-col items-center justify-center p-2.5 rounded-xl transition-all active:scale-95 ${
-                  activeTool === 'pan'
-                    ? 'bg-slate-800 text-white ring-1 ring-slate-600 shadow-md'
-                    : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
-                }`}
+                onClick={() => setIsToolsPanelOpen(false)}
+                title="Ocultar Barra de Ferramentas"
+                className="w-9 h-9 rounded-xl flex items-center justify-center text-slate-400 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer"
               >
-                <MousePointer className="w-5 h-5 text-sky-400 mb-0.5" />
-                <span className="text-[10px] font-extrabold tracking-tight">Navegar</span>
+                <X className="w-4 h-4" />
               </button>
 
-              {/* Marcar Ponto com Foto */}
+              <div className="w-full h-px bg-slate-800" />
+
+              {/* 1. Navegar */}
               <button
-                onClick={() => {
-                  setActiveTool('add_point');
-                  setCurrentTrackPoints([]);
-                }}
-                title="Adicionar Ponto com Foto"
-                className={`flex flex-col items-center justify-center p-2.5 rounded-xl transition-all active:scale-95 ${
-                  activeTool === 'add_point'
-                    ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-950/60 ring-2 ring-emerald-400'
-                    : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
+                onClick={() => { setActiveTool('pan'); setCurrentTrackPoints([]); }}
+                title="Navegar no Mapa"
+                className={`w-9 h-9 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center transition-all cursor-pointer ${
+                  activeTool === 'pan' ? 'bg-sky-600 text-white shadow-md' : 'text-slate-400 hover:text-white hover:bg-slate-800/70'
                 }`}
               >
-                <Camera className="w-5 h-5 text-emerald-400 mb-0.5" />
-                <span className="text-[10px] font-extrabold tracking-tight">+ Ponto</span>
+                <MousePointer className="w-4 h-4 text-sky-400" />
               </button>
 
-              {/* Traçar Rota */}
+              {/* 2. Marcar Ponto com Foto */}
               <button
-                onClick={() => {
-                  setActiveTool('draw_track');
-                  setCurrentTrackPoints([]);
-                }}
-                title="Traçar Rota na Folha"
-                className={`flex flex-col items-center justify-center p-2.5 rounded-xl transition-all active:scale-95 ${
-                  activeTool === 'draw_track'
-                    ? 'bg-amber-600 text-white shadow-lg shadow-amber-950/60 ring-2 ring-amber-400'
-                    : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
+                onClick={() => { setActiveTool('add_point'); setCurrentTrackPoints([]); }}
+                title="Adicionar Ponto de Campo com Foto"
+                className={`w-9 h-9 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center transition-all cursor-pointer ${
+                  activeTool === 'add_point' ? 'bg-emerald-600 text-white shadow-md' : 'text-slate-400 hover:text-emerald-400 hover:bg-slate-800/70'
                 }`}
               >
-                <Activity className="w-5 h-5 text-amber-400 mb-0.5" />
-                <span className="text-[10px] font-extrabold tracking-tight">Traçar</span>
+                <Camera className="w-4 h-4 text-emerald-400" />
               </button>
 
-              {/* Gravar Rota */}
-              <button
-                onClick={handleStartLiveRecording}
-                title="Gravar Trilha em Tempo Real via GPS"
-                className={`flex flex-col items-center justify-center p-2.5 rounded-xl transition-all active:scale-95 ${
-                  activeTool === 'record_track'
-                    ? 'bg-rose-600 text-white shadow-lg shadow-rose-950/60 ring-2 ring-rose-400'
-                    : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
-                }`}
-              >
-                <Footprints className="w-5 h-5 text-rose-400 mb-0.5" />
-                <span className="text-[10px] font-extrabold tracking-tight">Gravar</span>
-              </button>
-
-              {/* Medir Distância / Régua */}
+              {/* 3. Régua / Medir Área & Distância */}
               <button
                 onClick={() => {
                   if (activeTool === 'measure' && measurementPoints.length > 0) {
@@ -2977,23 +2927,42 @@ export const PdfMapNavigator: React.FC = () => {
                     setCurrentTrackPoints([]);
                   }
                 }}
-                title="Régua Geodésica de Medição na Folha PDF"
-                className={`flex flex-col items-center justify-center p-2.5 rounded-xl transition-all active:scale-95 relative ${
-                  activeTool === 'measure'
-                    ? 'bg-rose-600 text-white shadow-lg shadow-rose-950/60 ring-2 ring-rose-400'
-                    : 'text-slate-400 hover:text-rose-400 hover:bg-slate-800/60'
+                title="Régua de Medição e Área"
+                className={`w-9 h-9 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center transition-all relative cursor-pointer ${
+                  activeTool === 'measure' ? 'bg-rose-600 text-white shadow-md' : 'text-slate-400 hover:text-rose-400 hover:bg-slate-800/70'
                 }`}
               >
-                <Ruler className="w-5 h-5 shrink-0 text-rose-400 mb-0.5" />
-                <span className="text-[10px] font-extrabold tracking-tight">Medir</span>
+                <Ruler className="w-4 h-4 text-rose-400" />
                 {measurementPoints.length > 0 && activeTool === 'measure' && (
-                  <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-amber-500 text-slate-950 text-[9px] font-black flex items-center justify-center">
+                  <span className="absolute -top-1 -right-1 w-3.5 h-3.5 rounded-full bg-amber-500 text-slate-950 text-[8px] font-black flex items-center justify-center">
                     {measurementPoints.length}
                   </span>
                 )}
               </button>
 
-              {/* Pilha de Madeira (Apontar ou Medir) */}
+              {/* 4. Gravar Rota em Tempo Real */}
+              <button
+                onClick={handleStartLiveRecording}
+                title="Gravar Rota GPS em Tempo Real"
+                className={`w-9 h-9 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center transition-all cursor-pointer ${
+                  activeTool === 'record_track' ? 'bg-rose-600 text-white shadow-md' : 'text-slate-400 hover:text-rose-400 hover:bg-slate-800/70'
+                }`}
+              >
+                <Footprints className="w-4 h-4 text-rose-400" />
+              </button>
+
+              {/* 5. Traçar Rota Manualmente */}
+              <button
+                onClick={() => { setActiveTool('draw_track'); setCurrentTrackPoints([]); }}
+                title="Traçar Rota Manualmente"
+                className={`w-9 h-9 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center transition-all cursor-pointer ${
+                  activeTool === 'draw_track' ? 'bg-amber-600 text-white shadow-md' : 'text-slate-400 hover:text-amber-400 hover:bg-slate-800/70'
+                }`}
+              >
+                <Activity className="w-4 h-4 text-amber-400" />
+              </button>
+
+              {/* 6. Cubagem de Pilha de Madeira */}
               <button
                 onClick={() => {
                   if (activeTool === 'woodpile' && measurementPoints.length > 0 && woodpileSubMode === 'measure') {
@@ -3003,106 +2972,61 @@ export const PdfMapNavigator: React.FC = () => {
                     setCurrentTrackPoints([]);
                   }
                 }}
-                title="Medir ou Apontar Pilha de Madeira"
-                className={`flex flex-col items-center justify-center p-2.5 rounded-xl transition-all active:scale-95 relative ${
-                  activeTool === 'woodpile'
-                    ? 'bg-amber-600 text-white shadow-lg shadow-amber-950/60 ring-2 ring-amber-400'
-                    : 'text-slate-400 hover:text-amber-400 hover:bg-slate-800/60'
+                title="Cubagem de Madeira"
+                className={`w-9 h-9 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center transition-all cursor-pointer ${
+                  activeTool === 'woodpile' ? 'bg-amber-600 text-white shadow-md' : 'text-slate-400 hover:text-amber-400 hover:bg-slate-800/70'
                 }`}
               >
-                <div className="relative">
-                  <WoodpileIcon className="w-5 h-5 text-amber-400 mb-0.5" />
-                  {!isProUser && (
-                    <Lock className="w-2.5 h-2.5 text-amber-400 absolute -top-1 -right-1" />
-                  )}
-                </div>
-                <span className="text-[10px] font-extrabold tracking-tight">Madeira</span>
-                {activeDoc?.markers?.filter((m) => m.category === 'woodpile').length ? (
-                  <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-amber-500 text-slate-950 text-[9px] font-black flex items-center justify-center">
-                    {activeDoc.markers.filter((m) => m.category === 'woodpile').length}
-                  </span>
-                ) : null}
+                <WoodpileIcon className="w-4 h-4 text-amber-400" />
               </button>
 
-              <div className="w-full h-px bg-slate-800 my-0.5" />
+              <div className="w-full h-px bg-slate-800" />
 
-              {/* GPS Live Tracking Toggle Button */}
+              {/* 7. GPS Live Toggle */}
               <button
                 onClick={() => toggleGps()}
                 title={isGpsActive ? 'Desativar GPS' : 'Ativar Meu GPS'}
-                className={`flex flex-col items-center justify-center p-2.5 rounded-xl transition-all active:scale-95 cursor-pointer ${
-                  isGpsActive
-                    ? 'bg-sky-600 text-white shadow-lg shadow-sky-950/60 ring-2 ring-sky-400'
-                    : 'text-slate-400 hover:text-sky-400 hover:bg-slate-800/60'
+                className={`w-9 h-9 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center transition-all cursor-pointer ${
+                  isGpsActive ? 'bg-sky-600 text-white shadow-md' : 'text-slate-400 hover:text-sky-400 hover:bg-slate-800/70'
                 }`}
               >
-                <LocateFixed className={`w-5 h-5 mb-0.5 ${isGpsActive ? 'animate-spin' : 'text-sky-400'}`} style={{ animationDuration: '4s' }} />
-                <span className="text-[10px] font-extrabold tracking-tight">{isGpsActive ? 'GPS Ativo' : 'Meu GPS'}</span>
+                <LocateFixed className={`w-4 h-4 ${isGpsActive ? 'animate-spin text-white' : 'text-sky-400'}`} style={{ animationDuration: '4s' }} />
               </button>
 
-              {/* Calibrar Georreferenciamento */}
+              {/* 8. Calibrar Georreferenciamento */}
               <button
                 onClick={() => setIsCalibrationModalOpen(true)}
-                title="Calibrar Georreferenciamento da Folha PDF"
-                className="flex flex-col items-center justify-center p-2.5 rounded-xl text-slate-400 hover:text-amber-400 hover:bg-slate-800/60 transition-all active:scale-95 cursor-pointer"
+                title="Calibrar Georreferenciamento da Folha"
+                className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center text-slate-400 hover:text-amber-400 hover:bg-slate-800/70 transition-colors cursor-pointer"
               >
-                <Sliders className="w-5 h-5 text-amber-400 mb-0.5" />
-                <span className="text-[10px] font-extrabold tracking-tight">Calibrar</span>
+                <Sliders className="w-4 h-4 text-amber-400" />
               </button>
 
-              {/* Exportar & Compartilhar */}
+              {/* 9. Exportar & Compartilhar */}
               <button
                 onClick={() => setIsExportModalOpen(true)}
-                title="Exportar Dados do Mapa (KML, GPX, GeoJSON, PDF)"
-                className="flex flex-col items-center justify-center p-2.5 rounded-xl text-slate-400 hover:text-emerald-400 hover:bg-slate-800/60 transition-all active:scale-95 cursor-pointer"
+                title="Exportar & Compartilhar Mapa"
+                className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center text-slate-400 hover:text-emerald-400 hover:bg-slate-800/70 transition-colors cursor-pointer"
               >
-                <Share2 className="w-5 h-5 shrink-0 text-emerald-400 mb-0.5" />
-                <span className="text-[10px] font-extrabold tracking-tight">Exportar</span>
+                <Share2 className="w-4 h-4 text-emerald-400" />
               </button>
 
-              {/* Mapas / Gaveta */}
+              {/* 10. Camadas / Lista de Pontos */}
               <button
                 onClick={() => setIsDrawerOpen(true)}
-                title="Abrir Camadas e Lista de Pontos"
-                className="flex flex-col items-center justify-center p-2.5 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800/60 transition-all active:scale-95 cursor-pointer"
+                title="Camadas & Lista de Pontos"
+                className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center text-slate-400 hover:text-teal-400 hover:bg-slate-800/70 transition-colors cursor-pointer"
               >
-                <Layers className="w-5 h-5 shrink-0 text-teal-400 mb-0.5" />
-                <span className="text-[10px] font-extrabold tracking-tight">Camadas</span>
+                <Layers className="w-4 h-4 text-teal-400" />
               </button>
 
-              {/* Zoom & Ajuste Controls */}
-              <div className="flex items-center gap-1 bg-slate-950/80 p-1 rounded-xl border border-slate-800 justify-center">
-                <button
-                  onClick={handleZoomIn}
-                  className="p-1.5 text-slate-300 hover:text-white rounded-lg hover:bg-slate-800 cursor-pointer"
-                  title="Aproximar Zoom"
-                >
-                  <ZoomIn className="w-3.5 h-3.5" />
-                </button>
-                <button
-                  onClick={handleZoomOut}
-                  className="p-1.5 text-slate-300 hover:text-white rounded-lg hover:bg-slate-800 cursor-pointer"
-                  title="Afastar Zoom"
-                >
-                  <ZoomOut className="w-3.5 h-3.5" />
-                </button>
-                <button
-                  onClick={handleFitBounds}
-                  className="p-1.5 text-slate-300 hover:text-white rounded-lg hover:bg-slate-800 cursor-pointer"
-                  title="Ajustar à Tela"
-                >
-                  <Maximize2 className="w-3.5 h-3.5" />
-                </button>
-              </div>
-
-              {/* Ocultar Barra Lateral */}
+              {/* 11. Ajustar à Tela */}
               <button
-                onClick={() => setIsToolsPanelOpen(false)}
-                title="Ocultar Barra de Ferramentas"
-                className="flex items-center justify-center gap-1 py-1.5 px-2 rounded-xl text-slate-400 hover:text-slate-200 hover:bg-slate-800/60 transition-all text-[10px] font-bold border border-slate-800/80 cursor-pointer"
+                onClick={handleFitBounds}
+                title="Ajustar Mapa à Tela"
+                className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center text-slate-400 hover:text-white hover:bg-slate-800/70 transition-colors cursor-pointer"
               >
-                <EyeOff className="w-3.5 h-3.5 text-slate-400" />
-                <span>Ocultar</span>
+                <Maximize2 className="w-4 h-4" />
               </button>
             </div>
           </div>
