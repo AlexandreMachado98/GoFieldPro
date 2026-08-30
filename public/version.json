@@ -1,9 +1,9 @@
 {
-  "version": "v2.6.48050",
-  "buildNumber": 1788050550381,
+  "version": "v2.6.48051",
+  "buildNumber": 1788051189411,
   "buildDate": "29/08/2026",
-  "buildTime": "20:42:30",
-  "releaseTimestamp": 1788050550381,
+  "buildTime": "20:53:09",
+  "releaseTimestamp": 1788051189411,
   "minSupportedVersion": "v2.0.0",
-  "description": "GoField Pro - Build v2.6.48050 (29/08/2026 20:42:30)"
+  "description": "GoField Pro - Build v2.6.48051 (29/08/2026 20:53:09)"
 }

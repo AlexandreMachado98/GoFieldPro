@@ -182,6 +182,7 @@ export const PdfMapNavigator: React.FC = () => {
   // Storage state
   const [documents, setDocuments] = useState<PdfDocument[]>([]);
   const [activeDocId, setActiveDocId] = useState<string | null>(null);
+  const [isMapsListOpen, setIsMapsListOpen] = useState<boolean>(false);
   const [isLoadingDocs, setIsLoadingDocs] = useState(true);
 
   // Tools mode: 'pan', 'add_point', 'draw_track', 'record_track', 'measure', 'woodpile'
@@ -2292,188 +2293,187 @@ export const PdfMapNavigator: React.FC = () => {
     }
   }, [activeDocId]);
 
-  if (!activeDoc) {
-    return (
-      <div className="flex-1 w-full h-full bg-slate-950 flex flex-col p-4 sm:p-8 overflow-y-auto pb-32 text-slate-100">
-        <div className="max-w-5xl mx-auto w-full space-y-6">
-          {/* Header */}
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-800/80">
-            <div>
-              <div className="flex items-center gap-2 mb-2">
-                {documents.length > 0 && (
-                  <button
-                    onClick={() => {
-                      const targetId = lastActiveDocIdRef.current || documents[0]?.id;
-                      if (targetId) {
-                        setActiveDocId(targetId);
-                      }
-                    }}
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900 border border-slate-700 hover:bg-slate-800 hover:border-emerald-500 text-slate-300 hover:text-white text-xs font-bold transition-all active:scale-95 cursor-pointer shadow-sm"
-                    title="Retornar para a visualização da planta PDF"
-                  >
-                    <ArrowLeft className="w-3.5 h-3.5 text-emerald-400" />
-                    <span>← Voltar ao Mapa PDF</span>
-                  </button>
-                )}
-                <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wider bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 flex items-center gap-1">
-                  <FileText className="w-3 h-3" />
-                  Plantas & Mapas Georreferenciados
-                </span>
-              </div>
-              <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">
-                Meus Mapas <span className="text-emerald-400">em PDF</span>
-              </h1>
-              <p className="text-xs sm:text-sm text-slate-400 mt-1 max-w-xl">
-                Selecione uma planta para navegar em campo com GPS exato, medir áreas ou importe novos mapas em PDF.
-              </p>
-            </div>
-
-            {/* Action Buttons */}
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => triggerFileInput(fileInputRef)}
-                disabled={isProcessing}
-                className="flex items-center justify-center gap-2 px-4 py-2.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-extrabold text-xs rounded-xl shadow-lg shadow-emerald-950/50 transition-all active:scale-95 cursor-pointer"
-              >
-                {isProcessing ? (
-                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                ) : (
-                  <UploadCloud className="w-4 h-4 shrink-0" />
-                )}
-                <span>{isProcessing ? 'Processando PDF...' : '+ Importar Novo Mapa PDF'}</span>
-              </button>
-            </div>
-          </div>
-
-          {/* Processing message */}
-          {isProcessing && (
-            <div className="p-4 rounded-2xl bg-emerald-950/60 border border-emerald-800 text-emerald-200 text-xs flex items-center gap-3 animate-pulse">
-              <div className="w-4 h-4 border-2 border-emerald-400 border-t-transparent rounded-full animate-spin shrink-0" />
-              <span>{processingProgress || 'Renderizando páginas em alta resolução para navegação offline...'}</span>
-            </div>
-          )}
-
-          {/* List of Maps Cards */}
-          {documents.length > 0 ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {documents.map((doc) => {
-                const docMarkers = Array.isArray(doc.markers) ? doc.markers : [];
-                const docTracks = Array.isArray(doc.tracks) ? doc.tracks : [];
-                const docPolygons = Array.isArray(doc.polygons) ? doc.polygons : [];
-                const hasCalib = doc.calibration && doc.calibration.isCalibrated;
-
-                return (
-                  <div
-                    key={doc.id}
-                    className="bg-slate-900 border border-slate-800 hover:border-emerald-500/60 rounded-2xl p-4 shadow-xl flex flex-col justify-between transition-all group hover:-translate-y-0.5"
-                  >
-                    <div className="space-y-3">
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="w-10 h-10 rounded-xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-emerald-400 shrink-0">
-                          <FileText className="w-5 h-5" />
-                        </div>
-                        <div className="flex items-center gap-1">
-                          <button
-                            onClick={(e) => handleDeleteDoc(doc.id, e)}
-                            className="p-2 text-slate-500 hover:text-rose-400 hover:bg-slate-800 rounded-lg transition-colors cursor-pointer"
-                            title="Excluir Mapa"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        </div>
-                      </div>
-
-                      <div>
-                        <h3 className="font-extrabold text-white text-sm truncate" title={doc.name}>
-                          {doc.name}
-                        </h3>
-                        <p className="text-[11px] text-slate-400 mt-0.5">
-                          {doc.pageCount} {doc.pageCount === 1 ? 'página' : 'páginas'} • {hasCalib ? '🛰️ Georreferenciado' : '📍 Não Calibrado'}
-                        </p>
-                      </div>
-
-                      <div className="grid grid-cols-3 gap-1.5 py-2 px-2.5 bg-slate-950/80 rounded-xl border border-slate-800/80 text-center text-[10px]">
-                        <div>
-                          <div className="text-slate-500 uppercase font-bold">Pontos</div>
-                          <div className="font-black text-emerald-400">{docMarkers.length}</div>
-                        </div>
-                        <div>
-                          <div className="text-slate-500 uppercase font-bold">Rotas</div>
-                          <div className="font-black text-sky-400">{docTracks.length}</div>
-                        </div>
-                        <div>
-                          <div className="text-slate-500 uppercase font-bold">Áreas</div>
-                          <div className="font-black text-amber-400">{docPolygons.length}</div>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="pt-4 border-t border-slate-800 mt-3 flex items-center gap-2">
-                      <button
-                        onClick={() => {
-                          setActiveDocId(doc.id);
-                          setUserItem(currentUserId, 'selected_pdf_id', doc.id);
-                        }}
-                        className="flex-1 py-2.5 px-3 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-black text-xs rounded-xl shadow transition-all active:scale-95 flex items-center justify-center gap-1.5 cursor-pointer"
-                      >
-                        <Eye className="w-4 h-4" />
-                        <span>Abrir Mapa</span>
-                      </button>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          ) : (
-            <div className="bg-slate-900/60 border border-dashed border-slate-800 rounded-3xl p-12 text-center space-y-4">
-              <div className="w-16 h-16 rounded-3xl bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 flex items-center justify-center mx-auto">
-                <FileText className="w-8 h-8" />
-              </div>
-              <div className="space-y-1 max-w-sm mx-auto">
-                <h3 className="text-lg font-bold text-white">Nenhum Mapa PDF Importado</h3>
-                <p className="text-xs text-slate-400">
-                  Carregue uma planta em PDF do seu dispositivo para navegar com GPS, traçar rotas e fazer medições georreferenciadas.
-                </p>
-              </div>
-              <button
-                onClick={() => triggerFileInput(fileInputRef)}
-                className="inline-flex items-center gap-2 px-5 py-3 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-extrabold text-xs uppercase tracking-wider shadow-lg transition-all active:scale-95 cursor-pointer"
-              >
-                <UploadCloud className="w-4 h-4" />
-                <span>Importar Meu Primeiro Mapa</span>
-              </button>
-            </div>
-          )}
-        </div>
-
-        {/* Hidden File Input */}
-        <input
-          type="file"
-          ref={fileInputRef}
-          onChange={handleFileUpload}
-          accept=".pdf,application/pdf"
-          className="hidden"
-        />
-      </div>
-    );
-  }
-
   return (
     <div className="flex-1 w-full h-full bg-slate-950 flex flex-col relative overflow-hidden select-none">
       
+      {/* Fullscreen Overlay: Meus Mapas PDF (Safe Overlay - Map stays mounted underneath) */}
+      {(!activeDoc || isMapsListOpen) && (
+        <div className="absolute inset-0 z-[1500] bg-slate-950 flex flex-col p-4 sm:p-8 overflow-y-auto pb-32 text-slate-100 animate-in fade-in duration-150">
+          <div className="max-w-5xl mx-auto w-full space-y-6">
+            {/* Header */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-800/80">
+              <div>
+                <div className="flex items-center gap-2 mb-2">
+                  {documents.length > 0 && (
+                    <button
+                      onClick={() => {
+                        const targetId = activeDocId || lastActiveDocIdRef.current || documents[0]?.id;
+                        if (targetId) {
+                          setActiveDocId(targetId);
+                          setIsMapsListOpen(false);
+                          setTimeout(() => {
+                            try { mapInstanceRef.current?.invalidateSize(); } catch {}
+                          }, 60);
+                        }
+                      }}
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900 border border-slate-700 hover:bg-slate-800 hover:border-emerald-500 text-slate-300 hover:text-white text-xs font-bold transition-all active:scale-95 cursor-pointer shadow-sm"
+                      title="Retornar para a visualização da planta PDF"
+                    >
+                      <ArrowLeft className="w-3.5 h-3.5 text-emerald-400" />
+                      <span>← Voltar ao Mapa PDF</span>
+                    </button>
+                  )}
+                  <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wider bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 flex items-center gap-1">
+                    <FileText className="w-3 h-3" />
+                    Plantas & Mapas Georreferenciados
+                  </span>
+                </div>
+                <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">
+                  Meus Mapas <span className="text-emerald-400">em PDF</span>
+                </h1>
+                <p className="text-xs sm:text-sm text-slate-400 mt-1 max-w-xl">
+                  Selecione uma planta para navegar em campo com GPS exato, medir áreas ou importe novos mapas em PDF.
+                </p>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => triggerFileInput(fileInputRef)}
+                  disabled={isProcessing}
+                  className="flex items-center justify-center gap-2 px-4 py-2.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-extrabold text-xs rounded-xl shadow-lg shadow-emerald-950/50 transition-all active:scale-95 cursor-pointer"
+                >
+                  {isProcessing ? (
+                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  ) : (
+                    <UploadCloud className="w-4 h-4 shrink-0" />
+                  )}
+                  <span>{isProcessing ? 'Processando PDF...' : '+ Importar Novo Mapa PDF'}</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Processing message */}
+            {isProcessing && (
+              <div className="p-4 rounded-2xl bg-emerald-950/60 border border-emerald-800 text-emerald-200 text-xs flex items-center gap-3 animate-pulse">
+                <div className="w-4 h-4 border-2 border-emerald-400 border-t-transparent rounded-full animate-spin shrink-0" />
+                <span>{processingProgress || 'Renderizando páginas em alta resolução para navegação offline...'}</span>
+              </div>
+            )}
+
+            {/* List of Maps Cards */}
+            {documents.length > 0 ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {documents.map((doc) => {
+                  const docMarkers = Array.isArray(doc.markers) ? doc.markers : [];
+                  const docTracks = Array.isArray(doc.tracks) ? doc.tracks : [];
+                  const docPolygons = Array.isArray(doc.polygons) ? doc.polygons : [];
+                  const hasCalib = doc.calibration && doc.calibration.isCalibrated;
+
+                  return (
+                    <div
+                      key={doc.id}
+                      className="bg-slate-900 border border-slate-800 hover:border-emerald-500/60 rounded-2xl p-4 shadow-xl flex flex-col justify-between transition-all group hover:-translate-y-0.5"
+                    >
+                      <div className="space-y-3">
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="w-10 h-10 rounded-xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-emerald-400 shrink-0">
+                            <FileText className="w-5 h-5" />
+                          </div>
+                          <div className="flex items-center gap-1">
+                            <button
+                              onClick={(e) => handleDeleteDoc(doc.id, e)}
+                              className="p-2 text-slate-500 hover:text-rose-400 hover:bg-slate-800 rounded-lg transition-colors cursor-pointer"
+                              title="Excluir Mapa"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
+                        </div>
+
+                        <div>
+                          <h3 className="font-extrabold text-white text-sm truncate" title={doc.name}>
+                            {doc.name}
+                          </h3>
+                          <p className="text-[11px] text-slate-400 mt-0.5">
+                            {doc.pageCount} {doc.pageCount === 1 ? 'página' : 'páginas'} • {hasCalib ? '🛰️ Georreferenciado' : '📍 Não Calibrado'}
+                          </p>
+                        </div>
+
+                        <div className="grid grid-cols-3 gap-1.5 py-2 px-2.5 bg-slate-950/80 rounded-xl border border-slate-800/80 text-center text-[10px]">
+                          <div>
+                            <div className="text-slate-500 uppercase font-bold">Pontos</div>
+                            <div className="font-black text-emerald-400">{docMarkers.length}</div>
+                          </div>
+                          <div>
+                            <div className="text-slate-500 uppercase font-bold">Rotas</div>
+                            <div className="font-black text-sky-400">{docTracks.length}</div>
+                          </div>
+                          <div>
+                            <div className="text-slate-500 uppercase font-bold">Áreas</div>
+                            <div className="font-black text-amber-400">{docPolygons.length}</div>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="pt-4 border-t border-slate-800 mt-3 flex items-center gap-2">
+                        <button
+                          onClick={() => {
+                            setActiveDocId(doc.id);
+                            setIsMapsListOpen(false);
+                            setUserItem(currentUserId, 'selected_pdf_id', doc.id);
+                            setTimeout(() => {
+                              try { mapInstanceRef.current?.invalidateSize(); } catch {}
+                            }, 60);
+                          }}
+                          className="flex-1 py-2.5 px-3 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-black text-xs rounded-xl shadow transition-all active:scale-95 flex items-center justify-center gap-1.5 cursor-pointer"
+                        >
+                          <Eye className="w-4 h-4" />
+                          <span>Abrir Mapa</span>
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="bg-slate-900/60 border border-dashed border-slate-800 rounded-3xl p-12 text-center space-y-4">
+                <div className="w-16 h-16 rounded-3xl bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 flex items-center justify-center mx-auto">
+                  <FileText className="w-8 h-8" />
+                </div>
+                <div className="space-y-1 max-w-sm mx-auto">
+                  <h3 className="text-lg font-bold text-white">Nenhum Mapa PDF Importado</h3>
+                  <p className="text-xs text-slate-400">
+                    Carregue uma planta em PDF do seu dispositivo para navegar com GPS, traçar rotas e fazer medições georreferenciadas.
+                  </p>
+                </div>
+                <button
+                  onClick={() => triggerFileInput(fileInputRef)}
+                  className="inline-flex items-center gap-2 px-5 py-3 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-extrabold text-xs uppercase tracking-wider shadow-lg transition-all active:scale-95 cursor-pointer"
+                >
+                  <UploadCloud className="w-4 h-4" />
+                  <span>Importar Meu Primeiro Mapa</span>
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Top Floating App Bar (Clean & Focused) */}
-      <div className="absolute top-2.5 left-2.5 right-2.5 z-[1000] flex items-center justify-between pointer-events-none gap-2">
-        
-        {/* Left: Voltar para Meus Mapas PDF & Info */}
-        <div className="flex items-center gap-1.5 pointer-events-auto flex-wrap">
-          <button
-            onClick={() => setActiveDocId(null)}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-2xl bg-slate-900/95 backdrop-blur-md border border-emerald-500/80 text-emerald-400 hover:text-white hover:bg-slate-800 text-xs font-black shadow-2xl transition-all active:scale-95 cursor-pointer"
-            title="Voltar para a Lista de Mapas em PDF (Importar / Gerenciar)"
-          >
-            <FolderOpen className="w-4 h-4 text-emerald-400" />
-            <span>📁 Meus Mapas</span>
-          </button>
+      {activeDoc && !isMapsListOpen && (
+        <div className="absolute top-2.5 left-2.5 right-2.5 z-[1000] flex items-center justify-between pointer-events-none gap-2">
+          
+          {/* Left: Voltar para Meus Mapas PDF & Info */}
+          <div className="flex items-center gap-1.5 pointer-events-auto flex-wrap">
+            <button
+              onClick={() => setIsMapsListOpen(true)}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-2xl bg-slate-900/95 backdrop-blur-md border border-emerald-500/80 text-emerald-400 hover:text-white hover:bg-slate-800 text-xs font-black shadow-2xl transition-all active:scale-95 cursor-pointer"
+              title="Abrir Lista de Mapas em PDF (Importar / Gerenciar)"
+            >
+              <FolderOpen className="w-4 h-4 text-emerald-400" />
+              <span>📁 Meus Mapas</span>
+            </button>
 
           <button
             onClick={() => setActiveTab('map')}
@@ -2513,6 +2513,7 @@ export const PdfMapNavigator: React.FC = () => {
           </div>
         </div>
       </div>
+    )}
 
       {/* Target Navigation Live HUD */}
       {activeNavPoint && navMetrics && (
