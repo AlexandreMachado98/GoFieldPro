@@ -674,6 +674,18 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const [isWoodpileModalOpen, setIsWoodpileModalOpen] = useState<boolean>(false);
   const [isPoliciesModalOpen, setIsPoliciesModalOpen] = useState<boolean>(false);
 
+  // Auto-dismiss transient modal overlays whenever activeTab changes to prevent lingering screens
+  useEffect(() => {
+    setIsAddWaypointModalOpen(false);
+    setIsLayerModalOpen(false);
+    setIsSettingsModalOpen(false);
+    setIsWoodpileModalOpen(false);
+    setIsPoliciesModalOpen(false);
+    setIsAiModalOpen(false);
+    setIsReportModalOpen(false);
+    setIsMobileMenuOpen(false);
+  }, [activeTab]);
+
   // App Settings with LocalStorage persistence
   const [settings, setSettings] = useState<AppSettings>(() => {
     const defaultSettings: AppSettings = {
