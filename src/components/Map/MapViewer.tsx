@@ -40,20 +40,53 @@ import { MeasurementSummaryModal } from './MeasurementSummaryModal';
 import { OfflineMapDownloadModal } from '../Offline/OfflineMapDownloadModal';
 import { SaveTrackModal } from '../FieldTrack/SaveTrackModal';
 
-const basemapTileUrls = {
-  satellite: 'http://mt0.google.com/vt/lyrs=y&hl=pt-BR&x={x}&y={y}&z={z}',
-  topo: 'https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png',
-  osm: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
-  dark: 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
-  hybrid: 'http://mt0.google.com/vt/lyrs=y&hl=pt-BR&x={x}&y={y}&z={z}',
+const basemapConfigs: Record<string, { url: string; subdomains?: string[]; maxNativeZoom?: number; maxZoom?: number; attribution: string }> = {
+  satellite: {
+    url: 'https://mt{s}.google.com/vt/lyrs=y&hl=pt-BR&x={x}&y={y}&z={z}',
+    subdomains: ['0', '1', '2', '3'],
+    maxNativeZoom: 20,
+    maxZoom: 22,
+    attribution: '© Google Satélite',
+  },
+  hybrid: {
+    url: 'https://mt{s}.google.com/vt/lyrs=y&hl=pt-BR&x={x}&y={y}&z={z}',
+    subdomains: ['0', '1', '2', '3'],
+    maxNativeZoom: 20,
+    maxZoom: 22,
+    attribution: '© Google Satélite',
+  },
+  osm: {
+    url: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+    subdomains: ['a', 'b', 'c'],
+    maxNativeZoom: 19,
+    maxZoom: 21,
+    attribution: '© OpenStreetMap contributors',
+  },
+  topo: {
+    url: 'https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png',
+    subdomains: ['a', 'b', 'c'],
+    maxNativeZoom: 17,
+    maxZoom: 20,
+    attribution: '© OpenTopoMap',
+  },
+  dark: {
+    url: 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
+    subdomains: ['a', 'b', 'c', 'd'],
+    maxNativeZoom: 19,
+    maxZoom: 21,
+    attribution: '© CartoDB',
+  },
 };
 
-const basemapAttributions = {
-  satellite: 'Map data: © Google',
-  topo: 'Map data: © OpenStreetMap, SRTM | Map style: © OpenTopoMap',
-  osm: '© OpenStreetMap contributors',
-  dark: '© CartoDB, © OpenStreetMap',
-  hybrid: 'Map data: © Google',
+const createBasemapTileLayer = (type: string): L.TileLayer => {
+  const config = basemapConfigs[type] || basemapConfigs.satellite;
+  return L.tileLayer(config.url, {
+    subdomains: config.subdomains || ['a', 'b', 'c'],
+    maxZoom: config.maxZoom || 22,
+    maxNativeZoom: config.maxNativeZoom || 19,
+    attribution: config.attribution,
+    crossOrigin: true,
+  });
 };
 
 export const MapViewer: React.FC = () => {
@@ -170,12 +203,7 @@ export const MapViewer: React.FC = () => {
 
 
     // Basemap tile with high maxNativeZoom and maxZoom
-    const tileLayer = L.tileLayer(basemapTileUrls[basemap], {
-      attribution: basemapAttributions[basemap],
-      maxZoom: 21,
-      maxNativeZoom: 19,
-    }).addTo(map);
-
+    const tileLayer = createBasemapTileLayer(basemap).addTo(map);
     tileLayerRef.current = tileLayer;
 
     // Feature group for overlays (Waypoints, PDF, KML)
@@ -198,7 +226,22 @@ export const MapViewer: React.FC = () => {
       hasAutoCenteredRef.current = true;
     }
 
+    // ResizeObserver ensures map always adapts when tab opens, window resizes or device rotates
+    const resizeObserver = new ResizeObserver(() => {
+      try {
+        map.invalidateSize();
+      } catch {}
+    });
+    resizeObserver.observe(container);
+
+    setTimeout(() => {
+      try {
+        map.invalidateSize();
+      } catch {}
+    }, 100);
+
     return () => {
+      resizeObserver.disconnect();
       map.remove();
       mapInstanceRef.current = null;
     };
@@ -219,12 +262,10 @@ export const MapViewer: React.FC = () => {
   // Update Basemap Tiles without altering view or zoom
   useEffect(() => {
     if (!mapInstanceRef.current || !tileLayerRef.current) return;
-    mapInstanceRef.current.removeLayer(tileLayerRef.current);
-    const newTile = L.tileLayer(basemapTileUrls[basemap], {
-      attribution: basemapAttributions[basemap],
-      maxZoom: 21,
-      maxNativeZoom: 19,
-    }).addTo(mapInstanceRef.current);
+    try {
+      mapInstanceRef.current.removeLayer(tileLayerRef.current);
+    } catch {}
+    const newTile = createBasemapTileLayer(basemap).addTo(mapInstanceRef.current);
     tileLayerRef.current = newTile;
   }, [basemap]);
 
