@@ -226,14 +226,14 @@ export const LoginScreen: React.FC = () => {
       <div className="w-full max-w-md z-10 space-y-3 sm:space-y-4">
         {/* Brand Logo & Title (Compact for Mobile) */}
         <div className="flex flex-col items-center">
-          <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl bg-gradient-to-br from-sky-500 to-emerald-500 flex items-center justify-center text-white shadow-xl mb-2">
-            <Map className="w-6 h-6 sm:w-7 sm:h-7" />
+          <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl overflow-hidden shadow-2xl shadow-emerald-950/60 mb-2 border border-emerald-500/30">
+            <img src="/app-icon.png" alt="GoField Pro" className="w-full h-full object-cover" />
           </div>
           <h1 className="text-xl sm:text-2xl font-extrabold text-white tracking-tight">
-            GoField <span className="text-sky-400">Pro</span>
+            GoField <span className="text-emerald-400">Pro</span>
           </h1>
           <p className="text-slate-400 mt-0.5 text-center text-[11px] sm:text-xs">
-            Navegação GPS, Mapas PDF e Gestão de Campo
+            Navegação GPS, Mapas PDF e Engenharia de Campo
           </p>
         </div>
 

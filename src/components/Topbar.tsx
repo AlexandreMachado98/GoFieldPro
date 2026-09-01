@@ -115,7 +115,8 @@ export const Topbar: React.FC = () => {
             >
               <Menu className="w-5 h-5" />
             </button>
-            <div className="hidden sm:block pl-2 border-l border-slate-800/80">
+            <div className="hidden sm:flex items-center gap-2 pl-2 border-l border-slate-800/80">
+               <img src="/app-icon.png" alt="GoField Pro" className="w-5 h-5 rounded-md object-cover shadow-sm border border-emerald-500/30" />
                <h1 className="text-sm font-bold text-white tracking-tight">GoField <span className="text-emerald-400">Pro</span></h1>
             </div>
           </div>
