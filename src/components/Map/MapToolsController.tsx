@@ -105,7 +105,7 @@ export const MapToolsController: React.FC<MapToolsControllerProps> = ({
   return (
     <>
       {/* ------------------------------------------------------------- */}
-      {/* LEVEL 4: CONTEXTUAL TOP FLOATING PILLS (REC & RULER)          */}
+      {/* CONTEXTUAL TOP FLOATING PILLS (REC & RULER ONLY WHEN ACTIVE)  */}
       {/* ------------------------------------------------------------- */}
 
       {/* Track Recording Active Top Pill */}
@@ -188,30 +188,39 @@ export const MapToolsController: React.FC<MapToolsControllerProps> = ({
       )}
 
       {/* ------------------------------------------------------------- */}
-      {/* LEVEL 3: RIGHT TACTICAL ACTION COLUMN (GPS RECENTER & ZOOM)   */}
+      {/* TOP-RIGHT CORNER: MAP CONTROLS & TOOLS BUTTON STACK          */}
       {/* ------------------------------------------------------------- */}
-      <div className="absolute right-3.5 top-1/2 -translate-y-1/2 z-20 pointer-events-auto flex flex-col gap-2">
+      <div className="absolute top-3 right-3 z-20 pointer-events-auto flex flex-col gap-2">
+        {/* Tools Drawer Button */}
+        <button
+          onClick={() => setIsToolsBottomSheetOpen(true)}
+          className="w-10 h-10 rounded-xl bg-slate-950/90 hover:bg-slate-900 text-sky-400 border border-slate-800 shadow-lg flex items-center justify-center transition-all active:scale-95 cursor-pointer backdrop-blur-md"
+          title="Ferramentas do Mapa"
+        >
+          <SlidersHorizontal className="w-4 h-4 text-sky-400" />
+        </button>
+
         {/* Recenter GPS */}
         <button
           onClick={onRecenterGps}
-          className={`w-11 h-11 rounded-2xl border shadow-xl flex items-center justify-center transition-all active:scale-95 cursor-pointer ${
+          className={`w-10 h-10 rounded-xl border shadow-lg flex items-center justify-center transition-all active:scale-95 cursor-pointer ${
             hasGpsLock
               ? 'bg-slate-950/90 text-emerald-400 border-slate-800 hover:bg-slate-900'
               : 'bg-amber-950/90 text-amber-400 border-amber-500/50 animate-pulse'
           }`}
-          title="Recentralizar GPS na Minha Posição"
+          title="Recentralizar no GPS"
         >
-          <Crosshair className="w-5 h-5" />
+          <Crosshair className="w-4.5 h-4.5" />
         </button>
 
         {/* Zoom In */}
         {onZoomIn && (
           <button
             onClick={onZoomIn}
-            className="w-11 h-11 rounded-2xl bg-slate-950/90 hover:bg-slate-900 text-slate-200 border border-slate-800 shadow-xl flex items-center justify-center transition-all active:scale-95 cursor-pointer"
+            className="w-10 h-10 rounded-xl bg-slate-950/90 hover:bg-slate-900 text-slate-200 border border-slate-800 shadow-lg flex items-center justify-center transition-all active:scale-95 cursor-pointer"
             title="Aproximar Zoom (+)"
           >
-            <ZoomIn className="w-5 h-5" />
+            <ZoomIn className="w-4.5 h-4.5" />
           </button>
         )}
 
@@ -219,10 +228,10 @@ export const MapToolsController: React.FC<MapToolsControllerProps> = ({
         {onZoomOut && (
           <button
             onClick={onZoomOut}
-            className="w-11 h-11 rounded-2xl bg-slate-950/90 hover:bg-slate-900 text-slate-200 border border-slate-800 shadow-xl flex items-center justify-center transition-all active:scale-95 cursor-pointer"
+            className="w-10 h-10 rounded-xl bg-slate-950/90 hover:bg-slate-900 text-slate-200 border border-slate-800 shadow-lg flex items-center justify-center transition-all active:scale-95 cursor-pointer"
             title="Afastar Zoom (-)"
           >
-            <ZoomOut className="w-5 h-5" />
+            <ZoomOut className="w-4.5 h-4.5" />
           </button>
         )}
 
@@ -230,31 +239,39 @@ export const MapToolsController: React.FC<MapToolsControllerProps> = ({
         {onFitBounds && (
           <button
             onClick={onFitBounds}
-            className="w-11 h-11 rounded-2xl bg-slate-950/90 hover:bg-slate-900 text-slate-200 border border-slate-800 shadow-xl flex items-center justify-center transition-all active:scale-95 cursor-pointer"
-            title="Enquadrar Todas as Camadas no Mapa"
+            className="w-10 h-10 rounded-xl bg-slate-950/90 hover:bg-slate-900 text-slate-200 border border-slate-800 shadow-lg flex items-center justify-center transition-all active:scale-95 cursor-pointer"
+            title="Enquadrar Todas as Camadas"
           >
-            <Maximize2 className="w-5 h-5" />
+            <Maximize2 className="w-4.5 h-4.5" />
           </button>
         )}
       </div>
 
       {/* ------------------------------------------------------------- */}
-      {/* LEVEL 1 & 2: CENTERED FLOATING BOTTOM ACTION PILL BAR          */}
+      {/* BOTTOM-RIGHT CORNER: CLEAN ACTION FABS (FLUSH ABOVE NAV BAR)   */}
       {/* ------------------------------------------------------------- */}
-      <div className="absolute bottom-[calc(4.5rem+env(safe-area-inset-bottom,0px))] left-1/2 -translate-x-1/2 z-20 pointer-events-auto flex items-center gap-2 bg-[#090D16]/95 border border-slate-800/90 p-1.5 rounded-full shadow-[0_12px_30px_rgba(0,0,0,0.65)] backdrop-blur-md">
-        {/* 1. Tools Button */}
-        <button
-          onClick={() => setIsToolsBottomSheetOpen(true)}
-          className="flex items-center gap-1.5 px-3 py-2 bg-slate-900/90 hover:bg-slate-800 text-sky-400 rounded-full font-bold text-xs transition-all active:scale-95 cursor-pointer border border-slate-800/80"
-          title="Abrir Painel de Ferramentas"
-        >
-          <SlidersHorizontal className="w-4 h-4 text-sky-400" />
-          <span className="font-extrabold text-slate-200">Ferramentas</span>
-        </button>
+      <div className="absolute bottom-3 right-3 z-20 pointer-events-auto flex items-center gap-2">
+        {/* Track Recording FAB */}
+        {isRecordingTrack ? (
+          <button
+            onClick={onStopTrackRecording}
+            className="flex items-center gap-1.5 px-3 py-2.5 bg-rose-600 hover:bg-rose-500 text-white rounded-xl font-bold text-xs shadow-xl transition-all active:scale-95 border border-rose-400/50 cursor-pointer animate-pulse"
+          >
+            <Square className="w-3.5 h-3.5 fill-white" />
+            <span>Parar</span>
+          </button>
+        ) : (
+          <button
+            onClick={onStartTrackRecording}
+            className="flex items-center gap-1.5 px-3 py-2.5 bg-slate-950/95 hover:bg-slate-900 text-emerald-400 border border-slate-800 rounded-xl font-bold text-xs shadow-xl transition-all active:scale-95 cursor-pointer backdrop-blur-md"
+            title="Iniciar Gravação de Trilha GPS"
+          >
+            <Play className="w-3.5 h-3.5 text-emerald-400 fill-emerald-400" />
+            <span>Gravar</span>
+          </button>
+        )}
 
-        <div className="h-4 w-px bg-slate-800/80 shrink-0" />
-
-        {/* 2. Primary Waypoint Mark FAB */}
+        {/* Primary Waypoint Mark FAB */}
         <div className="relative">
           <button
             onClick={() => {
@@ -264,15 +281,15 @@ export const MapToolsController: React.FC<MapToolsControllerProps> = ({
                 onMarkWaypoint();
               }
             }}
-            className="flex items-center gap-1.5 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 px-3.5 py-2 rounded-full font-black shadow-[0_4px_15px_rgba(16,185,129,0.3)] transition-all active:scale-95 cursor-pointer text-xs"
+            className="flex items-center gap-1.5 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 px-3.5 py-2.5 rounded-xl font-black shadow-lg transition-all active:scale-95 cursor-pointer text-xs"
           >
-            <Pin className="w-4 h-4 text-slate-950 fill-slate-950" />
+            <Pin className="w-3.5 h-3.5 text-slate-950 fill-slate-950" />
             <span>Marcar Ponto</span>
           </button>
 
           {/* Pin Choice Dropup */}
           {isPinChoiceOpen && (
-            <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-52 bg-slate-950 border border-slate-800 p-2 rounded-2xl shadow-2xl flex flex-col gap-1 z-40 animate-in fade-in slide-in-from-bottom-2">
+            <div className="absolute bottom-full right-0 mb-2 w-52 bg-slate-950 border border-slate-800 p-2 rounded-2xl shadow-2xl flex flex-col gap-1 z-40 animate-in fade-in slide-in-from-bottom-2">
               <button
                 onClick={() => {
                   setIsPinChoiceOpen(false);
@@ -299,28 +316,6 @@ export const MapToolsController: React.FC<MapToolsControllerProps> = ({
             </div>
           )}
         </div>
-
-        <div className="h-4 w-px bg-slate-800/80 shrink-0" />
-
-        {/* 3. Track Recording Button */}
-        {isRecordingTrack ? (
-          <button
-            onClick={onStopTrackRecording}
-            className="flex items-center gap-1.5 px-3 py-2 bg-rose-600 hover:bg-rose-500 text-white rounded-full font-extrabold text-xs shadow-lg transition-all active:scale-95 border border-rose-400/50 cursor-pointer animate-pulse"
-          >
-            <Square className="w-3.5 h-3.5 fill-white" />
-            <span>Parar</span>
-          </button>
-        ) : (
-          <button
-            onClick={onStartTrackRecording}
-            className="flex items-center gap-1.5 px-3 py-2 bg-slate-900/90 hover:bg-slate-800 text-emerald-400 rounded-full font-bold text-xs transition-all active:scale-95 cursor-pointer border border-slate-800/80"
-            title="Iniciar Gravação de Trilha GPS"
-          >
-            <Play className="w-3.5 h-3.5 text-emerald-400 fill-emerald-400" />
-            <span>Gravar</span>
-          </button>
-        )}
       </div>
 
       {/* ------------------------------------------------------------- */}
