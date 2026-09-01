@@ -17,7 +17,7 @@ export const MobileBottomNav: React.FC = () => {
   ];
 
   return (
-    <nav className="md:hidden fixed bottom-0 left-0 right-0 z-[95000] bg-[#070d1e]/95 backdrop-blur-md border-t border-[#253352]/80 px-2 py-1.5 flex items-center justify-around select-none">
+    <nav className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-[#070A10]/95 backdrop-blur-lg border-t border-slate-800/90 px-2 pt-2 pb-[calc(0.6rem+env(safe-area-inset-bottom,0px))] flex items-center justify-around select-none shadow-[0_-10px_25px_rgba(0,0,0,0.6)]">
       {navItems.map((item) => {
         const Icon = item.icon;
         const isActive = activeTab === (item.id as any);
@@ -33,23 +33,31 @@ export const MobileBottomNav: React.FC = () => {
               }
               setActiveTab(item.id as any);
             }}
-            className={`flex flex-col items-center justify-center py-1 px-2.5 rounded-xl transition-all relative active:scale-95 ${
-              isActive
-                ? 'text-sky-400 font-extrabold'
-                : 'text-slate-400 hover:text-slate-200 font-medium'
-            }`}
+            className="flex-1 flex flex-col items-center justify-center py-1 group relative transition-transform active:scale-90"
+            aria-label={item.label}
           >
-            <div className="relative">
+            {/* Material 3 Active Indicator Pill */}
+            <div
+              className={`px-4 py-1 rounded-full transition-all flex items-center justify-center relative ${
+                isActive
+                  ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 shadow-[0_0_12px_rgba(16,185,129,0.25)]'
+                  : 'text-slate-400 group-hover:text-slate-200'
+              }`}
+            >
               <Icon
                 className={`w-5 h-5 transition-transform ${
-                  isActive ? 'scale-110' : ''
+                  isActive ? 'scale-110 stroke-[2.4]' : 'stroke-[1.8]'
                 }`}
               />
               {isLocked && (
-                <Lock className="w-2.5 h-2.5 text-amber-400 absolute -top-1 -right-1.5" />
+                <Lock className="w-2.5 h-2.5 text-amber-400 absolute -top-1 -right-1" />
               )}
             </div>
-            <span className="text-[10px] mt-0.5 tracking-tight flex items-center gap-0.5">
+            <span
+              className={`text-[10px] mt-1 tracking-tight transition-colors ${
+                isActive ? 'font-black text-emerald-400' : 'font-semibold text-slate-400'
+              }`}
+            >
               {item.label}
             </span>
           </button>

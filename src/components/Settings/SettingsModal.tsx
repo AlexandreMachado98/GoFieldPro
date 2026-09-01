@@ -133,9 +133,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
   };
 
   return (
-    <div className="fixed inset-0 z-[99999] flex items-center justify-center p-3 sm:p-4 bg-black/80 backdrop-blur-md animate-in fade-in">
+    <div className="fixed inset-0 z-[200] flex items-center justify-center p-3 sm:p-4 bg-slate-950/80 backdrop-blur-sm animate-in fade-in duration-200">
       <div 
-        className="bg-slate-900 border border-slate-700/80 rounded-3xl max-w-2xl w-full h-[90vh] max-h-[640px] shadow-2xl flex flex-col overflow-hidden text-slate-100 relative"
+        className="bg-slate-900 border border-slate-700/80 rounded-2xl max-w-2xl w-full max-h-[min(90dvh,calc(100vh-32px))] shadow-2xl flex flex-col overflow-hidden text-slate-100 relative"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Modal Header */}

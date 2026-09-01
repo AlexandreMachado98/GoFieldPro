@@ -2901,14 +2901,14 @@ export const PdfMapNavigator: React.FC = () => {
             )}
 
             {/* Sleek Compact Tactical GIS Tool Rail */}
-            <div className="bg-slate-900/95 backdrop-blur-md border border-slate-700/80 rounded-2xl p-1 shadow-2xl flex flex-col gap-1 pointer-events-auto items-center">
+            <div className="bg-slate-900/95 backdrop-blur-md border border-slate-700/80 rounded-2xl p-1.5 shadow-2xl flex flex-col gap-1.5 pointer-events-auto items-center">
               {/* Ocultar / Fechar */}
               <button
                 onClick={() => setIsToolsPanelOpen(false)}
                 title="Ocultar Barra de Ferramentas"
-                className="w-9 h-9 rounded-xl flex items-center justify-center text-slate-400 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer"
+                className="w-11 h-11 rounded-xl flex items-center justify-center text-slate-400 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer"
               >
-                <X className="w-4 h-4" />
+                <X className="w-5 h-5" />
               </button>
 
               <div className="w-full h-px bg-slate-800" />
@@ -2917,22 +2917,22 @@ export const PdfMapNavigator: React.FC = () => {
               <button
                 onClick={() => { setActiveTool('pan'); setCurrentTrackPoints([]); }}
                 title="Navegar no Mapa"
-                className={`w-9 h-9 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center transition-all cursor-pointer ${
+                className={`w-11 h-11 rounded-xl flex items-center justify-center transition-all cursor-pointer ${
                   activeTool === 'pan' ? 'bg-sky-600 text-white shadow-md' : 'text-slate-400 hover:text-white hover:bg-slate-800/70'
                 }`}
               >
-                <MousePointer className="w-4 h-4 text-sky-400" />
+                <MousePointer className="w-5 h-5 text-sky-400" />
               </button>
 
               {/* 2. Marcar Ponto com Foto */}
               <button
                 onClick={() => { setActiveTool('add_point'); setCurrentTrackPoints([]); }}
                 title="Adicionar Ponto de Campo com Foto"
-                className={`w-9 h-9 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center transition-all cursor-pointer ${
+                className={`w-11 h-11 rounded-xl flex items-center justify-center transition-all cursor-pointer ${
                   activeTool === 'add_point' ? 'bg-emerald-600 text-white shadow-md' : 'text-slate-400 hover:text-emerald-400 hover:bg-slate-800/70'
                 }`}
               >
-                <Camera className="w-4 h-4 text-emerald-400" />
+                <Camera className="w-5 h-5 text-emerald-400" />
               </button>
 
               {/* 3. Régua / Medir Área & Distância */}
@@ -2946,13 +2946,13 @@ export const PdfMapNavigator: React.FC = () => {
                   }
                 }}
                 title="Régua de Medição e Área"
-                className={`w-9 h-9 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center transition-all relative cursor-pointer ${
+                className={`w-11 h-11 rounded-xl flex items-center justify-center transition-all relative cursor-pointer ${
                   activeTool === 'measure' ? 'bg-rose-600 text-white shadow-md' : 'text-slate-400 hover:text-rose-400 hover:bg-slate-800/70'
                 }`}
               >
-                <Ruler className="w-4 h-4 text-rose-400" />
+                <Ruler className="w-5 h-5 text-rose-400" />
                 {measurementPoints.length > 0 && activeTool === 'measure' && (
-                  <span className="absolute -top-1 -right-1 w-3.5 h-3.5 rounded-full bg-amber-500 text-slate-950 text-[8px] font-black flex items-center justify-center">
+                  <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-amber-500 text-slate-950 text-[9px] font-black flex items-center justify-center">
                     {measurementPoints.length}
                   </span>
                 )}
@@ -2962,22 +2962,22 @@ export const PdfMapNavigator: React.FC = () => {
               <button
                 onClick={handleStartLiveRecording}
                 title="Gravar Rota GPS em Tempo Real"
-                className={`w-9 h-9 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center transition-all cursor-pointer ${
+                className={`w-11 h-11 rounded-xl flex items-center justify-center transition-all cursor-pointer ${
                   activeTool === 'record_track' ? 'bg-rose-600 text-white shadow-md' : 'text-slate-400 hover:text-rose-400 hover:bg-slate-800/70'
                 }`}
               >
-                <Footprints className="w-4 h-4 text-rose-400" />
+                <Footprints className="w-5 h-5 text-rose-400" />
               </button>
 
               {/* 5. Traçar Rota Manualmente */}
               <button
                 onClick={() => { setActiveTool('draw_track'); setCurrentTrackPoints([]); }}
                 title="Traçar Rota Manualmente"
-                className={`w-9 h-9 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center transition-all cursor-pointer ${
+                className={`w-11 h-11 rounded-xl flex items-center justify-center transition-all cursor-pointer ${
                   activeTool === 'draw_track' ? 'bg-amber-600 text-white shadow-md' : 'text-slate-400 hover:text-amber-400 hover:bg-slate-800/70'
                 }`}
               >
-                <Activity className="w-4 h-4 text-amber-400" />
+                <Activity className="w-5 h-5 text-amber-400" />
               </button>
 
               {/* 6. Cubagem de Pilha de Madeira */}
@@ -2991,11 +2991,11 @@ export const PdfMapNavigator: React.FC = () => {
                   }
                 }}
                 title="Cubagem de Madeira"
-                className={`w-9 h-9 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center transition-all cursor-pointer ${
+                className={`w-11 h-11 rounded-xl flex items-center justify-center transition-all cursor-pointer ${
                   activeTool === 'woodpile' ? 'bg-amber-600 text-white shadow-md' : 'text-slate-400 hover:text-amber-400 hover:bg-slate-800/70'
                 }`}
               >
-                <WoodpileIcon className="w-4 h-4 text-amber-400" />
+                <WoodpileIcon className="w-5 h-5 text-amber-400" />
               </button>
 
               <div className="w-full h-px bg-slate-800" />
@@ -3004,47 +3004,47 @@ export const PdfMapNavigator: React.FC = () => {
               <button
                 onClick={() => toggleGps()}
                 title={isGpsActive ? 'Desativar GPS' : 'Ativar Meu GPS'}
-                className={`w-9 h-9 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center transition-all cursor-pointer ${
+                className={`w-11 h-11 rounded-xl flex items-center justify-center transition-all cursor-pointer ${
                   isGpsActive ? 'bg-sky-600 text-white shadow-md' : 'text-slate-400 hover:text-sky-400 hover:bg-slate-800/70'
                 }`}
               >
-                <LocateFixed className={`w-4 h-4 ${isGpsActive ? 'animate-spin text-white' : 'text-sky-400'}`} style={{ animationDuration: '4s' }} />
+                <LocateFixed className={`w-5 h-5 ${isGpsActive ? 'animate-spin text-white' : 'text-sky-400'}`} style={{ animationDuration: '4s' }} />
               </button>
 
               {/* 8. Calibrar Georreferenciamento */}
               <button
                 onClick={() => setIsCalibrationModalOpen(true)}
                 title="Calibrar Georreferenciamento da Folha"
-                className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center text-slate-400 hover:text-amber-400 hover:bg-slate-800/70 transition-colors cursor-pointer"
+                className="w-11 h-11 rounded-xl flex items-center justify-center text-slate-400 hover:text-amber-400 hover:bg-slate-800/70 transition-colors cursor-pointer"
               >
-                <Sliders className="w-4 h-4 text-amber-400" />
+                <Sliders className="w-5 h-5 text-amber-400" />
               </button>
 
               {/* 9. Exportar & Compartilhar */}
               <button
                 onClick={() => setIsExportModalOpen(true)}
                 title="Exportar & Compartilhar Mapa"
-                className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center text-slate-400 hover:text-emerald-400 hover:bg-slate-800/70 transition-colors cursor-pointer"
+                className="w-11 h-11 rounded-xl flex items-center justify-center text-slate-400 hover:text-emerald-400 hover:bg-slate-800/70 transition-colors cursor-pointer"
               >
-                <Share2 className="w-4 h-4 text-emerald-400" />
+                <Share2 className="w-5 h-5 text-emerald-400" />
               </button>
 
               {/* 10. Camadas / Lista de Pontos */}
               <button
                 onClick={() => setIsDrawerOpen(true)}
                 title="Camadas & Lista de Pontos"
-                className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center text-slate-400 hover:text-teal-400 hover:bg-slate-800/70 transition-colors cursor-pointer"
+                className="w-11 h-11 rounded-xl flex items-center justify-center text-slate-400 hover:text-teal-400 hover:bg-slate-800/70 transition-colors cursor-pointer"
               >
-                <Layers className="w-4 h-4 text-teal-400" />
+                <Layers className="w-5 h-5 text-teal-400" />
               </button>
 
               {/* 11. Ajustar à Tela */}
               <button
                 onClick={handleFitBounds}
                 title="Ajustar Mapa à Tela"
-                className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center text-slate-400 hover:text-white hover:bg-slate-800/70 transition-colors cursor-pointer"
+                className="w-11 h-11 rounded-xl flex items-center justify-center text-slate-400 hover:text-white hover:bg-slate-800/70 transition-colors cursor-pointer"
               >
-                <Maximize2 className="w-4 h-4" />
+                <Maximize2 className="w-5 h-5" />
               </button>
             </div>
           </div>
@@ -3103,10 +3103,10 @@ export const PdfMapNavigator: React.FC = () => {
         className="hidden"
       />
 
-      {/* MODAL: Adicionar Novo Ponto com Foto (z-[9999]) */}
+      {/* MODAL: Adicionar Novo Ponto com Foto (z-[200]) */}
       {pendingMarkerPos && (
-        <div className="fixed inset-0 z-[9999] bg-black/80 backdrop-blur-sm flex items-center justify-center p-3 animate-in fade-in">
-          <div className="bg-slate-900 border border-slate-800 w-full max-w-md rounded-2xl shadow-2xl flex flex-col max-h-[85dvh] overflow-hidden">
+        <div className="fixed inset-0 z-[200] bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 animate-in fade-in">
+          <div className="bg-slate-900 border border-slate-800 w-full max-w-md rounded-2xl shadow-2xl flex flex-col max-h-[min(90dvh,calc(100vh-32px))] overflow-hidden">
             
             <div className="p-4 border-b border-slate-800 flex items-center justify-between bg-slate-950 shrink-0">
               <div className="flex items-center gap-2">
@@ -3168,36 +3168,30 @@ export const PdfMapNavigator: React.FC = () => {
 
                   {/* Tipo de Madeira */}
                   <div>
-                    <label className="block text-[11px] text-slate-300 font-bold mb-1">Tipo de Madeira</label>
-                    <div className="grid grid-cols-3 sm:grid-cols-5 gap-1">
-                      {['Eucalipto', 'Pinus', 'Nativa', 'Lenha', 'Mista'].map((type) => (
-                        <button
-                          key={type}
-                          type="button"
-                          onClick={() => setWoodType(type)}
-                          className={`py-1 px-1.5 rounded-lg text-[11px] font-bold border transition-all text-center ${
-                            woodType === type
-                              ? 'bg-amber-500 text-slate-950 border-amber-400 font-black shadow'
-                              : 'bg-slate-900 border-slate-700 text-slate-400 hover:text-white'
-                          }`}
-                        >
-                          {type}
-                        </button>
-                      ))}
-                    </div>
+                    <label className="block text-[10px] text-slate-300 font-bold mb-1">Espécie / Madeira</label>
+                    <select
+                      value={woodType}
+                      onChange={(e) => setWoodType(e.target.value)}
+                      className="w-full bg-slate-900 border border-slate-700 rounded-xl px-2.5 py-1.5 text-white font-bold text-xs focus:border-amber-500"
+                    >
+                      <option value="Eucalipto">Eucalipto (Eucalyptus)</option>
+                      <option value="Pinus">Pinus (Pinus elliottii)</option>
+                      <option value="Nativa">Nativas Diversas</option>
+                      <option value="Lenha">Lenha / Mista</option>
+                    </select>
                   </div>
 
                   {/* Dimensões: Comprimento, Altura, Largura */}
                   <div className="grid grid-cols-3 gap-2">
                     <div>
-                      <label className="block text-[10px] text-slate-300 font-bold mb-0.5">Comprimento (m)</label>
+                      <label className="block text-[10px] text-slate-300 font-bold mb-0.5">Comprim. (m)</label>
                       <input
                         type="number"
                         step="0.1"
                         min="0"
                         value={woodpileLength}
                         onChange={(e) => setWoodpileLength(e.target.value)}
-                        placeholder="Ex: 20.0"
+                        placeholder="Ex: 12.5"
                         className="w-full bg-slate-900 border border-slate-700 rounded-xl px-2.5 py-1.5 text-white font-mono font-bold text-xs focus:border-amber-500"
                       />
                     </div>
@@ -3209,7 +3203,7 @@ export const PdfMapNavigator: React.FC = () => {
                         min="0"
                         value={woodpileHeight}
                         onChange={(e) => setWoodpileHeight(e.target.value)}
-                        placeholder="Ex: 2.5"
+                        placeholder="Ex: 2.2"
                         className="w-full bg-slate-900 border border-slate-700 rounded-xl px-2.5 py-1.5 text-white font-mono font-bold text-xs focus:border-amber-500"
                       />
                     </div>
@@ -3244,7 +3238,7 @@ export const PdfMapNavigator: React.FC = () => {
                             <div className="text-sm font-black text-amber-400 font-mono">{stereo.toFixed(2)} st</div>
                           </div>
                           <div>
-                            <div className="text-[10px] text-slate-400 font-semibold">Volume Sólido ({stF})</div>
+                            <div className="text-[10px] text-slate-400 font-semibold">Volume Sólido (m³)</div>
                             <div className="text-sm font-black text-emerald-400 font-mono">{solid.toFixed(2)} m³</div>
                           </div>
                         </div>
@@ -3252,51 +3246,44 @@ export const PdfMapNavigator: React.FC = () => {
                     }
                     return null;
                   })()}
+                </div>
+              )}
 
-                  {/* Status da Pilha */}
-                  <div>
-                    <label className="block text-[10px] text-slate-300 font-bold mb-1">Status da Pilha</label>
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-1">
-                      {[
-                        { id: 'empilhada', label: 'Empilhada' },
-                        { id: 'medida', label: 'Medida' },
-                        { id: 'carregada', label: 'Carregada' },
-                        { id: 'transportada', label: 'Transportada' },
-                      ].map((st) => (
-                        <button
-                          key={st.id}
-                          type="button"
-                          onClick={() => setWoodpileStatus(st.id as any)}
-                          className={`py-1 px-1.5 rounded-lg text-[10px] font-bold border transition-all text-center ${
-                            woodpileStatus === st.id
-                              ? 'bg-amber-600 text-white border-amber-400 font-black'
-                              : 'bg-slate-900 border-slate-800 text-slate-400'
-                          }`}
-                        >
-                          {st.label}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
+              {/* Geographic Coordinates info if available */}
+              {activeDoc && pendingMarkerPos && (
+                <div className="bg-slate-950 p-2.5 rounded-xl border border-slate-800 flex items-center justify-between text-[11px]">
+                  <span className="text-slate-400">Coordenadas Estimadas:</span>
+                  {(() => {
+                    try {
+                      const gps = pdfToGps(pendingMarkerPos.x, pendingMarkerPos.y, activeDoc);
+                      if (!gps || isNaN(gps.lat) || isNaN(gps.lng)) return null;
+                      return (
+                        <span className="font-mono text-sky-400 font-bold">
+                          {gps.lat.toFixed(5)}, {gps.lng.toFixed(5)}
+                        </span>
+                      );
+                    } catch {
+                      return null;
+                    }
+                  })()}
                 </div>
               )}
 
               <div>
-                <label className="block text-slate-300 font-bold mb-1">Anotações / Descrição</label>
+                <label className="block text-slate-300 font-bold mb-1">Notas / Descrição Técnica</label>
                 <textarea
                   value={markerNotes}
                   onChange={(e) => setMarkerNotes(e.target.value)}
-                  placeholder="Observações técnicas, condições da pilha, etc."
-                  rows={2}
-                  className="w-full bg-slate-800 border border-slate-700 rounded-xl p-2.5 text-white text-xs focus:outline-none focus:border-emerald-500 resize-none"
+                  placeholder="Detalhes observados em campo..."
+                  className="w-full bg-slate-800 border border-slate-700 rounded-xl p-2.5 text-white text-xs resize-none h-16 focus:outline-none focus:border-emerald-500"
                 />
               </div>
 
-              {/* Photos Section */}
+              {/* Photo Upload Section */}
               <div>
                 <label className="block text-slate-300 font-bold mb-1.5 flex items-center justify-between">
-                  <span>Fotos de Campo ({markerPhotos.length})</span>
-                  {isCompressingPhoto && <span className="text-emerald-400 font-normal">Processando foto...</span>}
+                  <span>Fotos Comprobatórias ({markerPhotos.length})</span>
+                  <span className="text-[10px] text-slate-500 font-normal">Geolocalizadas</span>
                 </label>
 
                 {/* Photo Previews */}
@@ -3361,10 +3348,10 @@ export const PdfMapNavigator: React.FC = () => {
         </div>
       )}
 
-      {/* MODAL: Salvar Rota Traçada (z-[9999]) */}
+      {/* MODAL: Salvar Rota Traçada (z-[200]) */}
       {isTrackModalOpen && (
-        <div className="fixed inset-0 z-[9999] bg-black/80 backdrop-blur-sm flex items-center justify-center p-3 animate-in fade-in">
-          <div className="bg-slate-900 border border-slate-800 w-full max-w-sm rounded-2xl shadow-2xl p-4 space-y-4 max-h-[85dvh] overflow-y-auto">
+        <div className="fixed inset-0 z-[200] bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 animate-in fade-in">
+          <div className="bg-slate-900 border border-slate-800 w-full max-w-sm rounded-2xl shadow-2xl p-4 space-y-4 max-h-[min(90dvh,calc(100vh-32px))] overflow-y-auto">
             <h3 className="text-sm font-extrabold text-white flex items-center gap-2">
               <Activity className="w-4 h-4 text-amber-400" />
               Salvar Traçado de Rota
@@ -3417,10 +3404,10 @@ export const PdfMapNavigator: React.FC = () => {
         </div>
       )}
 
-      {/* MODAL: Salvar Trilha Gravada em Tempo Real (z-[9999]) */}
+      {/* MODAL: Salvar Trilha Gravada em Tempo Real (z-[200]) */}
       {isSaveRecordedModalOpen && (
-        <div className="fixed inset-0 z-[9999] bg-black/80 backdrop-blur-sm flex items-center justify-center p-3 animate-in fade-in">
-          <div className="bg-slate-900 border border-slate-800 w-full max-w-sm rounded-2xl shadow-2xl p-5 space-y-4 max-h-[85dvh] overflow-y-auto">
+        <div className="fixed inset-0 z-[200] bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 animate-in fade-in">
+          <div className="bg-slate-900 border border-slate-800 w-full max-w-sm rounded-2xl shadow-2xl p-5 space-y-4 max-h-[min(90dvh,calc(100vh-32px))] overflow-y-auto">
             <div className="flex items-center justify-between border-b border-slate-800 pb-3">
               <div className="flex items-center gap-2">
                 <Footprints className="w-5 h-5 text-rose-500" />
@@ -3502,10 +3489,10 @@ export const PdfMapNavigator: React.FC = () => {
         </div>
       )}
 
-      {/* MODAL: Calibração de Georreferenciamento (z-[9999]) */}
+      {/* MODAL: Calibração de Georreferenciamento (z-[200]) */}
       {isCalibrationModalOpen && activeDoc && (
-        <div className="fixed inset-0 z-[9999] bg-black/80 backdrop-blur-sm flex items-center justify-center p-3 animate-in fade-in">
-          <div className="bg-slate-900 border border-slate-800 w-full max-w-md rounded-2xl shadow-2xl p-5 space-y-4 max-h-[85dvh] overflow-y-auto">
+        <div className="fixed inset-0 z-[200] bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 animate-in fade-in">
+          <div className="bg-slate-900 border border-slate-800 w-full max-w-md rounded-2xl shadow-2xl p-5 space-y-4 max-h-[min(90dvh,calc(100vh-32px))] overflow-y-auto">
             <div className="flex items-center justify-between border-b border-slate-800 pb-3">
               <div className="flex items-center gap-2">
                 <Sliders className="w-5 h-5 text-amber-400" />
@@ -3577,7 +3564,7 @@ export const PdfMapNavigator: React.FC = () => {
         </div>
       )}
 
-      {/* MODAL: Exportar e Compartilhar Arquivo (z-[9999]) */}
+      {/* MODAL: Exportar e Compartilhar Arquivo (z-[200]) */}
       {isExportModalOpen && activeDoc && (
         <PdfExportModal
           document={activeDoc}
@@ -3586,10 +3573,10 @@ export const PdfMapNavigator: React.FC = () => {
         />
       )}
 
-      {/* MODAL / DRAWER: Detalhes do Ponto Selecionado (z-[9999]) */}
+      {/* MODAL / DRAWER: Detalhes do Ponto Selecionado (z-[200]) */}
       {selectedMarker && (
-        <div className="fixed inset-0 z-[9999] bg-black/80 backdrop-blur-sm flex items-center justify-center p-3 animate-in fade-in">
-          <div className="bg-slate-900 border border-slate-800 w-full max-w-md rounded-2xl shadow-2xl flex flex-col max-h-[85dvh] overflow-hidden">
+        <div className="fixed inset-0 z-[200] bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 animate-in fade-in">
+          <div className="bg-slate-900 border border-slate-800 w-full max-w-md rounded-2xl shadow-2xl flex flex-col max-h-[min(90dvh,calc(100vh-32px))] overflow-hidden">
             
             <div className="p-4 border-b border-slate-800 flex items-center justify-between bg-slate-950 shrink-0">
               <div className="flex items-center gap-2">
@@ -3771,10 +3758,10 @@ export const PdfMapNavigator: React.FC = () => {
         </div>
       )}
 
-      {/* Lightbox for viewing photos (z-[99999]) */}
+      {/* Lightbox for viewing photos (z-[250]) */}
       {activeLightboxPhoto && (
         <div 
-          className="fixed inset-0 z-[99999] bg-black/95 flex items-center justify-center p-4"
+          className="fixed inset-0 z-[250] bg-slate-950/95 flex items-center justify-center p-4"
           onClick={() => setActiveLightboxPhoto(null)}
         >
           <button
@@ -3791,9 +3778,9 @@ export const PdfMapNavigator: React.FC = () => {
         </div>
       )}
 
-      {/* Slide-over Drawer: Lista de Mapas & Pontos (z-[9999]) */}
+      {/* Slide-over Drawer: Lista de Mapas & Pontos (z-[100]) */}
       {isDrawerOpen && (
-        <div className="fixed inset-0 z-[9999] bg-black/75 backdrop-blur-xs flex justify-end animate-in fade-in">
+        <div className="fixed inset-0 z-[100] bg-slate-950/75 backdrop-blur-xs flex justify-end animate-in fade-in">
           <div className="w-full sm:w-96 bg-slate-900 border-l border-slate-800 flex flex-col h-[100dvh] shadow-2xl animate-in slide-in-from-right">
             
             <div className="p-4 border-b border-slate-800 flex items-center justify-between bg-slate-950 shrink-0">

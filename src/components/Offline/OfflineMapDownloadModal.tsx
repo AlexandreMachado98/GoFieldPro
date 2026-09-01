@@ -88,10 +88,10 @@ export const OfflineMapDownloadModal: React.FC<OfflineMapDownloadModalProps> = (
   };
 
   return (
-    <div className="fixed inset-0 z-[10000] flex items-center justify-center p-3 sm:p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
-      <div className="bg-slate-900 border border-slate-800 w-full max-w-lg rounded-3xl shadow-2xl flex flex-col overflow-hidden text-slate-100">
+    <div className="fixed inset-0 z-[200] flex items-center justify-center p-3 sm:p-4 bg-slate-950/80 backdrop-blur-sm animate-in fade-in duration-200">
+      <div className="bg-slate-900 border border-slate-800 w-full max-w-lg rounded-2xl shadow-2xl flex flex-col max-h-[min(90dvh,calc(100vh-32px))] overflow-hidden text-slate-100">
         {/* Header */}
-        <div className="p-4 sm:p-5 border-b border-slate-800 flex items-center justify-between bg-slate-950/70">
+        <div className="p-4 sm:p-5 border-b border-slate-800 flex items-center justify-between bg-slate-950/70 shrink-0">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-2xl bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 flex items-center justify-center">
               <Download className="w-5 h-5" />
@@ -111,7 +111,7 @@ export const OfflineMapDownloadModal: React.FC<OfflineMapDownloadModalProps> = (
         </div>
 
         {/* Form Body */}
-        <div className="p-5 space-y-5 text-xs">
+        <div className="p-5 space-y-5 text-xs overflow-y-auto flex-1">
           {/* Location reference info */}
           <div className="bg-slate-950/80 border border-slate-800 rounded-2xl p-3 flex items-center justify-between">
             <div className="flex items-center gap-2">
@@ -239,7 +239,7 @@ export const OfflineMapDownloadModal: React.FC<OfflineMapDownloadModalProps> = (
         </div>
 
         {/* Footer */}
-        <div className="p-4 border-t border-slate-800 flex items-center justify-between bg-slate-950/70">
+        <div className="p-4 border-t border-slate-800 flex items-center justify-between bg-slate-950/70 shrink-0">
           <button
             type="button"
             disabled={isDownloading}

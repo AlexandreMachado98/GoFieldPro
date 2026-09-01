@@ -213,8 +213,8 @@ export const FireIncidentModal: React.FC<FireIncidentModalProps> = ({
   const utm = latLngToUTM(formData.lat, formData.lng);
 
   return (
-    <div className="fixed inset-0 z-[99999] bg-black/85 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 animate-in fade-in select-none">
-      <div className="bg-slate-900 border border-slate-700/90 w-full max-w-2xl rounded-3xl shadow-2xl flex flex-col max-h-[92dvh] overflow-hidden">
+    <div className="fixed inset-0 z-[200] bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 animate-in fade-in select-none">
+      <div className="bg-slate-900 border border-slate-700/90 w-full max-w-2xl rounded-2xl shadow-2xl flex flex-col max-h-[min(90dvh,calc(100vh-32px))] overflow-hidden">
         
         {/* Header */}
         <div className="p-4 sm:p-5 border-b border-slate-800 flex items-center justify-between bg-gradient-to-r from-rose-950/80 to-amber-950/80 shrink-0">
@@ -237,8 +237,10 @@ export const FireIncidentModal: React.FC<FireIncidentModalProps> = ({
           </button>
         </div>
 
-        {/* Form Body */}
-        <form onSubmit={handleSubmit} className="p-4 sm:p-6 overflow-y-auto space-y-5 text-xs">
+        {/* Form */}
+        <form onSubmit={handleSubmit} className="flex flex-col flex-1 overflow-hidden">
+          {/* Scrollable Form Body */}
+          <div className="p-4 sm:p-6 overflow-y-auto flex-1 space-y-5 text-xs">
           
           {/* Main Info */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -529,9 +531,10 @@ export const FireIncidentModal: React.FC<FireIncidentModalProps> = ({
               </div>
             )}
           </div>
+        </div>
 
-          {/* Footer Buttons */}
-          <div className="pt-3 border-t border-slate-800 flex items-center justify-end gap-2.5">
+        {/* Footer Buttons (Fixo) */}
+        <div className="p-4 border-t border-slate-800 flex items-center justify-end gap-2.5 bg-slate-950/80 shrink-0">
             <button
               type="button"
               onClick={onClose}

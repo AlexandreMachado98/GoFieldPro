@@ -1302,31 +1302,31 @@ export const MapViewer: React.FC = () => {
 
       {/* Floating Tactical Map Controls (Right Side) - Compact Clustered Group */}
       {isToolsVisible && (
-        <div className="absolute top-3 right-3 z-20 flex flex-col gap-1.5 pointer-events-auto animate-in slide-in-from-right duration-200 bg-slate-950/80 backdrop-blur-md p-1.5 rounded-2xl border border-slate-800/80 shadow-2xl max-h-[calc(100dvh-140px)] overflow-y-auto">
+        <div className="absolute top-3 right-3 z-20 flex flex-col gap-2 pointer-events-auto animate-in slide-in-from-right duration-200 bg-[#070A10]/90 backdrop-blur-md p-2 rounded-2xl border border-slate-800/90 shadow-2xl max-h-[calc(100dvh-160px)] overflow-y-auto no-scrollbar">
           {/* Header row: Toggle Hide Tools */}
-          <div className="flex items-center justify-between gap-1 pb-1 border-b border-slate-800/80 px-0.5">
-            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Ações</span>
+          <div className="flex items-center justify-between gap-1 pb-1 border-b border-slate-800/80 px-1">
+            <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Ações</span>
             <button
               onClick={() => setIsToolsVisible(false)}
               title="Ocultar Painel"
-              className="p-1 text-slate-400 hover:text-white rounded-md hover:bg-slate-800 transition-colors"
+              className="p-1 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 transition-colors"
             >
               <EyeOff className="w-3.5 h-3.5" />
             </button>
           </div>
 
           {/* Group 1: GPS & Location */}
-          <div className="flex flex-col gap-1.5">
+          <div className="flex flex-col gap-2">
             <button
               id="btn-center-gps"
               onClick={centerOnGps}
               title="Centralizar no GPS (Minha Localização)"
-              className="w-9 h-9 rounded-xl bg-slate-900/90 hover:bg-slate-800 text-sky-400 border border-slate-800 shadow-md flex items-center justify-center transition-all hover:scale-105 active:scale-95"
+              className="w-11 h-11 rounded-xl bg-slate-900/95 hover:bg-slate-800 text-sky-400 border border-slate-800/90 shadow-lg flex items-center justify-center transition-all hover:scale-105 active:scale-95 cursor-pointer"
             >
               {isLocating ? (
-                <Loader2 className="w-4 h-4 animate-spin text-sky-400" />
+                <Loader2 className="w-5 h-5 animate-spin text-sky-400" />
               ) : (
-                <Crosshair className="w-4 h-4" />
+                <Crosshair className="w-5 h-5" />
               )}
             </button>
 
@@ -1334,45 +1334,45 @@ export const MapViewer: React.FC = () => {
               id="btn-calibrate-gps"
               onClick={() => setIsCalibratingGps(!isCalibratingGps)}
               title={isCalibratingGps ? 'Cancelar Calibração' : 'Calibrar Posição Manualmente no Mapa'}
-              className={`w-9 h-9 rounded-xl border shadow-md flex items-center justify-center transition-all hover:scale-105 active:scale-95 ${
+              className={`w-11 h-11 rounded-xl border shadow-lg flex items-center justify-center transition-all hover:scale-105 active:scale-95 cursor-pointer ${
                 isCalibratingGps
                   ? 'bg-amber-500 text-slate-950 border-amber-400 shadow-amber-900/50 animate-bounce'
-                  : 'bg-slate-900/90 hover:bg-slate-800 text-amber-400 border-slate-800'
+                  : 'bg-slate-900/95 hover:bg-slate-800 text-amber-400 border-slate-800/90'
               }`}
             >
-              <MapPin className="w-4 h-4" />
+              <MapPin className="w-5 h-5" />
             </button>
           </div>
 
           {/* Group 2: Pins & Track Recording */}
-          <div className="flex flex-col gap-1.5 pt-1 border-t border-slate-800/80">
+          <div className="flex flex-col gap-2 pt-1 border-t border-slate-800/80">
             {/* Pin Dropping Tool Trigger with Quick Selector */}
             <div className="relative">
               <button
                 id="btn-add-pin-tool"
                 onClick={() => setIsPinChoiceMenuOpen(!isPinChoiceMenuOpen)}
                 title="Adicionar Alfinete de Marcação no Mapa"
-                className={`w-9 h-9 rounded-xl border shadow-md flex items-center justify-center transition-all hover:scale-105 active:scale-95 ${
+                className={`w-11 h-11 rounded-xl border shadow-lg flex items-center justify-center transition-all hover:scale-105 active:scale-95 cursor-pointer ${
                   isPinModeActive
                     ? 'bg-sky-500 text-white border-sky-400 shadow-sky-900/50 animate-bounce'
-                    : 'bg-slate-900/90 hover:bg-slate-800 text-sky-400 border-slate-800'
+                    : 'bg-slate-900/95 hover:bg-slate-800 text-sky-400 border-slate-800/90'
                 }`}
               >
-                <Pin className="w-4 h-4" />
+                <Pin className="w-5 h-5" />
               </button>
 
               {/* Pin Choice Dropdown */}
               {isPinChoiceMenuOpen && (
-                <div className="absolute right-11 top-0 bg-slate-900/95 border border-slate-700 p-1.5 rounded-xl shadow-2xl flex flex-col gap-1 w-48 z-40 backdrop-blur-md">
+                <div className="absolute right-12 top-0 bg-slate-900/95 border border-slate-700 p-2 rounded-2xl shadow-2xl flex flex-col gap-1 w-52 z-40 backdrop-blur-md animate-in fade-in slide-in-from-right-2">
                   <button
                     onClick={() => {
                       setIsPinChoiceMenuOpen(false);
                       setPendingWaypointCoord(null);
                       setIsAddWaypointModalOpen(true);
                     }}
-                    className="text-left px-3 py-2 rounded-lg hover:bg-slate-800 text-xs font-bold text-sky-400 flex items-center gap-2 transition-colors"
+                    className="text-left px-3 py-2.5 rounded-xl hover:bg-slate-800 text-xs font-bold text-sky-400 flex items-center gap-2 transition-colors cursor-pointer"
                   >
-                    <Crosshair className="w-3.5 h-3.5" />
+                    <Crosshair className="w-4 h-4 shrink-0" />
                     <span>Marcar no GPS Atual</span>
                   </button>
                   <button
@@ -1380,9 +1380,9 @@ export const MapViewer: React.FC = () => {
                       setIsPinChoiceMenuOpen(false);
                       setIsPinModeActive(true);
                     }}
-                    className="text-left px-3 py-2 rounded-lg hover:bg-slate-800 text-xs font-bold text-amber-400 flex items-center gap-2 transition-colors"
+                    className="text-left px-3 py-2.5 rounded-xl hover:bg-slate-800 text-xs font-bold text-amber-400 flex items-center gap-2 transition-colors cursor-pointer"
                   >
-                    <MapPin className="w-3.5 h-3.5" />
+                    <MapPin className="w-4 h-4 shrink-0" />
                     <span>Marcar Clicando no Mapa</span>
                   </button>
                 </div>
@@ -1410,13 +1410,13 @@ export const MapViewer: React.FC = () => {
                   ? 'Trilha em Gravação Ativa - Clique para Concluir'
                   : 'Gravar Trilha / Rota no Mapa'
               }
-              className={`w-9 h-9 rounded-xl border shadow-md flex items-center justify-center transition-all hover:scale-105 active:scale-95 ${
+              className={`w-11 h-11 rounded-xl border shadow-lg flex items-center justify-center transition-all hover:scale-105 active:scale-95 cursor-pointer ${
                 isRecordingTrack
                   ? 'bg-red-600 text-white border-red-500 shadow-red-900/50 animate-pulse'
-                  : 'bg-slate-900/90 hover:bg-slate-800 text-emerald-400 border-slate-800'
+                  : 'bg-slate-900/95 hover:bg-slate-800 text-emerald-400 border-slate-800/90'
               }`}
             >
-              <Activity className="w-4 h-4" />
+              <Activity className="w-5 h-5" />
             </button>
 
             {/* Ruler / Geodesic Measurement Tool Trigger */}
@@ -1434,15 +1434,15 @@ export const MapViewer: React.FC = () => {
                   ? 'Régua Ativa - Clique para Ver Resumo'
                   : 'Ativar Régua Geodésica de Medição'
               }
-              className={`w-9 h-9 rounded-xl border shadow-md flex items-center justify-center transition-all hover:scale-105 active:scale-95 relative ${
+              className={`w-11 h-11 rounded-xl border shadow-lg flex items-center justify-center transition-all hover:scale-105 active:scale-95 cursor-pointer relative ${
                 isMeasuring
                   ? 'bg-rose-600 text-white border-rose-500 shadow-rose-900/50 animate-pulse'
-                  : 'bg-slate-900/90 hover:bg-slate-800 text-slate-300 border-slate-800'
+                  : 'bg-slate-900/95 hover:bg-slate-800 text-slate-300 border-slate-800/90'
               }`}
             >
-              <Ruler className="w-4 h-4" />
+              <Ruler className="w-5 h-5" />
               {measurementPoints.length > 0 && (
-                <span className="absolute -top-1 -right-1 w-3.5 h-3.5 rounded-full bg-amber-500 text-slate-950 text-[8px] font-black flex items-center justify-center">
+                <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-amber-500 text-slate-950 text-[9px] font-black flex items-center justify-center">
                   {measurementPoints.length}
                 </span>
               )}
@@ -1450,46 +1450,46 @@ export const MapViewer: React.FC = () => {
           </div>
 
           {/* Group 3: Zoom & Bounds */}
-          <div className="flex flex-col gap-1.5 pt-1 border-t border-slate-800/80">
+          <div className="flex flex-col gap-2 pt-1 border-t border-slate-800/80">
             <button
               id="btn-zoom-in"
               onClick={() => mapInstanceRef.current?.zoomIn()}
               title="Aproximar Zoom (+)"
-              className="w-9 h-9 rounded-xl bg-slate-900/90 hover:bg-slate-800 text-slate-300 border border-slate-800 shadow-md flex items-center justify-center transition-all hover:scale-105 active:scale-95"
+              className="w-11 h-11 rounded-xl bg-slate-900/95 hover:bg-slate-800 text-slate-300 border border-slate-800/90 shadow-lg flex items-center justify-center transition-all hover:scale-105 active:scale-95 cursor-pointer"
             >
-              <ZoomIn className="w-4 h-4" />
+              <ZoomIn className="w-5 h-5" />
             </button>
 
             <button
               id="btn-zoom-out"
               onClick={() => mapInstanceRef.current?.zoomOut()}
               title="Afastar Zoom (-)"
-              className="w-9 h-9 rounded-xl bg-slate-900/90 hover:bg-slate-800 text-slate-300 border border-slate-800 shadow-md flex items-center justify-center transition-all hover:scale-105 active:scale-95"
+              className="w-11 h-11 rounded-xl bg-slate-900/95 hover:bg-slate-800 text-slate-300 border border-slate-800/90 shadow-lg flex items-center justify-center transition-all hover:scale-105 active:scale-95 cursor-pointer"
             >
-              <ZoomOut className="w-4 h-4" />
+              <ZoomOut className="w-5 h-5" />
             </button>
 
             <button
               id="btn-fit-bounds"
               onClick={fitAllLayers}
               title="Ajustar Visualização a Todas as Camadas"
-              className="w-9 h-9 rounded-xl bg-slate-900/90 hover:bg-slate-800 text-slate-300 border border-slate-800 shadow-md flex items-center justify-center transition-all hover:scale-105 active:scale-95"
+              className="w-11 h-11 rounded-xl bg-slate-900/95 hover:bg-slate-800 text-slate-300 border border-slate-800/90 shadow-lg flex items-center justify-center transition-all hover:scale-105 active:scale-95 cursor-pointer"
             >
-              <Maximize2 className="w-4 h-4" />
+              <Maximize2 className="w-5 h-5" />
             </button>
           </div>
 
           {/* Group 4: Layers & Offline Maps */}
-          <div className="flex flex-col gap-1.5 pt-1 border-t border-slate-800/80">
+          <div className="flex flex-col gap-2 pt-1 border-t border-slate-800/80">
             <button
               id="btn-layer-manager-quick"
               onClick={() => setIsLayerModalOpen(true)}
               title="Camadas"
               aria-label="Camadas"
-              className="w-9 h-9 rounded-xl bg-slate-900/90 hover:bg-slate-800 text-slate-300 border border-slate-800 shadow-md flex items-center justify-center transition-all hover:scale-105 active:scale-95 relative"
+              className="w-11 h-11 rounded-xl bg-slate-900/95 hover:bg-slate-800 text-slate-300 border border-slate-800/90 shadow-lg flex items-center justify-center transition-all hover:scale-105 active:scale-95 cursor-pointer relative"
             >
-              <LayersIcon className="w-4 h-4 text-sky-400" />
-              <span className="absolute -top-1 -right-1 w-3.5 h-3.5 rounded-full bg-sky-600 text-white text-[8px] font-bold flex items-center justify-center">
+              <LayersIcon className="w-5 h-5 text-sky-400" />
+              <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-sky-600 text-white text-[9px] font-black flex items-center justify-center">
                 {layers.filter((l) => l.visible).length}
               </span>
             </button>
@@ -1498,25 +1498,25 @@ export const MapViewer: React.FC = () => {
               id="btn-download-offline-map-quick"
               onClick={() => setIsOfflineModalOpen(true)}
               title="Baixar Área do Mapa para Uso Offline"
-              className="w-9 h-9 rounded-xl bg-slate-900/90 hover:bg-slate-800 text-emerald-400 border border-slate-800 shadow-md flex items-center justify-center transition-all hover:scale-105 active:scale-95"
+              className="w-11 h-11 rounded-xl bg-slate-900/95 hover:bg-slate-800 text-emerald-400 border border-slate-800/90 shadow-lg flex items-center justify-center transition-all hover:scale-105 active:scale-95 cursor-pointer"
             >
-              <Download className="w-4 h-4" />
+              <Download className="w-5 h-5" />
             </button>
           </div>
         </div>
       )}
 
-      {/* Floating Bottom Quick Action Button: Mark Waypoint & Track (Safe Area Above Bottom Nav) */}
+      {/* Floating Bottom Quick Action FAB: Mark Waypoint & Track (Safe Area Above Bottom Nav) */}
       {currentRole !== 'auditor' && (
-        <div className="absolute bottom-20 right-4 sm:bottom-6 sm:right-6 z-20 pointer-events-auto pb-[env(safe-area-inset-bottom)] flex items-center gap-2">
+        <div className="absolute bottom-[calc(5.2rem+env(safe-area-inset-bottom,0px))] right-3 sm:bottom-6 sm:right-6 z-20 pointer-events-auto flex items-center gap-2.5">
           {/* Quick Track Recording on Map */}
           {isRecordingTrack ? (
             <button
               onClick={() => setIsSaveTrackModalOpen(true)}
-              className="flex items-center gap-1.5 bg-red-600 hover:bg-red-500 text-white px-3.5 py-2.5 sm:px-4 sm:py-3 rounded-full font-bold shadow-2xl transition-all transform hover:-translate-y-0.5 border border-red-400/40 text-xs animate-pulse"
+              className="flex items-center gap-2 bg-rose-600 hover:bg-rose-500 text-white px-4 py-3 rounded-2xl font-bold shadow-2xl transition-all active:scale-95 border border-rose-400/50 text-xs animate-pulse cursor-pointer"
             >
-              <Square className="w-3.5 h-3.5" />
-              <span>Finalizar Rota</span>
+              <Square className="w-4 h-4 fill-white" />
+              <span>Finalizar Trilha</span>
             </button>
           ) : (
             <button
@@ -1526,10 +1526,10 @@ export const MapViewer: React.FC = () => {
                 );
                 notifySuccess('Gravação Iniciada', 'Traçado em tempo real ativado.');
               }}
-              className="flex items-center gap-1.5 bg-slate-900/95 hover:bg-slate-800 text-emerald-400 border border-slate-800 px-3.5 py-2.5 sm:px-4 sm:py-3 rounded-full font-bold shadow-2xl transition-all transform hover:-translate-y-0.5 text-xs"
+              className="flex items-center gap-2 bg-slate-900/95 hover:bg-slate-800 text-emerald-400 border border-slate-800/90 px-3.5 py-3 rounded-2xl font-bold shadow-xl transition-all active:scale-95 text-xs cursor-pointer"
               title="Iniciar Gravação de Trilha GPS no Mapa"
             >
-              <Play className="w-3.5 h-3.5 text-emerald-400" />
+              <Play className="w-4 h-4 text-emerald-400 fill-emerald-400" />
               <span className="hidden sm:inline">Gravar Trilha</span>
             </button>
           )}
@@ -1540,10 +1540,10 @@ export const MapViewer: React.FC = () => {
               setPendingWaypointCoord(null);
               setIsAddWaypointModalOpen(true);
             }}
-            className="flex items-center gap-2 bg-sky-600 hover:bg-sky-500 active:bg-sky-700 text-white px-3.5 py-2.5 sm:px-4 sm:py-3 rounded-full font-bold shadow-2xl transition-all transform hover:-translate-y-0.5 border border-sky-400/40"
+            className="flex items-center gap-2 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 px-4 py-3 rounded-2xl font-black shadow-[0_10px_25px_rgba(16,185,129,0.35)] transition-all active:scale-95 border border-emerald-300/40 cursor-pointer text-xs sm:text-sm"
           >
-            <Pin className="w-3.5 h-3.5" />
-            <span className="text-xs sm:text-sm font-bold">Marcar Ponto</span>
+            <Pin className="w-4 h-4 text-slate-950 fill-slate-950" />
+            <span>Marcar Ponto</span>
           </button>
         </div>
       )}

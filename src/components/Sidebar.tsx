@@ -148,7 +148,7 @@ export const Sidebar: React.FC = () => {
       {/* Mobile backdrop overlay */}
       {isMobileMenuOpen && (
         <div
-          className="md:hidden fixed inset-0 bg-black/80 backdrop-blur-xs z-[99998] transition-opacity cursor-pointer"
+          className="md:hidden fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-[90] transition-opacity cursor-pointer"
           onClick={() => setIsMobileMenuOpen(false)}
         />
       )}
@@ -156,7 +156,7 @@ export const Sidebar: React.FC = () => {
       {/* Main Sidebar: Responsive Drawer on Mobile, Collapsible Permanent Bar on Desktop */}
       <aside
         className={`
-          fixed md:relative inset-y-0 left-0 bg-[#070A10] border-r border-slate-800/80 flex flex-col h-[100dvh] z-[99999] md:z-30 shadow-2xl transition-all duration-300 ease-in-out select-none
+          fixed md:relative inset-y-0 left-0 bg-[#070A10] border-r border-slate-800/80 flex flex-col h-[100dvh] z-[100] md:z-30 shadow-2xl transition-all duration-300 ease-in-out select-none pt-[env(safe-area-inset-top,0px)] pb-[env(safe-area-inset-bottom,0px)]
           ${isMobileMenuOpen ? 'translate-x-0 w-72' : '-translate-x-full md:translate-x-0'}
           ${isSidebarCollapsed ? 'md:w-20' : 'md:w-64 lg:w-72'}
         `}

@@ -129,8 +129,8 @@ export const SpecialAccessModal: React.FC<SpecialAccessModalProps> = ({ onOpenUp
   };
 
   return (
-    <div className="fixed inset-0 z-[999999] bg-black/85 backdrop-blur-md flex items-center justify-center p-3 sm:p-4 overflow-y-auto animate-in fade-in">
-      <div className="bg-gradient-to-b from-slate-900 via-slate-900 to-slate-950 border border-amber-500/50 w-full max-w-lg rounded-3xl shadow-2xl p-6 sm:p-7 space-y-5 my-8 relative overflow-hidden">
+    <div className="fixed inset-0 z-[200] bg-slate-950/85 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 animate-in fade-in">
+      <div className="bg-gradient-to-b from-slate-900 via-slate-900 to-slate-950 border border-amber-500/50 w-full max-w-lg rounded-2xl shadow-2xl p-5 sm:p-7 space-y-5 relative overflow-y-auto max-h-[min(90dvh,calc(100vh-32px))]">
         {/* Background glow */}
         <div className="absolute -right-20 -top-20 w-52 h-52 bg-amber-500/15 rounded-full blur-3xl pointer-events-none" />
         <div className="absolute -left-20 -bottom-20 w-52 h-52 bg-yellow-500/10 rounded-full blur-3xl pointer-events-none" />

@@ -13,8 +13,8 @@ export const FeatureLockModal: React.FC = () => {
   };
 
   return (
-    <div className="fixed inset-0 z-[9999] flex items-center justify-center p-3 sm:p-4 bg-slate-950/85 backdrop-blur-md animate-in fade-in duration-200">
-      <div className="relative w-full max-w-lg bg-[#070A10] border border-slate-800 rounded-3xl shadow-2xl overflow-hidden text-slate-100 p-6 sm:p-8 space-y-6">
+    <div className="fixed inset-0 z-[200] flex items-center justify-center p-3 sm:p-4 bg-slate-950/85 backdrop-blur-sm animate-in fade-in duration-200">
+      <div className="relative w-full max-w-lg bg-[#070A10] border border-slate-800 rounded-2xl shadow-2xl overflow-y-auto max-h-[min(90dvh,calc(100vh-32px))] text-slate-100 p-5 sm:p-7 space-y-5">
         
         {/* Header with Close */}
         <div className="flex items-center justify-between">

@@ -142,7 +142,7 @@ const MainAppContent: React.FC = () => {
         })()}
 
         {/* Main View Area */}
-        <main className="flex-1 relative overflow-hidden flex flex-col h-full pb-14 md:pb-0">
+        <main className="flex-1 relative overflow-hidden flex flex-col h-full pb-[calc(3.5rem+env(safe-area-inset-bottom,0px))] md:pb-0">
           {(activeTab === 'map' || activeTab === 'layers') && (
             <div className="relative flex-1 flex flex-col w-full h-full">
               <MapViewer />

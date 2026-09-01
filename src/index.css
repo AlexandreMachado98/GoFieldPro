@@ -163,25 +163,12 @@ html.light .leaflet-container {
   user-select: none !important;
   -webkit-user-select: none !important;
   isolation: isolate;
-  background-color: #090d16 !important;
+  background-color: #0b1329;
   cursor: grab;
 }
 
 .leaflet-container:active {
   cursor: grabbing;
-}
-
-.leaflet-pane {
-  z-index: 200 !important;
-}
-
-.leaflet-top,
-.leaflet-bottom {
-  z-index: 300 !important;
-}
-
-.leaflet-popup-pane {
-  z-index: 400 !important;
 }
 
 .leaflet-popup-content-wrapper {
@@ -237,8 +224,51 @@ html.light .leaflet-container {
 }
 
 /* =========================================================
-   AM TST DESIGN SYSTEM — UTILITY CLASSES & MICROINTERACTIONS
+   ANDROID NATIVE & MATERIAL 3 — TACTICAL FIELD DESIGN SYSTEM
    ========================================================= */
+.android-touch-target {
+  min-height: 48px;
+  min-width: 48px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Material 3 Bottom Sheet Drag Handle */
+.android-bottom-sheet-handle {
+  width: 36px;
+  height: 4px;
+  border-radius: 9999px;
+  background-color: rgba(148, 163, 184, 0.4);
+  margin: 8px auto 12px auto;
+  flex-shrink: 0;
+  cursor: grab;
+}
+
+/* Glassmorphism Tactical Overlay */
+.tactical-glass {
+  background: rgba(7, 10, 16, 0.85);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(51, 65, 85, 0.6);
+}
+
+/* Tactical Action FAB */
+.tactical-fab {
+  min-height: 56px;
+  min-width: 56px;
+  border-radius: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.6), 0 8px 10px -6px rgba(0, 0, 0, 0.5);
+  transition: all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.tactical-fab:active {
+  transform: scale(0.92);
+}
+
 .amtst-gradient-primary {
   background: linear-gradient(135deg, #059669 0%, #10b981 100%);
 }
@@ -250,7 +280,7 @@ html.light .leaflet-container {
 .amtst-card {
   background-color: #0b132b;
   border: 1px solid rgba(37, 51, 82, 0.8);
-  border-radius: 1rem;
+  border-radius: 1.25rem;
   transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
@@ -262,7 +292,7 @@ html.light .leaflet-container {
   background: linear-gradient(135deg, #059669 0%, #10b981 100%);
   color: #ffffff;
   font-weight: 800;
-  border-radius: 0.75rem;
+  border-radius: 0.875rem;
   box-shadow: 0 4px 14px rgba(5, 150, 105, 0.35);
   transition: all 0.15s ease-in-out;
 }
