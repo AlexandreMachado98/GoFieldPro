@@ -2300,7 +2300,7 @@ export const PdfMapNavigator: React.FC = () => {
       
       {/* Fullscreen Overlay: Meus Mapas PDF (Safe Overlay - Map stays mounted underneath) */}
       {(!activeDoc || isMapsListOpen) && (
-        <div className="absolute inset-0 z-[1500] bg-slate-950 flex flex-col p-4 sm:p-8 overflow-y-auto pb-32 text-slate-100 animate-in fade-in duration-150">
+        <div className="absolute inset-0 z-20 bg-slate-950 flex flex-col p-4 sm:p-8 overflow-y-auto pb-32 text-slate-100 animate-in fade-in duration-150">
           <div className="max-w-5xl mx-auto w-full space-y-6">
             {/* Header */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-800/80">
@@ -2464,7 +2464,7 @@ export const PdfMapNavigator: React.FC = () => {
 
       {/* Top Floating App Bar (Clean & Focused) */}
       {activeDoc && !isMapsListOpen && (
-        <div className="absolute top-2.5 left-2.5 right-2.5 z-[1000] flex items-center justify-between pointer-events-none gap-2">
+        <div className="absolute top-2.5 left-2.5 right-2.5 z-10 flex items-center justify-between pointer-events-none gap-2">
           
           {/* Left: Voltar para Meus Mapas PDF & Info */}
           <div className="flex items-center gap-1.5 pointer-events-auto flex-wrap">
@@ -3780,7 +3780,7 @@ export const PdfMapNavigator: React.FC = () => {
 
       {/* Slide-over Drawer: Lista de Mapas & Pontos (z-[100]) */}
       {isDrawerOpen && (
-        <div className="fixed inset-0 z-[100] bg-slate-950/75 backdrop-blur-xs flex justify-end animate-in fade-in">
+        <div className="absolute inset-0 z-30 bg-slate-950/75 backdrop-blur-xs flex justify-end animate-in fade-in">
           <div className="w-full sm:w-96 bg-slate-900 border-l border-slate-800 flex flex-col h-[100dvh] shadow-2xl animate-in slide-in-from-right">
             
             <div className="p-4 border-b border-slate-800 flex items-center justify-between bg-slate-950 shrink-0">
