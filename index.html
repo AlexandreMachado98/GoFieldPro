@@ -26,17 +26,40 @@
     <meta name="build-date" content="2026-08-26" />
     
     <script>
-      // Register PWA Service Worker with aggressive update detection
+      // Is native Capacitor app check
+      const isNative = window.Capacitor?.isNativePlatform?.() || 
+                       window.location.protocol === 'capacitor:' || 
+                       window.location.hostname === 'localhost';
+
       if ('serviceWorker' in navigator) {
-        window.addEventListener('load', () => {
-          navigator.serviceWorker.register('/sw.js')
-            .then(reg => {
-              console.log('GoField Pro Service Worker registrado:', reg.scope);
-              // Check for updates on startup
-              if (reg.update) reg.update();
-            })
-            .catch(err => console.log('Erro ao registrar Service Worker:', err));
-        });
+        if (isNative) {
+          // In native Android app, unregister all SWs and purge cache to always use local APK assets
+          navigator.serviceWorker.getRegistrations().then(registrations => {
+            for (const reg of registrations) {
+              reg.unregister();
+              console.log('[Native] Desregistrado ServiceWorker no Android nativo.');
+            }
+          });
+          if ('caches' in window) {
+            caches.keys().then(keys => {
+              keys.forEach(k => {
+                if (!k.startsWith('geofield_offline_tiles')) {
+                  caches.delete(k);
+                }
+              });
+            });
+          }
+        } else {
+          // Web / PWA browser environment: Register Service Worker
+          window.addEventListener('load', () => {
+            navigator.serviceWorker.register('/sw.js')
+              .then(reg => {
+                console.log('GoField Pro Service Worker registrado:', reg.scope);
+                if (reg.update) reg.update();
+              })
+              .catch(err => console.log('Erro ao registrar Service Worker:', err));
+          });
+        }
       }
     </script>
   </head>
