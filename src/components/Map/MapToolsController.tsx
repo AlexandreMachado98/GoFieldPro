@@ -239,89 +239,88 @@ export const MapToolsController: React.FC<MapToolsControllerProps> = ({
       </div>
 
       {/* ------------------------------------------------------------- */}
-      {/* LEVEL 1 & 2: BOTTOM ACTION FAB CLUSTER (THUMB ERGONOMICS)     */}
+      {/* LEVEL 1 & 2: CENTERED FLOATING BOTTOM ACTION PILL BAR          */}
       {/* ------------------------------------------------------------- */}
-      <div className="absolute bottom-[calc(4.2rem+env(safe-area-inset-bottom,0px))] left-3.5 right-3.5 z-20 pointer-events-none flex items-center justify-between gap-3">
-        {/* Left FAB: Tools Drawer Trigger */}
-        <div className="pointer-events-auto relative">
+      <div className="absolute bottom-[calc(4.5rem+env(safe-area-inset-bottom,0px))] left-1/2 -translate-x-1/2 z-20 pointer-events-auto flex items-center gap-2 bg-[#090D16]/95 border border-slate-800/90 p-1.5 rounded-full shadow-[0_12px_30px_rgba(0,0,0,0.65)] backdrop-blur-md">
+        {/* 1. Tools Button */}
+        <button
+          onClick={() => setIsToolsBottomSheetOpen(true)}
+          className="flex items-center gap-1.5 px-3 py-2 bg-slate-900/90 hover:bg-slate-800 text-sky-400 rounded-full font-bold text-xs transition-all active:scale-95 cursor-pointer border border-slate-800/80"
+          title="Abrir Painel de Ferramentas"
+        >
+          <SlidersHorizontal className="w-4 h-4 text-sky-400" />
+          <span className="font-extrabold text-slate-200">Ferramentas</span>
+        </button>
+
+        <div className="h-4 w-px bg-slate-800/80 shrink-0" />
+
+        {/* 2. Primary Waypoint Mark FAB */}
+        <div className="relative">
           <button
-            onClick={() => setIsToolsBottomSheetOpen(true)}
-            className="flex items-center gap-2 px-4 py-3 bg-slate-950/95 hover:bg-slate-900 text-sky-400 border border-slate-800 rounded-2xl font-bold text-xs shadow-2xl transition-all active:scale-95 cursor-pointer backdrop-blur-md"
-            title="Abrir Painel de Ferramentas"
+            onClick={() => {
+              if (onMarkWaypointClickMap) {
+                setIsPinChoiceOpen(!isPinChoiceOpen);
+              } else {
+                onMarkWaypoint();
+              }
+            }}
+            className="flex items-center gap-1.5 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 px-3.5 py-2 rounded-full font-black shadow-[0_4px_15px_rgba(16,185,129,0.3)] transition-all active:scale-95 cursor-pointer text-xs"
           >
-            <SlidersHorizontal className="w-4 h-4 text-sky-400" />
-            <span className="font-extrabold text-slate-200">Ferramentas</span>
+            <Pin className="w-4 h-4 text-slate-950 fill-slate-950" />
+            <span>Marcar Ponto</span>
           </button>
-        </div>
 
-        {/* Right FAB Group: Primary Track Record & Mark Waypoint */}
-        <div className="pointer-events-auto flex items-center gap-2.5">
-          {/* Quick Track Recording Toggle */}
-          {isRecordingTrack ? (
-            <button
-              onClick={onStopTrackRecording}
-              className="flex items-center gap-2 px-4 py-3 bg-rose-600 hover:bg-rose-500 text-white rounded-2xl font-extrabold text-xs shadow-2xl transition-all active:scale-95 border border-rose-400/50 cursor-pointer animate-pulse"
-            >
-              <Square className="w-4 h-4 fill-white" />
-              <span>Finalizar</span>
-            </button>
-          ) : (
-            <button
-              onClick={onStartTrackRecording}
-              className="flex items-center gap-2 px-3.5 py-3 bg-slate-950/95 hover:bg-slate-900 text-emerald-400 border border-slate-800 rounded-2xl font-bold text-xs shadow-xl transition-all active:scale-95 cursor-pointer backdrop-blur-md"
-              title="Iniciar Gravação de Trilha GPS"
-            >
-              <Play className="w-4 h-4 text-emerald-400 fill-emerald-400" />
-              <span className="hidden sm:inline">Gravar</span>
-            </button>
-          )}
-
-          {/* Primary Waypoint Mark FAB */}
-          <div className="relative">
-            <button
-              onClick={() => {
-                if (onMarkWaypointClickMap) {
-                  setIsPinChoiceOpen(!isPinChoiceOpen);
-                } else {
+          {/* Pin Choice Dropup */}
+          {isPinChoiceOpen && (
+            <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-52 bg-slate-950 border border-slate-800 p-2 rounded-2xl shadow-2xl flex flex-col gap-1 z-40 animate-in fade-in slide-in-from-bottom-2">
+              <button
+                onClick={() => {
+                  setIsPinChoiceOpen(false);
                   onMarkWaypoint();
-                }
-              }}
-              className="flex items-center gap-2 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 px-4 py-3 rounded-2xl font-black shadow-[0_10px_25px_rgba(16,185,129,0.35)] transition-all active:scale-95 border border-emerald-300/40 cursor-pointer text-xs sm:text-sm"
-            >
-              <Pin className="w-4 h-4 text-slate-950 fill-slate-950" />
-              <span>Marcar Ponto</span>
-            </button>
+                }}
+                className="text-left px-3 py-2.5 rounded-xl hover:bg-slate-800 text-xs font-bold text-sky-400 flex items-center gap-2 transition-colors cursor-pointer"
+              >
+                <Crosshair className="w-4 h-4 shrink-0" />
+                <span>Marcar no GPS Atual</span>
+              </button>
 
-            {/* Pin Choice Dropup */}
-            {isPinChoiceOpen && (
-              <div className="absolute bottom-full right-0 mb-2 w-52 bg-slate-950 border border-slate-800 p-2 rounded-2xl shadow-2xl flex flex-col gap-1 z-40 backdrop-blur-md animate-in fade-in slide-in-from-bottom-2">
+              {onMarkWaypointClickMap && (
                 <button
                   onClick={() => {
                     setIsPinChoiceOpen(false);
-                    onMarkWaypoint();
+                    onMarkWaypointClickMap();
                   }}
-                  className="text-left px-3 py-2.5 rounded-xl hover:bg-slate-800 text-xs font-bold text-sky-400 flex items-center gap-2 transition-colors cursor-pointer"
+                  className="text-left px-3 py-2.5 rounded-xl hover:bg-slate-800 text-xs font-bold text-amber-400 flex items-center gap-2 transition-colors cursor-pointer"
                 >
-                  <Crosshair className="w-4 h-4 shrink-0" />
-                  <span>Marcar no GPS Atual</span>
+                  <MapPin className="w-4 h-4 shrink-0" />
+                  <span>Marcar Clicando no Mapa</span>
                 </button>
-
-                {onMarkWaypointClickMap && (
-                  <button
-                    onClick={() => {
-                      setIsPinChoiceOpen(false);
-                      onMarkWaypointClickMap();
-                    }}
-                    className="text-left px-3 py-2.5 rounded-xl hover:bg-slate-800 text-xs font-bold text-amber-400 flex items-center gap-2 transition-colors cursor-pointer"
-                  >
-                    <MapPin className="w-4 h-4 shrink-0" />
-                    <span>Marcar Clicando no Mapa</span>
-                  </button>
-                )}
-              </div>
-            )}
-          </div>
+              )}
+            </div>
+          )}
         </div>
+
+        <div className="h-4 w-px bg-slate-800/80 shrink-0" />
+
+        {/* 3. Track Recording Button */}
+        {isRecordingTrack ? (
+          <button
+            onClick={onStopTrackRecording}
+            className="flex items-center gap-1.5 px-3 py-2 bg-rose-600 hover:bg-rose-500 text-white rounded-full font-extrabold text-xs shadow-lg transition-all active:scale-95 border border-rose-400/50 cursor-pointer animate-pulse"
+          >
+            <Square className="w-3.5 h-3.5 fill-white" />
+            <span>Parar</span>
+          </button>
+        ) : (
+          <button
+            onClick={onStartTrackRecording}
+            className="flex items-center gap-1.5 px-3 py-2 bg-slate-900/90 hover:bg-slate-800 text-emerald-400 rounded-full font-bold text-xs transition-all active:scale-95 cursor-pointer border border-slate-800/80"
+            title="Iniciar Gravação de Trilha GPS"
+          >
+            <Play className="w-3.5 h-3.5 text-emerald-400 fill-emerald-400" />
+            <span>Gravar</span>
+          </button>
+        )}
       </div>
 
       {/* ------------------------------------------------------------- */}
