@@ -1251,7 +1251,7 @@ export const MapViewer: React.FC = () => {
       {!isToolsVisible && (
         <button
           onClick={() => setIsToolsVisible(true)}
-          className="absolute top-3 right-3 z-10 px-3 py-2 rounded-2xl bg-slate-900/95 backdrop-blur-md border border-sky-500/80 text-sky-400 font-extrabold text-xs flex items-center gap-1.5 shadow-2xl hover:bg-slate-800 active:scale-95 transition-all pointer-events-auto cursor-pointer animate-in fade-in"
+          className="absolute top-3 right-3 z-20 px-3 py-2 rounded-2xl bg-slate-900/95 backdrop-blur-md border border-sky-500/80 text-sky-400 font-extrabold text-xs flex items-center gap-1.5 shadow-2xl hover:bg-slate-800 active:scale-95 transition-all pointer-events-auto cursor-pointer animate-in fade-in"
           title="Mostrar Ferramentas e Controles do Mapa"
         >
           <LayersIcon className="w-4 h-4 text-sky-400" />
@@ -1259,209 +1259,223 @@ export const MapViewer: React.FC = () => {
         </button>
       )}
 
-      {/* Floating Tactical Map Controls (Right Side) */}
+      {/* Floating Tactical Map Controls (Right Side) - Compact Clustered Group */}
       {isToolsVisible && (
-        <div className="absolute top-3 right-3 z-10 flex flex-col gap-2 pointer-events-auto animate-in slide-in-from-right duration-200">
-          {/* Toggle Hide Tools */}
-          <button
-            onClick={() => setIsToolsVisible(false)}
-            title="Ocultar Ferramentas do Mapa"
-            className="w-10 h-10 rounded-lg bg-slate-900/90 hover:bg-slate-800 text-slate-400 hover:text-white border border-slate-800 shadow-xl flex items-center justify-center transition-all hover:scale-105 active:scale-95"
-          >
-            <EyeOff className="w-4 h-4" />
-          </button>
-        <button
-          id="btn-center-gps"
-          onClick={centerOnGps}
-          title="Centralizar no GPS (Minha Localização)"
-          className="w-10 h-10 rounded-lg bg-slate-900/90 hover:bg-slate-800 text-sky-400 border border-slate-800 shadow-xl flex items-center justify-center transition-all hover:scale-105 active:scale-95"
-        >
-          {isLocating ? (
-            <Loader2 className="w-5 h-5 animate-spin text-sky-400" />
-          ) : (
-            <Crosshair className="w-5 h-5" />
-          )}
-        </button>
+        <div className="absolute top-3 right-3 z-20 flex flex-col gap-1.5 pointer-events-auto animate-in slide-in-from-right duration-200 bg-slate-950/80 backdrop-blur-md p-1.5 rounded-2xl border border-slate-800/80 shadow-2xl max-h-[calc(100dvh-140px)] overflow-y-auto">
+          {/* Header row: Toggle Hide Tools */}
+          <div className="flex items-center justify-between gap-1 pb-1 border-b border-slate-800/80 px-0.5">
+            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Ações</span>
+            <button
+              onClick={() => setIsToolsVisible(false)}
+              title="Ocultar Painel"
+              className="p-1 text-slate-400 hover:text-white rounded-md hover:bg-slate-800 transition-colors"
+            >
+              <EyeOff className="w-3.5 h-3.5" />
+            </button>
+          </div>
 
-        <button
-          id="btn-calibrate-gps"
-          onClick={() => setIsCalibratingGps(!isCalibratingGps)}
-          title={isCalibratingGps ? 'Cancelar Calibração' : 'Calibrar Posição Manualmente no Mapa'}
-          className={`w-10 h-10 rounded-lg border shadow-xl flex items-center justify-center transition-all hover:scale-105 active:scale-95 ${
-            isCalibratingGps
-              ? 'bg-amber-500 text-slate-950 border-amber-400 shadow-amber-900/50 animate-bounce'
-              : 'bg-slate-900/90 hover:bg-slate-800 text-amber-400 border-slate-800'
-          }`}
-        >
-          <MapPin className="w-5 h-5" />
-        </button>
+          {/* Group 1: GPS & Location */}
+          <div className="flex flex-col gap-1.5">
+            <button
+              id="btn-center-gps"
+              onClick={centerOnGps}
+              title="Centralizar no GPS (Minha Localização)"
+              className="w-9 h-9 rounded-xl bg-slate-900/90 hover:bg-slate-800 text-sky-400 border border-slate-800 shadow-md flex items-center justify-center transition-all hover:scale-105 active:scale-95"
+            >
+              {isLocating ? (
+                <Loader2 className="w-4 h-4 animate-spin text-sky-400" />
+              ) : (
+                <Crosshair className="w-4 h-4" />
+              )}
+            </button>
 
-        {/* Pin Dropping Tool Trigger with Quick Selector */}
-        <div className="relative">
-          <button
-            id="btn-add-pin-tool"
-            onClick={() => setIsPinChoiceMenuOpen(!isPinChoiceMenuOpen)}
-            title="Adicionar Alfinete de Marcação no Mapa"
-            className={`w-10 h-10 rounded-lg border shadow-xl flex items-center justify-center transition-all hover:scale-105 active:scale-95 ${
-              isPinModeActive
-                ? 'bg-sky-500 text-white border-sky-400 shadow-sky-900/50 animate-bounce'
-                : 'bg-slate-900/90 hover:bg-slate-800 text-sky-400 border-slate-800'
-            }`}
-          >
-            <Pin className="w-5 h-5" />
-          </button>
+            <button
+              id="btn-calibrate-gps"
+              onClick={() => setIsCalibratingGps(!isCalibratingGps)}
+              title={isCalibratingGps ? 'Cancelar Calibração' : 'Calibrar Posição Manualmente no Mapa'}
+              className={`w-9 h-9 rounded-xl border shadow-md flex items-center justify-center transition-all hover:scale-105 active:scale-95 ${
+                isCalibratingGps
+                  ? 'bg-amber-500 text-slate-950 border-amber-400 shadow-amber-900/50 animate-bounce'
+                  : 'bg-slate-900/90 hover:bg-slate-800 text-amber-400 border-slate-800'
+              }`}
+            >
+              <MapPin className="w-4 h-4" />
+            </button>
+          </div>
 
-          {/* Pin Choice Dropdown */}
-          {isPinChoiceMenuOpen && (
-            <div className="absolute right-12 top-0 bg-slate-900/95 border border-slate-700 p-1.5 rounded-xl shadow-2xl flex flex-col gap-1 w-48 z-40 backdrop-blur-md">
+          {/* Group 2: Pins & Track Recording */}
+          <div className="flex flex-col gap-1.5 pt-1 border-t border-slate-800/80">
+            {/* Pin Dropping Tool Trigger with Quick Selector */}
+            <div className="relative">
               <button
-                onClick={() => {
-                  setIsPinChoiceMenuOpen(false);
-                  setPendingWaypointCoord(null);
-                  setIsAddWaypointModalOpen(true);
-                }}
-                className="text-left px-3 py-2 rounded-lg hover:bg-slate-800 text-xs font-bold text-sky-400 flex items-center gap-2 transition-colors"
+                id="btn-add-pin-tool"
+                onClick={() => setIsPinChoiceMenuOpen(!isPinChoiceMenuOpen)}
+                title="Adicionar Alfinete de Marcação no Mapa"
+                className={`w-9 h-9 rounded-xl border shadow-md flex items-center justify-center transition-all hover:scale-105 active:scale-95 ${
+                  isPinModeActive
+                    ? 'bg-sky-500 text-white border-sky-400 shadow-sky-900/50 animate-bounce'
+                    : 'bg-slate-900/90 hover:bg-slate-800 text-sky-400 border-slate-800'
+                }`}
               >
-                <Crosshair className="w-3.5 h-3.5" />
-                <span>Marcar no GPS Atual</span>
+                <Pin className="w-4 h-4" />
               </button>
-              <button
-                onClick={() => {
-                  setIsPinChoiceMenuOpen(false);
-                  setIsPinModeActive(true);
-                }}
-                className="text-left px-3 py-2 rounded-lg hover:bg-slate-800 text-xs font-bold text-amber-400 flex items-center gap-2 transition-colors"
-              >
-                <MapPin className="w-3.5 h-3.5" />
-                <span>Marcar Clicando no Mapa</span>
-              </button>
+
+              {/* Pin Choice Dropdown */}
+              {isPinChoiceMenuOpen && (
+                <div className="absolute right-11 top-0 bg-slate-900/95 border border-slate-700 p-1.5 rounded-xl shadow-2xl flex flex-col gap-1 w-48 z-40 backdrop-blur-md">
+                  <button
+                    onClick={() => {
+                      setIsPinChoiceMenuOpen(false);
+                      setPendingWaypointCoord(null);
+                      setIsAddWaypointModalOpen(true);
+                    }}
+                    className="text-left px-3 py-2 rounded-lg hover:bg-slate-800 text-xs font-bold text-sky-400 flex items-center gap-2 transition-colors"
+                  >
+                    <Crosshair className="w-3.5 h-3.5" />
+                    <span>Marcar no GPS Atual</span>
+                  </button>
+                  <button
+                    onClick={() => {
+                      setIsPinChoiceMenuOpen(false);
+                      setIsPinModeActive(true);
+                    }}
+                    className="text-left px-3 py-2 rounded-lg hover:bg-slate-800 text-xs font-bold text-amber-400 flex items-center gap-2 transition-colors"
+                  >
+                    <MapPin className="w-3.5 h-3.5" />
+                    <span>Marcar Clicando no Mapa</span>
+                  </button>
+                </div>
+              )}
             </div>
-          )}
+
+            {/* Live Track Recording Toggle Trigger */}
+            <button
+              id="btn-track-record-tool"
+              onClick={() => {
+                if (isRecordingTrack) {
+                  setIsSaveTrackModalOpen(true);
+                } else {
+                  startTrackRecording(
+                    `Trilha Campo ${new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`
+                  );
+                  notifySuccess(
+                    'Gravação de Rota Iniciada',
+                    'O traçado em tempo real está ativo. Percorra o terreno para registrar os pontos.'
+                  );
+                }
+              }}
+              title={
+                isRecordingTrack
+                  ? 'Trilha em Gravação Ativa - Clique para Concluir'
+                  : 'Gravar Trilha / Rota no Mapa'
+              }
+              className={`w-9 h-9 rounded-xl border shadow-md flex items-center justify-center transition-all hover:scale-105 active:scale-95 ${
+                isRecordingTrack
+                  ? 'bg-red-600 text-white border-red-500 shadow-red-900/50 animate-pulse'
+                  : 'bg-slate-900/90 hover:bg-slate-800 text-emerald-400 border-slate-800'
+              }`}
+            >
+              <Activity className="w-4 h-4" />
+            </button>
+
+            {/* Ruler / Geodesic Measurement Tool Trigger */}
+            <button
+              id="btn-measure-tool"
+              onClick={() => {
+                if (isMeasuring && measurementPoints.length > 0) {
+                  setIsSummaryModalOpen(true);
+                } else {
+                  setIsMeasuring(!isMeasuring);
+                }
+              }}
+              title={
+                isMeasuring
+                  ? 'Régua Ativa - Clique para Ver Resumo'
+                  : 'Ativar Régua Geodésica de Medição'
+              }
+              className={`w-9 h-9 rounded-xl border shadow-md flex items-center justify-center transition-all hover:scale-105 active:scale-95 relative ${
+                isMeasuring
+                  ? 'bg-rose-600 text-white border-rose-500 shadow-rose-900/50 animate-pulse'
+                  : 'bg-slate-900/90 hover:bg-slate-800 text-slate-300 border-slate-800'
+              }`}
+            >
+              <Ruler className="w-4 h-4" />
+              {measurementPoints.length > 0 && (
+                <span className="absolute -top-1 -right-1 w-3.5 h-3.5 rounded-full bg-amber-500 text-slate-950 text-[8px] font-black flex items-center justify-center">
+                  {measurementPoints.length}
+                </span>
+              )}
+            </button>
+          </div>
+
+          {/* Group 3: Zoom & Bounds */}
+          <div className="flex flex-col gap-1.5 pt-1 border-t border-slate-800/80">
+            <button
+              id="btn-zoom-in"
+              onClick={() => mapInstanceRef.current?.zoomIn()}
+              title="Aproximar Zoom (+)"
+              className="w-9 h-9 rounded-xl bg-slate-900/90 hover:bg-slate-800 text-slate-300 border border-slate-800 shadow-md flex items-center justify-center transition-all hover:scale-105 active:scale-95"
+            >
+              <ZoomIn className="w-4 h-4" />
+            </button>
+
+            <button
+              id="btn-zoom-out"
+              onClick={() => mapInstanceRef.current?.zoomOut()}
+              title="Afastar Zoom (-)"
+              className="w-9 h-9 rounded-xl bg-slate-900/90 hover:bg-slate-800 text-slate-300 border border-slate-800 shadow-md flex items-center justify-center transition-all hover:scale-105 active:scale-95"
+            >
+              <ZoomOut className="w-4 h-4" />
+            </button>
+
+            <button
+              id="btn-fit-bounds"
+              onClick={fitAllLayers}
+              title="Ajustar Visualização a Todas as Camadas"
+              className="w-9 h-9 rounded-xl bg-slate-900/90 hover:bg-slate-800 text-slate-300 border border-slate-800 shadow-md flex items-center justify-center transition-all hover:scale-105 active:scale-95"
+            >
+              <Maximize2 className="w-4 h-4" />
+            </button>
+          </div>
+
+          {/* Group 4: Layers & Offline Maps */}
+          <div className="flex flex-col gap-1.5 pt-1 border-t border-slate-800/80">
+            <button
+              id="btn-layer-manager-quick"
+              onClick={() => setIsLayerModalOpen(true)}
+              title="Camadas"
+              aria-label="Camadas"
+              className="w-9 h-9 rounded-xl bg-slate-900/90 hover:bg-slate-800 text-slate-300 border border-slate-800 shadow-md flex items-center justify-center transition-all hover:scale-105 active:scale-95 relative"
+            >
+              <LayersIcon className="w-4 h-4 text-sky-400" />
+              <span className="absolute -top-1 -right-1 w-3.5 h-3.5 rounded-full bg-sky-600 text-white text-[8px] font-bold flex items-center justify-center">
+                {layers.filter((l) => l.visible).length}
+              </span>
+            </button>
+
+            <button
+              id="btn-download-offline-map-quick"
+              onClick={() => setIsOfflineModalOpen(true)}
+              title="Baixar Área do Mapa para Uso Offline"
+              className="w-9 h-9 rounded-xl bg-slate-900/90 hover:bg-slate-800 text-emerald-400 border border-slate-800 shadow-md flex items-center justify-center transition-all hover:scale-105 active:scale-95"
+            >
+              <Download className="w-4 h-4" />
+            </button>
+          </div>
         </div>
-
-        {/* Live Track Recording Toggle Trigger */}
-        <button
-          id="btn-track-record-tool"
-          onClick={() => {
-            if (isRecordingTrack) {
-              setIsSaveTrackModalOpen(true);
-            } else {
-              startTrackRecording(
-                `Trilha Campo ${new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`
-              );
-              notifySuccess(
-                'Gravação de Rota Iniciada',
-                'O traçado em tempo real está ativo. Percorra o terreno para registrar os pontos.'
-              );
-            }
-          }}
-          title={
-            isRecordingTrack
-              ? 'Trilha em Gravação Ativa - Clique para Concluir e Baixar'
-              : 'Iniciar Gravação de Trilha / Rota no Mapa'
-          }
-          className={`w-10 h-10 rounded-lg border shadow-xl flex items-center justify-center transition-all hover:scale-105 active:scale-95 ${
-            isRecordingTrack
-              ? 'bg-red-600 text-white border-red-500 shadow-red-900/50 animate-pulse'
-              : 'bg-slate-900/90 hover:bg-slate-800 text-emerald-400 border-slate-800'
-          }`}
-        >
-          <Activity className="w-5 h-5" />
-        </button>
-
-        <button
-          id="btn-zoom-in"
-          onClick={() => mapInstanceRef.current?.zoomIn()}
-          title="Aproximar Zoom (+)"
-          className="w-10 h-10 rounded-lg bg-slate-900/90 hover:bg-slate-800 text-slate-300 border border-slate-800 shadow-xl flex items-center justify-center transition-all hover:scale-105 active:scale-95"
-        >
-          <ZoomIn className="w-5 h-5" />
-        </button>
-
-        <button
-          id="btn-zoom-out"
-          onClick={() => mapInstanceRef.current?.zoomOut()}
-          title="Afastar Zoom (-)"
-          className="w-10 h-10 rounded-lg bg-slate-900/90 hover:bg-slate-800 text-slate-300 border border-slate-800 shadow-xl flex items-center justify-center transition-all hover:scale-105 active:scale-95"
-        >
-          <ZoomOut className="w-5 h-5" />
-        </button>
-
-        <button
-          id="btn-fit-bounds"
-          onClick={fitAllLayers}
-          title="Ajustar Visualização a Todas as Camadas"
-          className="w-10 h-10 rounded-lg bg-slate-900/90 hover:bg-slate-800 text-slate-300 border border-slate-800 shadow-xl flex items-center justify-center transition-all hover:scale-105 active:scale-95"
-        >
-          <Maximize2 className="w-5 h-5" />
-        </button>
-
-        {/* Layer Manager Quick Trigger (Camadas) */}
-        <button
-          id="btn-layer-manager-quick"
-          onClick={() => setIsLayerModalOpen(true)}
-          title="Camadas"
-          aria-label="Camadas"
-          className="w-10 h-10 rounded-lg bg-slate-900/90 hover:bg-slate-800 text-slate-300 border border-slate-800 shadow-xl flex items-center justify-center transition-all hover:scale-105 active:scale-95 relative"
-        >
-          <LayersIcon className="w-5 h-5 text-sky-400" />
-          <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-sky-600 text-white text-[9px] font-bold flex items-center justify-center">
-            {layers.filter((l) => l.visible).length}
-          </span>
-        </button>
-
-        {/* Ruler / Geodesic Measurement Tool Trigger */}
-        <button
-          id="btn-measure-tool"
-          onClick={() => {
-            if (isMeasuring && measurementPoints.length > 0) {
-              setIsSummaryModalOpen(true);
-            } else {
-              setIsMeasuring(!isMeasuring);
-            }
-          }}
-          title={
-            isMeasuring
-              ? 'Régua Ativa - Clique para Ver Resumo e Relatório'
-              : 'Ativar Régua Geodésica de Medição'
-          }
-          className={`w-10 h-10 rounded-lg border shadow-xl flex items-center justify-center transition-all hover:scale-105 active:scale-95 relative ${
-            isMeasuring
-              ? 'bg-rose-600 text-white border-rose-500 shadow-rose-900/50 animate-pulse'
-              : 'bg-slate-900/90 hover:bg-slate-800 text-slate-300 border-slate-800'
-          }`}
-        >
-          <Ruler className="w-5 h-5" />
-          {measurementPoints.length > 0 && (
-            <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-amber-500 text-slate-950 text-[9px] font-black flex items-center justify-center">
-              {measurementPoints.length}
-            </span>
-          )}
-        </button>
-
-        {/* Quick Offline Map Area Downloader */}
-        <button
-          id="btn-download-offline-map-quick"
-          onClick={() => setIsOfflineModalOpen(true)}
-          title="Baixar Área do Mapa para Uso Offline"
-          className="w-10 h-10 rounded-lg bg-slate-900/90 hover:bg-slate-800 text-emerald-400 border border-slate-800 shadow-xl flex items-center justify-center transition-all hover:scale-105 active:scale-95"
-        >
-          <Download className="w-5 h-5" />
-        </button>
-      </div>
       )}
 
-      {/* Floating Bottom Quick Action Button: Mark Waypoint & Track */}
+      {/* Floating Bottom Quick Action Button: Mark Waypoint & Track (Safe Area Above Bottom Nav) */}
       {currentRole !== 'auditor' && (
-        <div className="absolute bottom-8 right-4 sm:bottom-6 sm:right-6 z-10 pointer-events-auto pb-[env(safe-area-inset-bottom)] flex items-center gap-2">
+        <div className="absolute bottom-20 right-4 sm:bottom-6 sm:right-6 z-20 pointer-events-auto pb-[env(safe-area-inset-bottom)] flex items-center gap-2">
           {/* Quick Track Recording on Map */}
           {isRecordingTrack ? (
             <button
               onClick={() => setIsSaveTrackModalOpen(true)}
-              className="flex items-center gap-1.5 bg-red-600 hover:bg-red-500 text-white px-4 py-3 rounded-full font-bold shadow-2xl transition-all transform hover:-translate-y-0.5 border border-red-400/40 text-xs animate-pulse"
+              className="flex items-center gap-1.5 bg-red-600 hover:bg-red-500 text-white px-3.5 py-2.5 sm:px-4 sm:py-3 rounded-full font-bold shadow-2xl transition-all transform hover:-translate-y-0.5 border border-red-400/40 text-xs animate-pulse"
             >
-              <Square className="w-4 h-4" />
-              <span>Finalizar & Baixar Rota</span>
+              <Square className="w-3.5 h-3.5" />
+              <span>Finalizar Rota</span>
             </button>
           ) : (
             <button
@@ -1471,10 +1485,10 @@ export const MapViewer: React.FC = () => {
                 );
                 notifySuccess('Gravação Iniciada', 'Traçado em tempo real ativado.');
               }}
-              className="flex items-center gap-1.5 bg-slate-900/95 hover:bg-slate-800 text-emerald-400 border border-slate-800 px-3.5 py-3 rounded-full font-bold shadow-2xl transition-all transform hover:-translate-y-0.5 text-xs"
+              className="flex items-center gap-1.5 bg-slate-900/95 hover:bg-slate-800 text-emerald-400 border border-slate-800 px-3.5 py-2.5 sm:px-4 sm:py-3 rounded-full font-bold shadow-2xl transition-all transform hover:-translate-y-0.5 text-xs"
               title="Iniciar Gravação de Trilha GPS no Mapa"
             >
-              <Play className="w-4 h-4 text-emerald-400" />
+              <Play className="w-3.5 h-3.5 text-emerald-400" />
               <span className="hidden sm:inline">Gravar Trilha</span>
             </button>
           )}
@@ -1485,10 +1499,10 @@ export const MapViewer: React.FC = () => {
               setPendingWaypointCoord(null);
               setIsAddWaypointModalOpen(true);
             }}
-            className="flex items-center gap-2 bg-sky-600 hover:bg-sky-500 active:bg-sky-700 text-white px-4 py-3 rounded-full font-bold shadow-2xl transition-all transform hover:-translate-y-0.5 border border-sky-400/40"
+            className="flex items-center gap-2 bg-sky-600 hover:bg-sky-500 active:bg-sky-700 text-white px-3.5 py-2.5 sm:px-4 sm:py-3 rounded-full font-bold shadow-2xl transition-all transform hover:-translate-y-0.5 border border-sky-400/40"
           >
-            <Pin className="w-4 h-4" />
-            <span className="text-xs sm:text-sm font-bold">Marcar Alfinete</span>
+            <Pin className="w-3.5 h-3.5" />
+            <span className="text-xs sm:text-sm font-bold">Marcar Ponto</span>
           </button>
         </div>
       )}

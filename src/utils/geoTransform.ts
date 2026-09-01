@@ -38,10 +38,10 @@ export function getDocumentCalibration(doc: PdfDocument | null | undefined): Geo
 }
 
 /**
- * Calibrates a document around the user's current GPS position
+ * Calibrates a document or dimensional sheet around the user's current GPS position
  */
 export function createCenteredCalibration(
-  doc: PdfDocument | null | undefined,
+  doc: { width?: number; height?: number; calibration?: GeoCalibration } | null | undefined,
   centerLat: number,
   centerLng: number,
   scaleMetersPerPixel = 0.75
@@ -50,12 +50,13 @@ export function createCenteredCalibration(
   const safeLng = typeof centerLng === 'number' && !isNaN(centerLng) ? centerLng : DEFAULT_REF.westLng;
   const safeScale = typeof scaleMetersPerPixel === 'number' && !isNaN(scaleMetersPerPixel) && scaleMetersPerPixel > 0 ? scaleMetersPerPixel : 0.75;
 
-  const h = doc?.height && !isNaN(doc.height) ? doc.height : 1200;
-  const w = doc?.width && !isNaN(doc.width) ? doc.width : 1600;
+  const h = doc?.height && !isNaN(doc.height) && doc.height > 0 ? doc.height : 1200;
+  const w = doc?.width && !isNaN(doc.width) && doc.width > 0 ? doc.width : 1600;
 
-  // 1 degree latitude ~ 111,320 meters
+  // 1 degree latitude ~ 111,320 meters (WGS84 ellipsoidal approximation)
   const degPerMeterLat = 1 / 111320;
-  const cosLat = Math.cos((safeLat * Math.PI) / 180);
+  const latRad = (safeLat * Math.PI) / 180;
+  const cosLat = Math.cos(latRad);
   // 1 degree longitude ~ 111,320 * cos(lat) meters
   const degPerMeterLng = 1 / (111320 * (Math.abs(cosLat) > 0.01 ? cosLat : 1));
 
@@ -69,8 +70,8 @@ export function createCenteredCalibration(
 
   return {
     isCalibrated: true,
-    ref1: { x: h * 0.9, y: w * 0.1, lat: northLat, lng: westLng },
-    ref2: { x: h * 0.1, y: w * 0.9, lat: southLat, lng: eastLng },
+    ref1: { x: +(h * 0.9).toFixed(1), y: +(w * 0.1).toFixed(1), lat: +northLat.toFixed(7), lng: +westLng.toFixed(7) },
+    ref2: { x: +(h * 0.1).toFixed(1), y: +(w * 0.9).toFixed(1), lat: +southLat.toFixed(7), lng: +eastLng.toFixed(7) },
     scaleMetersPerPixel: safeScale,
   };
 }
@@ -78,12 +79,12 @@ export function createCenteredCalibration(
 /**
  * Converts PDF Pixel Coordinates (x: vertical Leaflet lat, y: horizontal Leaflet lng) to WGS84 (Lat, Lng)
  */
-export function pdfToGps(x: number, y: number, doc: PdfDocument | null | undefined): { lat: number; lng: number } {
+export function pdfToGps(x: number, y: number, doc: { width?: number; height?: number; calibration?: GeoCalibration } | null | undefined): { lat: number; lng: number } {
   if (typeof x !== 'number' || typeof y !== 'number' || isNaN(x) || isNaN(y)) {
     return { lat: DEFAULT_REF.northLat, lng: DEFAULT_REF.westLng };
   }
 
-  const cal = getDocumentCalibration(doc);
+  const cal = getDocumentCalibration(doc as any);
   const { ref1, ref2 } = cal;
 
   // Linear interpolation with safeguards against 0 division
@@ -97,36 +98,39 @@ export function pdfToGps(x: number, y: number, doc: PdfDocument | null | undefin
   const lng = ref1.lng + lngRatio * (ref2.lng - ref1.lng);
 
   return {
-    lat: isNaN(lat) ? DEFAULT_REF.northLat : lat,
-    lng: isNaN(lng) ? DEFAULT_REF.westLng : lng,
+    lat: isNaN(lat) ? DEFAULT_REF.northLat : +lat.toFixed(7),
+    lng: isNaN(lng) ? DEFAULT_REF.westLng : +lng.toFixed(7),
   };
 }
 
 /**
  * Converts WGS84 (Lat, Lng) to PDF Pixel Coordinates (x: vertical Leaflet lat, y: horizontal Leaflet lng)
  */
-export function gpsToPdf(lat: number, lng: number, doc: PdfDocument | null | undefined): { x: number; y: number; isInside: boolean } {
-  const h = doc?.height && !isNaN(doc.height) ? doc.height : 1200;
-  const w = doc?.width && !isNaN(doc.width) ? doc.width : 1600;
+export function gpsToPdf(lat: number, lng: number, doc: { width?: number; height?: number; calibration?: GeoCalibration } | null | undefined): { x: number; y: number; isInside: boolean } {
+  const h = doc?.height && !isNaN(doc.height) && doc.height > 0 ? doc.height : 1200;
+  const w = doc?.width && !isNaN(doc.width) && doc.width > 0 ? doc.width : 1600;
 
   if (typeof lat !== 'number' || typeof lng !== 'number' || isNaN(lat) || isNaN(lng)) {
     return { x: h / 2, y: w / 2, isInside: true };
   }
 
-  const cal = getDocumentCalibration(doc);
+  const cal = getDocumentCalibration(doc as any);
   const { ref1, ref2 } = cal;
 
-  const dLat = (ref2.lat - ref1.lat) || 0.0001;
-  const dLng = (ref2.lng - ref1.lng) || 0.0001;
+  const dLat = (ref2.lat - ref1.lat);
+  const dLng = (ref2.lng - ref1.lng);
 
-  const latRatio = (lat - ref1.lat) / dLat;
-  const lngRatio = (lng - ref1.lng) / dLng;
+  const safeDLat = Math.abs(dLat) > 0.0000001 ? dLat : 0.0001;
+  const safeDLng = Math.abs(dLng) > 0.0000001 ? dLng : 0.0001;
+
+  const latRatio = (lat - ref1.lat) / safeDLat;
+  const lngRatio = (lng - ref1.lng) / safeDLng;
 
   const x = ref1.x + latRatio * (ref2.x - ref1.x);
   const y = ref1.y + lngRatio * (ref2.y - ref1.y);
 
-  const safeX = isNaN(x) ? h / 2 : x;
-  const safeY = isNaN(y) ? w / 2 : y;
+  const safeX = isNaN(x) ? h / 2 : +x.toFixed(1);
+  const safeY = isNaN(y) ? w / 2 : +y.toFixed(1);
   const isInside = safeX >= 0 && safeX <= h && safeY >= 0 && safeY <= w;
 
   return { x: safeX, y: safeY, isInside };

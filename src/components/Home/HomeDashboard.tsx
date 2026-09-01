@@ -6,7 +6,6 @@ import { FieldRound } from '../../types';
 import { APP_VERSION } from '../../config/version';
 import { generateFieldRoundsPdf } from '../../utils/fieldRoundsPdfReport';
 import { getSpecialAccessComputedStatus, getSpecialAccessDaysRemaining, hasSpecialAccessActive } from '../../utils/featureAccess';
-import { PwaInstallButton } from '../PWA/PwaInstallButton';
 import { 
   Gauge, 
   Map as MapIcon, 
@@ -375,9 +374,6 @@ export const HomeDashboard: React.FC = () => {
             </button>
           </div>
         </div>
-
-        {/* PWA Install Banner */}
-        <PwaInstallButton variant="banner" />
 
         {/* SPECIAL ACCESS VIP STATUS BANNER */}
         {profile && getSpecialAccessComputedStatus(profile) === 'active' && (

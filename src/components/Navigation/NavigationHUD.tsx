@@ -4,7 +4,7 @@ import { Navigation, Compass, ChevronRight, ChevronLeft, X, ArrowUpRight, Gauge,
 import { motion, AnimatePresence } from 'motion/react';
 
 export const NavigationHUD: React.FC = () => {
-  const { navTarget, cancelNavigation, cycleNextPoint, cyclePrevPoint, currentGps, gpsQuality, t } = useApp();
+  const { navTarget, cancelNavigation, cycleNextPoint, cyclePrevPoint, currentGps, gpsQuality, isMeasuring, t } = useApp();
 
   if (!navTarget) return null;
 
@@ -19,7 +19,7 @@ export const NavigationHUD: React.FC = () => {
         initial={{ y: -50, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
         exit={{ y: -50, opacity: 0 }}
-        className="absolute top-16 left-1/2 -translate-x-1/2 z-20 w-full max-w-xl px-4 pointer-events-none"
+        className={`absolute ${isMeasuring ? 'top-48 sm:top-44' : 'top-16'} left-1/2 -translate-x-1/2 z-20 w-full max-w-xl px-3 sm:px-4 pointer-events-none transition-all duration-300`}
       >
         <div className="pointer-events-auto bg-slate-900/95 backdrop-blur-md border-2 border-sky-500/80 rounded-2xl p-4 shadow-2xl text-slate-100">
           {/* Top Bar */}

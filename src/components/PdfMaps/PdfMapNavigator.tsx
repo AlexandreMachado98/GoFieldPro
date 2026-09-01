@@ -1802,10 +1802,10 @@ export const PdfMapNavigator: React.FC = () => {
           pageCount: renderedPages.length,
           currentPage: 0,
           width: baseWidth,
-          userId: currentUserId,
           height: baseHeight,
+          userId: currentUserId,
           calibration: createCenteredCalibration(
-            null,
+            { width: baseWidth, height: baseHeight },
             currentGps?.lat || -23.542,
             currentGps?.lng || -46.638,
             0.75
@@ -1837,6 +1837,8 @@ export const PdfMapNavigator: React.FC = () => {
           const dataUrl = event.target?.result as string;
           const img = typeof window !== 'undefined' ? document.createElement('img') : new (window as any).Image();
           img.onload = async () => {
+            const imgWidth = img.naturalWidth || 1600;
+            const imgHeight = img.naturalHeight || 1200;
             const newDoc: PdfDocument = {
               id: `img-${Date.now()}`,
               userId: currentUserId,
@@ -1846,10 +1848,10 @@ export const PdfMapNavigator: React.FC = () => {
               dataUrls: [dataUrl],
               pageCount: 1,
               currentPage: 0,
-              width: img.naturalWidth || 1600,
-              height: img.naturalHeight || 1200,
+              width: imgWidth,
+              height: imgHeight,
               calibration: createCenteredCalibration(
-                null,
+                { width: imgWidth, height: imgHeight },
                 currentGps?.lat || -23.542,
                 currentGps?.lng || -46.638,
                 0.75
@@ -2760,9 +2762,9 @@ export const PdfMapNavigator: React.FC = () => {
           </div>
         )}
 
-        {/* Live GPS Telemetry Overlay Badge (Bottom Left) */}
+        {/* Live GPS Telemetry Overlay Badge (Bottom Left - Safe Area above Mobile Nav) */}
         {isGpsActive && userGps && (
-          <div className="absolute bottom-2 left-2 z-10 pointer-events-auto bg-slate-900/95 backdrop-blur-md border border-sky-500/80 rounded-2xl px-3 py-2 shadow-2xl flex items-center gap-3 text-xs text-slate-200">
+          <div className="absolute bottom-16 sm:bottom-3 left-2.5 z-20 pointer-events-auto bg-slate-900/95 backdrop-blur-md border border-sky-500/80 rounded-2xl px-3 py-2 shadow-2xl flex items-center gap-3 text-xs text-slate-200">
             <div className="flex items-center gap-1.5">
               <span className="w-2.5 h-2.5 rounded-full bg-sky-400 animate-ping" />
               <span className="font-mono font-black text-sky-300">

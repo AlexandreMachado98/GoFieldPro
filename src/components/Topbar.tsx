@@ -4,7 +4,6 @@ import { useAuth } from '../context/AuthContext';
 import { useUpdate } from '../context/UpdateContext';
 import { APP_VERSION } from '../config/version';
 import { Language } from '../types';
-import { PwaInstallButton } from './PWA/PwaInstallButton';
 import { hasSpecialAccessActive } from '../utils/featureAccess';
 import {
   Folder,
@@ -277,11 +276,6 @@ export const Topbar: React.FC = () => {
                         </button>
                       </div>
                     )}
-                  </div>
-
-                  {/* 1. Botão de Instalar App (PWA) no menu do perfil */}
-                  <div className="pb-1">
-                    <PwaInstallButton variant="sidebar" />
                   </div>
 
                   {/* 2. Botão de Sincronização de Dados no menu do perfil */}

@@ -5,7 +5,6 @@ import { useApp } from '../context/AppContext';
 import { useAuth } from '../context/AuthContext';
 import { useUpdate } from '../context/UpdateContext';
 import { APP_VERSION } from '../config/version';
-import { PwaInstallButton } from './PWA/PwaInstallButton';
 import {
   Map,
   Crown,
@@ -319,8 +318,6 @@ export const Sidebar: React.FC = () => {
               <ShieldCheck className="w-5 h-5 text-emerald-400 shrink-0" />
               {(!isSidebarCollapsed || isMobileMenuOpen) && <span>Políticas & LGPD</span>}
             </button>
-
-            {(!isSidebarCollapsed || isMobileMenuOpen) && <PwaInstallButton variant="sidebar" />}
 
           {/* Pro Informative Card for Free Users */}
           {!hasFullProAccess && (!isSidebarCollapsed || isMobileMenuOpen) && (

@@ -15,7 +15,6 @@ import {
 } from 'firebase/auth';
 import { doc, setDoc } from 'firebase/firestore';
 import { auth, db } from '../../lib/firebase';
-import { PwaInstallButton } from '../PWA/PwaInstallButton';
 import { UserRole } from '../../types';
 import {
   Map,
@@ -163,18 +162,18 @@ export const LoginScreen: React.FC = () => {
 
       if (err.code === 'auth/popup-closed-by-user') {
         errorMsg = 'O login com o Google foi cancelado.';
-      } else if (err.code === 'auth/popup-blocked') {
-        errorMsg = 'A janela do Google foi bloqueada pelo navegador. Permita pop-ups no seu navegador.';
+      } else if (err.code === 'auth/popup-blocked' || err.message?.includes('disallowed_useragent')) {
+        errorMsg = 'O login via janela do Google requer configuração de SHA-1 no Firebase Console. Utilize o login por E-mail e Senha para acesso imediato.';
       } else if (err.code === 'auth/operation-not-allowed' || err.code === 'auth/admin-restricted-operation') {
         errorMsg =
           'O provedor Google precisa ser ativado no Firebase Console (Authentication > Sign-in method > Google).';
       } else if (err.code === 'auth/unauthorized-domain') {
         errorMsg =
-          'Domínio não autorizado no Firebase. Adicione o domínio atual em Authentication > Settings > Authorized domains no Firebase Console.';
+          'Domínio do app não autorizado no Firebase Console. Recomendamos o acesso por E-mail e Senha.';
       } else if (err.code === 'auth/network-request-failed') {
         errorMsg = 'Falha de conexão com os servidores. Verifique sua internet.';
       } else if (err.message) {
-        errorMsg = `Erro do Google Auth: ${err.message}`;
+        errorMsg = `Google Auth: ${err.message}`;
       }
 
       setError(errorMsg);
@@ -624,8 +623,6 @@ export const LoginScreen: React.FC = () => {
                   ? 'Não tem conta? Criar conta gratuita'
                   : 'Já possui cadastro? Realizar login'}
               </button>
-
-              <PwaInstallButton variant="login" />
             </div>
           </div>
         )}
