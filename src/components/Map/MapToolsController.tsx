@@ -100,7 +100,6 @@ export const MapToolsController: React.FC<MapToolsControllerProps> = ({
   pdfDocName,
 }) => {
   const [isToolsBottomSheetOpen, setIsToolsBottomSheetOpen] = useState(false);
-  const [isPinChoiceOpen, setIsPinChoiceOpen] = useState(false);
 
   return (
     <>
@@ -248,77 +247,6 @@ export const MapToolsController: React.FC<MapToolsControllerProps> = ({
       </div>
 
       {/* ------------------------------------------------------------- */}
-      {/* BOTTOM-RIGHT CORNER: CLEAN ACTION FABS (FLUSH ABOVE NAV BAR)   */}
-      {/* ------------------------------------------------------------- */}
-      <div className="absolute bottom-3 right-3 z-20 pointer-events-auto flex items-center gap-2">
-        {/* Track Recording FAB */}
-        {isRecordingTrack ? (
-          <button
-            onClick={onStopTrackRecording}
-            className="flex items-center gap-1.5 px-3 py-2.5 bg-rose-600 hover:bg-rose-500 text-white rounded-xl font-bold text-xs shadow-xl transition-all active:scale-95 border border-rose-400/50 cursor-pointer animate-pulse"
-          >
-            <Square className="w-3.5 h-3.5 fill-white" />
-            <span>Parar</span>
-          </button>
-        ) : (
-          <button
-            onClick={onStartTrackRecording}
-            className="flex items-center gap-1.5 px-3 py-2.5 bg-slate-950/95 hover:bg-slate-900 text-emerald-400 border border-slate-800 rounded-xl font-bold text-xs shadow-xl transition-all active:scale-95 cursor-pointer backdrop-blur-md"
-            title="Iniciar Gravação de Trilha GPS"
-          >
-            <Play className="w-3.5 h-3.5 text-emerald-400 fill-emerald-400" />
-            <span>Gravar</span>
-          </button>
-        )}
-
-        {/* Primary Waypoint Mark FAB */}
-        <div className="relative">
-          <button
-            onClick={() => {
-              if (onMarkWaypointClickMap) {
-                setIsPinChoiceOpen(!isPinChoiceOpen);
-              } else {
-                onMarkWaypoint();
-              }
-            }}
-            className="flex items-center gap-1.5 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 px-3.5 py-2.5 rounded-xl font-black shadow-lg transition-all active:scale-95 cursor-pointer text-xs"
-          >
-            <Pin className="w-3.5 h-3.5 text-slate-950 fill-slate-950" />
-            <span>Marcar Ponto</span>
-          </button>
-
-          {/* Pin Choice Dropup */}
-          {isPinChoiceOpen && (
-            <div className="absolute bottom-full right-0 mb-2 w-52 bg-slate-950 border border-slate-800 p-2 rounded-2xl shadow-2xl flex flex-col gap-1 z-40 animate-in fade-in slide-in-from-bottom-2">
-              <button
-                onClick={() => {
-                  setIsPinChoiceOpen(false);
-                  onMarkWaypoint();
-                }}
-                className="text-left px-3 py-2.5 rounded-xl hover:bg-slate-800 text-xs font-bold text-sky-400 flex items-center gap-2 transition-colors cursor-pointer"
-              >
-                <Crosshair className="w-4 h-4 shrink-0" />
-                <span>Marcar no GPS Atual</span>
-              </button>
-
-              {onMarkWaypointClickMap && (
-                <button
-                  onClick={() => {
-                    setIsPinChoiceOpen(false);
-                    onMarkWaypointClickMap();
-                  }}
-                  className="text-left px-3 py-2.5 rounded-xl hover:bg-slate-800 text-xs font-bold text-amber-400 flex items-center gap-2 transition-colors cursor-pointer"
-                >
-                  <MapPin className="w-4 h-4 shrink-0" />
-                  <span>Marcar Clicando no Mapa</span>
-                </button>
-              )}
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* ------------------------------------------------------------- */}
       {/* ANDROID MATERIAL 3 TOOLS BOTTOM SHEET                         */}
       {/* ------------------------------------------------------------- */}
       <BottomSheet
@@ -327,6 +255,50 @@ export const MapToolsController: React.FC<MapToolsControllerProps> = ({
         title={isPdfMap ? `Ferramentas do Mapa PDF` : `Painel de Ferramentas de Campo`}
       >
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 p-1">
+          {/* Marcar Ponto (Waypoint) */}
+          <button
+            onClick={() => {
+              setIsToolsBottomSheetOpen(false);
+              onMarkWaypoint();
+            }}
+            className="p-3.5 rounded-2xl bg-emerald-950/40 border border-emerald-500/50 hover:bg-emerald-900/60 flex flex-col items-start gap-2 transition-all active:scale-95 cursor-pointer text-left"
+          >
+            <div className="w-9 h-9 rounded-xl bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 flex items-center justify-center shrink-0">
+              <Pin className="w-5 h-5 fill-emerald-400" />
+            </div>
+            <div>
+              <div className="font-extrabold text-xs text-emerald-300">Marcar Ponto</div>
+              <div className="text-[10px] text-slate-400">Salvar coordenadas atuais</div>
+            </div>
+          </button>
+
+          {/* Gravar Trilha */}
+          <button
+            onClick={() => {
+              setIsToolsBottomSheetOpen(false);
+              if (isRecordingTrack) {
+                onStopTrackRecording();
+              } else {
+                onStartTrackRecording();
+              }
+            }}
+            className={`p-3.5 rounded-2xl border flex flex-col items-start gap-2 transition-all active:scale-95 cursor-pointer text-left ${
+              isRecordingTrack
+                ? 'bg-rose-950/60 border-rose-500/60 text-rose-300'
+                : 'bg-slate-900/80 border-slate-800 hover:bg-slate-800 text-slate-200'
+            }`}
+          >
+            <div className="w-9 h-9 rounded-xl bg-rose-500/10 text-rose-400 border border-rose-500/30 flex items-center justify-center shrink-0">
+              {isRecordingTrack ? <Square className="w-5 h-5 fill-rose-400" /> : <Play className="w-5 h-5 fill-rose-400" />}
+            </div>
+            <div>
+              <div className="font-extrabold text-xs text-slate-200">
+                {isRecordingTrack ? 'Parar Gravação' : 'Gravar Trilha'}
+              </div>
+              <div className="text-[10px] text-slate-400">Traçado GPS em tempo real</div>
+            </div>
+          </button>
+
           {/* 1. Régua / Medição */}
           <button
             onClick={() => {
