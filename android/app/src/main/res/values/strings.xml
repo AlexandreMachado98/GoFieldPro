@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">GoField Pro</string>
+    <string name="title_activity_main">GoField Pro</string>
+    <string name="package_name">com.gofield.pro</string>
+    <string name="custom_url_scheme">com.gofield.pro</string>
+</resources>
