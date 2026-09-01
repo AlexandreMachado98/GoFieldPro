@@ -3759,56 +3759,6 @@ export const PdfMapNavigator: React.FC = () => {
         </div>
       )}
 
-      {/* Unified Map Tools Controller for PDF Maps */}
-      {activeDoc && !isMapsListOpen && (
-        <MapToolsController
-          isPdfMap={true}
-          pdfDocName={activeDoc.name}
-          onMarkWaypoint={() => {
-            setActiveTool('add_point');
-            notifyInfo('Marcação no PDF', 'Toque na folha do mapa onde deseja soltar o ponto.');
-          }}
-          isRecordingTrack={isRecordingTrack}
-          onStartTrackRecording={handleStartTrack}
-          onStopTrackRecording={handleStopTrack}
-          trackDistanceFormatted={activeTrackPoints.length > 0 ? 'Gravando Rota' : '0.00 km'}
-          trackDurationFormatted={new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
-
-          isMeasuring={activeTool === 'measure'}
-          onToggleMeasuring={() => {
-            if (activeTool === 'measure') {
-              setActiveTool('pan');
-            } else {
-              setActiveTool('measure');
-            }
-          }}
-          measurementPointsCount={measurementPoints.length}
-          totalDistanceFormatted={
-            totalMeasureDistanceMeters >= 1000
-              ? `${(totalMeasureDistanceMeters / 1000).toFixed(2)} km`
-              : `${totalMeasureDistanceMeters.toFixed(0)} m`
-          }
-          onClearMeasurement={() => setMeasurementPoints([])}
-          onFinishMeasurement={() => setIsMeasureSummaryOpen(true)}
-
-          onRecenterGps={() => {
-            if (!isGpsActive) toggleGps(true);
-            if (currentGpsCoords && mapInstanceRef.current && activeDoc?.calibration?.isCalibrated) {
-              const pdfPt = gpsToPdf(currentGpsCoords.lat, currentGpsCoords.lng, activeDoc.calibration, activeDoc.height);
-              try { mapInstanceRef.current.setView([pdfPt.x, pdfPt.y], 2); } catch {}
-            }
-          }}
-          hasGpsLock={isGpsActive}
-          onZoomIn={() => mapInstanceRef.current?.zoomIn()}
-          onZoomOut={() => mapInstanceRef.current?.zoomOut()}
-          onFitBounds={fitPdfBounds}
-
-          onOpenKmlImport={() => triggerFileInput(importKmlInputRef)}
-          onOpenPdfExport={() => setIsExportModalOpen(true)}
-          onOpenMapsList={() => setIsMapsListOpen(true)}
-        />
-      )}
-
       {/* Lightbox for viewing photos (z-[250]) */}
       {activeLightboxPhoto && (
         <div 
