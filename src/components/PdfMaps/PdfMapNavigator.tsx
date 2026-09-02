@@ -2622,7 +2622,7 @@ export const PdfMapNavigator: React.FC = () => {
       
       {/* Fullscreen Overlay: Meus Mapas PDF (Safe Overlay - Map stays mounted underneath) */}
       {(!activeDoc || isMapsListOpen) && (
-        <div className="absolute inset-0 z-20 bg-slate-950 flex flex-col p-4 sm:p-8 overflow-y-auto pb-32 text-slate-100 animate-in fade-in duration-150">
+        <div className="absolute inset-0 z-40 bg-slate-950 flex flex-col p-4 sm:p-8 overflow-y-auto pb-32 text-slate-100 animate-in fade-in duration-150">
           <div className="max-w-5xl mx-auto w-full space-y-6">
             {/* Header */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-800/80">
@@ -2840,7 +2840,7 @@ export const PdfMapNavigator: React.FC = () => {
     )}
 
       {/* Target Navigation Live HUD (Bottom Centered - Compact & Proportional) */}
-      {activeNavPoint && navMetrics && (
+      {activeNavPoint && navMetrics && !isMapsListOpen && (
         <div
           className={`absolute bottom-20 sm:bottom-6 left-1/2 -translate-x-1/2 z-[1000] w-auto max-w-[92vw] pointer-events-auto transition-opacity duration-300 ${
             isMapInteracting ? 'opacity-20 pointer-events-none' : 'opacity-100 pointer-events-auto'
@@ -2877,7 +2877,7 @@ export const PdfMapNavigator: React.FC = () => {
       )}
 
       {/* Helper Banner for Active Tool (Add Point) */}
-      {activeTool === 'add_point' && (
+      {activeTool === 'add_point' && !isMapsListOpen && (
         <div
           className={`absolute bottom-20 sm:bottom-6 left-1/2 -translate-x-1/2 z-[1000] w-auto max-w-[92vw] pointer-events-auto transition-opacity duration-300 ${
             isMapInteracting ? 'opacity-20 pointer-events-none' : 'opacity-100 pointer-events-auto'
@@ -2899,7 +2899,7 @@ export const PdfMapNavigator: React.FC = () => {
       )}
 
       {/* Measurement Active Floating HUD */}
-      {activeTool === 'measure' && (
+      {activeTool === 'measure' && !isMapsListOpen && (
         <MeasurementControlBar
           points={measurementPoints}
           currentType={currentMeasureType}
@@ -2921,7 +2921,7 @@ export const PdfMapNavigator: React.FC = () => {
       )}
 
       {/* Woodpile Active Floating HUD */}
-      {activeTool === 'woodpile' && (
+      {activeTool === 'woodpile' && !isMapsListOpen && (
         <div
           className={`absolute bottom-20 sm:bottom-6 left-1/2 -translate-x-1/2 z-[1000] w-[95%] max-w-lg bg-slate-950/95 backdrop-blur-md border border-amber-500/80 rounded-2xl p-2.5 shadow-2xl flex flex-col sm:flex-row items-center justify-between gap-2.5 pointer-events-auto transition-opacity duration-300 ${
             isMapInteracting ? 'opacity-20 pointer-events-none' : 'opacity-100 pointer-events-auto'
@@ -3078,7 +3078,7 @@ export const PdfMapNavigator: React.FC = () => {
         )}
 
         {/* GCP Point Selection Banner (Bottom Centered) */}
-        {isSelectingGcpOnMap && (
+        {isSelectingGcpOnMap && !isMapsListOpen && (
           <div
             className={`absolute bottom-20 sm:bottom-6 left-1/2 -translate-x-1/2 z-[1100] max-w-md w-[calc(100%-2rem)] transition-opacity duration-300 pointer-events-auto ${
               isMapInteracting ? 'opacity-20 pointer-events-none' : 'opacity-100 pointer-events-auto'
@@ -3103,7 +3103,7 @@ export const PdfMapNavigator: React.FC = () => {
         )}
 
         {/* Helper Banner for Active Tool (Draw Track Initial State) */}
-        {activeTool === 'draw_track' && currentTrackPoints.length === 0 && (
+        {activeTool === 'draw_track' && !isMapsListOpen && currentTrackPoints.length === 0 && (
           <div
             className={`absolute bottom-20 sm:bottom-6 left-1/2 -translate-x-1/2 z-[1000] w-auto max-w-[92vw] pointer-events-auto transition-opacity duration-300 ${
               isMapInteracting ? 'opacity-20 pointer-events-none' : 'opacity-100 pointer-events-auto'
@@ -3126,7 +3126,7 @@ export const PdfMapNavigator: React.FC = () => {
 
 
         {/* User Outside Calibrated Map Indicator (Bottom Centered - Real-time tracking to destination) */}
-        {activeDoc && isDocumentCalibrated(activeDoc) && !isUserInsideMap && distanceToMapKm !== null && !isSelectingGcpOnMap && !isRecordingLive && activeTool === 'pan' && (
+        {activeDoc && !isMapsListOpen && isDocumentCalibrated(activeDoc) && !isUserInsideMap && distanceToMapKm !== null && !isSelectingGcpOnMap && !isRecordingLive && activeTool === 'pan' && (
           <div
             className={`absolute bottom-20 sm:bottom-6 left-1/2 -translate-x-1/2 z-[1000] max-w-md w-[calc(100%-2rem)] transition-opacity duration-300 pointer-events-auto ${
               isMapInteracting ? 'opacity-20 pointer-events-none' : 'opacity-100 pointer-events-auto'
@@ -3179,7 +3179,7 @@ export const PdfMapNavigator: React.FC = () => {
         {/* ------------------------------------------------------------- */}
         {/* TOP-RIGHT CORNER: DISCRETE TOOLS BUTTON STACK (GPS MAP STYLE) */}
         {/* ------------------------------------------------------------- */}
-        {activeDoc && (
+        {activeDoc && !isMapsListOpen && (
           <div
             className={`absolute top-3 right-3 z-20 pointer-events-auto flex flex-col gap-2 transition-opacity duration-300 ${
               isMapInteracting ? 'opacity-20 pointer-events-none' : 'opacity-100 pointer-events-auto'
@@ -3188,10 +3188,10 @@ export const PdfMapNavigator: React.FC = () => {
             {/* 1. Ferramentas (SlidersHorizontal - Opens Discrete Menu) */}
             <button
               onClick={() => setIsToolsPanelOpen(true)}
-              className="w-10 h-10 rounded-2xl bg-slate-900/95 hover:bg-slate-900 text-sky-400 border border-slate-700/80 shadow-xl flex items-center justify-center transition-all active:scale-95 cursor-pointer backdrop-blur-md"
+              className="w-10 h-10 rounded-2xl bg-slate-900/95 hover:bg-slate-900 text-emerald-400 border border-slate-700/80 shadow-xl flex items-center justify-center transition-all active:scale-95 cursor-pointer backdrop-blur-md"
               title="Ferramentas do Mapa PDF"
             >
-              <SlidersHorizontal className="w-4 h-4 text-sky-400" />
+              <SlidersHorizontal className="w-4 h-4 text-emerald-400" />
             </button>
 
             {/* 2. Centralizar GPS */}
@@ -3239,7 +3239,7 @@ export const PdfMapNavigator: React.FC = () => {
         {/* ------------------------------------------------------------- */}
         {/* BOTTOM FLOATING BAR: DISCRETE LIVE TRACK RECORDING CONTROLLER */}
         {/* ------------------------------------------------------------- */}
-        {isRecordingLive && (
+        {isRecordingLive && !isMapsListOpen && (
           <div
             className={`absolute bottom-20 sm:bottom-6 left-1/2 -translate-x-1/2 z-[1000] transition-opacity duration-300 pointer-events-auto ${
               isMapInteracting ? 'opacity-20 pointer-events-none' : 'opacity-100 pointer-events-auto'
