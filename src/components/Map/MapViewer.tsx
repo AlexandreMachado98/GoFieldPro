@@ -108,6 +108,7 @@ export const MapViewer: React.FC = () => {
     navigateToWaypoint,
     deleteWaypoint,
     setIsAddWaypointModalOpen,
+    setIsWoodpileModalOpen,
     setPendingWaypointCoord,
     setIsLayerModalOpen,
     setIsAiModalOpen,

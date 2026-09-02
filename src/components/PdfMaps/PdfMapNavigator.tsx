@@ -284,6 +284,8 @@ export const PdfMapNavigator: React.FC = () => {
   const [isSelectingGcpOnMap, setIsSelectingGcpOnMap] = useState<1 | 2 | null>(null);
   const isSelectingGcpOnMapRef = useRef<1 | 2 | null>(null);
   isSelectingGcpOnMapRef.current = isSelectingGcpOnMap;
+  const [distanceToMapKm, setDistanceToMapKm] = useState<number | null>(null);
+  const [isUserInsideMap, setIsUserInsideMap] = useState<boolean>(true);
 
   // Save Live Recorded Route Modal state
   const [isSaveRecordedModalOpen, setIsSaveRecordedModalOpen] = useState(false);
@@ -1497,7 +1499,35 @@ export const PdfMapNavigator: React.FC = () => {
     }
 
     const pdfCoords = gpsToPdf(currentGps.lat, currentGps.lng, activeDoc);
-    if (isNaN(pdfCoords.x) || isNaN(pdfCoords.y)) return;
+
+    // Calculate distance between user GPS and the calibrated document center
+    let distKm = 0;
+    if (activeDoc.calibration?.ref1 && activeDoc.calibration?.ref2) {
+      const centerLat = (activeDoc.calibration.ref1.lat + activeDoc.calibration.ref2.lat) / 2;
+      const centerLng = (activeDoc.calibration.ref1.lng + activeDoc.calibration.ref2.lng) / 2;
+      if (!isNaN(centerLat) && !isNaN(centerLng)) {
+        distKm = +(calculateDistanceMeters(currentGps.lat, currentGps.lng, centerLat, centerLng) / 1000).toFixed(1);
+      }
+    }
+
+    // STRICT CHECK: If user is physically outside the map bounds, NEVER plot markers on the sheet!
+    if (!pdfCoords.isInside || isNaN(pdfCoords.x) || isNaN(pdfCoords.y)) {
+      setIsUserInsideMap(false);
+      setDistanceToMapKm(distKm > 0 ? distKm : 1);
+      if (gpsUserMarkerRef.current) {
+        map.removeLayer(gpsUserMarkerRef.current);
+        gpsUserMarkerRef.current = null;
+      }
+      if (gpsAccuracyCircleRef.current) {
+        map.removeLayer(gpsAccuracyCircleRef.current);
+        gpsAccuracyCircleRef.current = null;
+      }
+      return;
+    }
+
+    // User is genuinely inside the map!
+    setIsUserInsideMap(true);
+    setDistanceToMapKm(0);
 
     const headingDeg = currentGps.heading !== undefined && currentGps.heading !== null && !isNaN(currentGps.heading) ? currentGps.heading : 0;
     const userMarkerHtml = `
@@ -1610,10 +1640,21 @@ export const PdfMapNavigator: React.FC = () => {
     if (!mapInstanceRef.current) return;
     try {
       const pdfCoords = gpsToPdf(currentGps.lat, currentGps.lng, activeDoc);
-      if (!isNaN(pdfCoords.x) && !isNaN(pdfCoords.y)) {
-        if (!pdfCoords.isInside) {
-          notifyWarning('Posição Fora da Folha', 'Você está a uma distância fora da área coberta por este mapa PDF.');
+      if (!pdfCoords.isInside) {
+        let distMsg = '';
+        if (activeDoc.calibration?.ref1 && activeDoc.calibration?.ref2) {
+          const centerLat = (activeDoc.calibration.ref1.lat + activeDoc.calibration.ref2.lat) / 2;
+          const centerLng = (activeDoc.calibration.ref1.lng + activeDoc.calibration.ref2.lng) / 2;
+          if (!isNaN(centerLat) && !isNaN(centerLng)) {
+            const km = (calculateDistanceMeters(currentGps.lat, currentGps.lng, centerLat, centerLng) / 1000).toFixed(1);
+            distMsg = ` (você está a ${km} km de distância desta folha)`;
+          }
         }
+        notifyWarning('Você Está Fora Desta Planta', `Sua localização atual não coincide com a área geográfica deste mapa${distMsg}. O marcador de satélite só aparece quando você estiver no local da propriedade.`);
+        return;
+      }
+
+      if (!isNaN(pdfCoords.x) && !isNaN(pdfCoords.y)) {
         mapInstanceRef.current.panTo([pdfCoords.x, pdfCoords.y], { animate: true, duration: 0.6 });
         notifySuccess('Posição Centralizada', `Lat: ${currentGps.lat.toFixed(5)} | Lng: ${currentGps.lng.toFixed(5)} (±${currentGps.accuracy?.toFixed(0)}m)`);
       }
@@ -1621,6 +1662,40 @@ export const PdfMapNavigator: React.FC = () => {
       console.warn('Error centering on GPS:', err);
     }
   }, [currentGps, activeDoc, requestCurrentLocation, notifySuccess, notifyWarning]);
+
+  // Clear calibration and return document to raw uncalibrated state
+  const handleClearCalibration = useCallback(() => {
+    if (!activeDoc) return;
+    try {
+      const resetDoc: PdfDocument = {
+        ...activeDoc,
+        calibration: {
+          isCalibrated: false,
+          ref1: { x: activeDoc.height * 0.9, y: activeDoc.width * 0.1, lat: NaN, lng: NaN },
+          ref2: { x: activeDoc.height * 0.1, y: activeDoc.width * 0.9, lat: NaN, lng: NaN },
+          scaleMetersPerPixel: 0.75,
+        },
+      };
+
+      if (gpsUserMarkerRef.current && mapInstanceRef.current) {
+        mapInstanceRef.current.removeLayer(gpsUserMarkerRef.current);
+        gpsUserMarkerRef.current = null;
+      }
+      if (gpsAccuracyCircleRef.current && mapInstanceRef.current) {
+        mapInstanceRef.current.removeLayer(gpsAccuracyCircleRef.current);
+        gpsAccuracyCircleRef.current = null;
+      }
+
+      updateDocumentInStore(resetDoc);
+      setIsCalibrationModalOpen(false);
+      setIsUserInsideMap(false);
+      setDistanceToMapKm(null);
+      notifySuccess('Calibração Removida', 'A planta voltou ao estado original não-georreferenciado.');
+    } catch (err) {
+      console.error('Error clearing calibration:', err);
+      notifyError('Erro ao Limpar', 'Não foi possível redefinir a calibração.');
+    }
+  }, [activeDoc, updateDocumentInStore, notifySuccess, notifyError]);
 
   // Calibrate map with user's current GPS position & nominal scale/rotation
   const handleCalibrateCurrentGps = useCallback(() => {
@@ -2870,6 +2945,25 @@ export const PdfMapNavigator: React.FC = () => {
           </div>
         )}
 
+        {/* User Outside Calibrated Map Indicator */}
+        {activeDoc && isDocumentCalibrated(activeDoc) && !isUserInsideMap && distanceToMapKm !== null && !isSelectingGcpOnMap && !isRecordingLive && (
+          <div className="absolute top-14 left-1/2 -translate-x-1/2 z-[1000] max-w-md w-[calc(100%-2rem)] bg-slate-900/95 border border-slate-700/80 text-slate-200 px-4 py-2 rounded-2xl shadow-2xl backdrop-blur-md flex items-center justify-between gap-3 animate-in fade-in slide-in-from-top pointer-events-auto">
+            <div className="flex items-center gap-2 text-xs">
+              <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse shrink-0" />
+              <div>
+                <span className="font-bold block text-white text-[11px]">Você está fora desta planta</span>
+                <span className="text-[10px] text-slate-400">Distância: {distanceToMapKm >= 10 ? distanceToMapKm.toFixed(0) : distanceToMapKm.toFixed(1)} km do mapa</span>
+              </div>
+            </div>
+            <button
+              onClick={() => setIsCalibrationModalOpen(true)}
+              className="shrink-0 px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-[10px] rounded-lg border border-slate-700"
+            >
+              Ajustar
+            </button>
+          </div>
+        )}
+
         {/* Live Track Recording Indicator Banner & Telemetry */}
         {isRecordingLive && (
           <div className="absolute top-14 left-1/2 -translate-x-1/2 z-[1000] bg-rose-950/95 backdrop-blur-md border border-rose-500 rounded-2xl px-4 py-2 shadow-2xl flex items-center gap-3 animate-in fade-in pointer-events-auto">
@@ -3948,7 +4042,19 @@ export const PdfMapNavigator: React.FC = () => {
               </div>
             )}
 
-            <div className="pt-2 border-t border-slate-800 flex justify-end">
+            <div className="pt-2 border-t border-slate-800 flex items-center justify-between">
+              {isDocumentCalibrated(activeDoc) ? (
+                <button
+                  type="button"
+                  onClick={handleClearCalibration}
+                  className="py-2 px-3 text-rose-400 hover:text-rose-300 hover:bg-rose-950/40 border border-rose-900/60 rounded-xl text-xs font-bold transition flex items-center gap-1.5"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                  <span>Limpar Calibração</span>
+                </button>
+              ) : (
+                <div />
+              )}
               <button
                 onClick={() => setIsCalibrationModalOpen(false)}
                 className="py-2 px-4 text-slate-400 hover:text-white text-xs font-bold"

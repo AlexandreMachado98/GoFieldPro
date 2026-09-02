@@ -26,7 +26,14 @@ export function isDocumentCalibrated(doc: { calibration?: GeoCalibration } | nul
   const cal = doc.calibration;
   if (!cal.isCalibrated) return false;
   if (!cal.ref1 || !cal.ref2) return false;
-  
+
+  // Detect legacy São Paulo hardcoded default (-23.542, -46.638) and invalidate it
+  const isLegacyFakeSp = (
+    Math.abs(cal.ref1.lat - (-23.5420)) < 0.005 &&
+    Math.abs(cal.ref1.lng - (-46.6380)) < 0.005
+  );
+  if (isLegacyFakeSp) return false;
+
   // Must have valid non-NaN coordinates
   if (isNaN(cal.ref1.lat) || isNaN(cal.ref1.lng) || isNaN(cal.ref2.lat) || isNaN(cal.ref2.lng)) return false;
   if (isNaN(cal.ref1.x) || isNaN(cal.ref1.y) || isNaN(cal.ref2.x) || isNaN(cal.ref2.y)) return false;
