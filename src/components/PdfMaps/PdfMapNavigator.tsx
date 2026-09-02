@@ -278,6 +278,8 @@ export const PdfMapNavigator: React.FC = () => {
   const [calibScale, setCalibScale] = useState(0.85);
   const [calibRotation, setCalibRotation] = useState<number>(0);
   const [calibNominalScale, setCalibNominalScale] = useState<string>('1:10.000');
+  const [calibCenterLat, setCalibCenterLat] = useState<string>('');
+  const [calibCenterLng, setCalibCenterLng] = useState<string>('');
   const [gcpPt1, setGcpPt1] = useState<{ x: number; y: number; lat: string; lng: string }>({ x: 0, y: 0, lat: '', lng: '' });
   const [gcpPt2, setGcpPt2] = useState<{ x: number; y: number; lat: string; lng: string }>({ x: 0, y: 0, lat: '', lng: '' });
   const [boundsNorth, setBoundsNorth] = useState<string>('');
@@ -521,6 +523,7 @@ export const PdfMapNavigator: React.FC = () => {
   const activeDrawPolylineRef = useRef<L.Polyline | null>(null);
   const liveRecordPolylineRef = useRef<L.Polyline | null>(null);
   const targetGuideLineRef = useRef<L.Polyline | null>(null);
+  const approachLineRef = useRef<L.Polyline | null>(null);
   const gpsUserMarkerRef = useRef<L.Marker | null>(null);
   const gpsAccuracyCircleRef = useRef<L.CircleMarker | null>(null);
   const gpsWatchIdRef = useRef<number | null>(null);
@@ -913,14 +916,9 @@ export const PdfMapNavigator: React.FC = () => {
         try {
           imageOverlayRef.current = L.imageOverlay(currentDataUrl, bounds).addTo(map);
           map.fitBounds(bounds, { padding: [15, 15] });
-          map.setMaxBounds(bounds.pad(1.5));
-          
+          // Allow zooming out freely so user can view their GPS position approaching the sheet from afar
           const baseZoom = map.getBoundsZoom(bounds);
-          if (isFinite(baseZoom)) {
-            map.setMinZoom(baseZoom - 1.2);
-          } else {
-            map.setMinZoom(-3);
-          }
+          map.setMinZoom(isFinite(baseZoom) ? Math.min(-5, baseZoom - 5) : -6);
         } catch (err) {
           console.warn('Error loading image overlay:', err);
         }
@@ -1559,10 +1557,8 @@ export const PdfMapNavigator: React.FC = () => {
       }
     }
 
-    // STRICT CHECK: If user is physically outside the map bounds, NEVER plot markers on the sheet!
-    if (!pdfCoords.isInside || isNaN(pdfCoords.x) || isNaN(pdfCoords.y)) {
-      setIsUserInsideMap(false);
-      setDistanceToMapKm(distKm > 0 ? distKm : 1);
+    // Check for valid projective coordinates
+    if (isNaN(pdfCoords.x) || isNaN(pdfCoords.y)) {
       if (gpsUserMarkerRef.current) {
         map.removeLayer(gpsUserMarkerRef.current);
         gpsUserMarkerRef.current = null;
@@ -1571,22 +1567,46 @@ export const PdfMapNavigator: React.FC = () => {
         map.removeLayer(gpsAccuracyCircleRef.current);
         gpsAccuracyCircleRef.current = null;
       }
+      if (approachLineRef.current) {
+        map.removeLayer(approachLineRef.current);
+        approachLineRef.current = null;
+      }
       return;
     }
 
-    // User is genuinely inside the map!
-    setIsUserInsideMap(true);
-    setDistanceToMapKm(0);
+    setIsUserInsideMap(pdfCoords.isInside);
+    setDistanceToMapKm(distKm);
 
+    // If user is physically outside the sheet, draw a guide approach line connecting user position to the PDF sheet
+    if (!pdfCoords.isInside) {
+      const centerSheet: [number, number] = [activeDoc.height / 2, activeDoc.width / 2];
+      if (approachLineRef.current) {
+        approachLineRef.current.setLatLngs([[pdfCoords.x, pdfCoords.y], centerSheet]);
+      } else {
+        approachLineRef.current = L.polyline([[pdfCoords.x, pdfCoords.y], centerSheet], {
+          color: '#38bdf8',
+          weight: 2,
+          dashArray: '6, 8',
+          opacity: 0.8,
+        }).addTo(map);
+      }
+    } else {
+      if (approachLineRef.current) {
+        try { map.removeLayer(approachLineRef.current); } catch {}
+        approachLineRef.current = null;
+      }
+    }
+
+    // PONTINHO AZUL (Iconic Pulsing Blue GPS Marker)
     const headingDeg = currentGps.heading !== undefined && currentGps.heading !== null && !isNaN(currentGps.heading) ? currentGps.heading : 0;
     const userMarkerHtml = `
-      <div class="user-gps-pulse-wrapper" style="position: relative; width: 36px; height: 36px; display: flex; align-items: center; justify-content: center;">
-        <div style="position: absolute; inset: 0; border-radius: 50%; background: rgba(16, 185, 129, 0.35); animation: ping 2s cubic-bezier(0, 0, 0.2, 1) infinite;"></div>
-        <div style="width: 20px; height: 20px; border-radius: 50%; background: #10b981; border: 3px solid #ffffff; box-shadow: 0 0 14px rgba(16, 185, 129, 0.9); display: flex; align-items: center; justify-content: center;">
+      <div class="user-gps-pulse-wrapper" style="position: relative; width: 40px; height: 40px; display: flex; align-items: center; justify-content: center;">
+        <div style="position: absolute; inset: 0; border-radius: 50%; background: rgba(59, 130, 246, 0.4); animation: ping 2s cubic-bezier(0, 0, 0.2, 1) infinite;"></div>
+        <div style="width: 22px; height: 22px; border-radius: 50%; background: #2563eb; border: 3.5px solid #ffffff; box-shadow: 0 0 16px rgba(37, 99, 235, 0.95); display: flex; align-items: center; justify-content: center;">
           <div style="width: 6px; height: 6px; border-radius: 50%; background: #ffffff;"></div>
         </div>
         ${currentGps.heading !== undefined && currentGps.heading !== null ? `
-          <div style="position: absolute; top: -8px; width: 0; height: 0; border-left: 5px solid transparent; border-right: 5px solid transparent; border-bottom: 8px solid #34d399; transform: rotate(${headingDeg}deg); transform-origin: 50% 26px;"></div>
+          <div style="position: absolute; top: -8px; width: 0; height: 0; border-left: 6px solid transparent; border-right: 6px solid transparent; border-bottom: 9px solid #60a5fa; transform: rotate(${headingDeg}deg); transform-origin: 50% 28px;"></div>
         ` : ''}
       </div>
     `;
@@ -1594,8 +1614,8 @@ export const PdfMapNavigator: React.FC = () => {
     const userIcon = L.divIcon({
       className: 'custom-user-gps-marker',
       html: userMarkerHtml,
-      iconSize: [36, 36],
-      iconAnchor: [18, 18],
+      iconSize: [40, 40],
+      iconAnchor: [20, 20],
     });
 
     if (gpsUserMarkerRef.current) {
@@ -1618,9 +1638,9 @@ export const PdfMapNavigator: React.FC = () => {
     } else {
       gpsAccuracyCircleRef.current = L.circle([pdfCoords.x, pdfCoords.y], {
         radius: accuracyRadiusPx,
-        color: '#10b981',
-        fillColor: '#34d399',
-        fillOpacity: 0.12,
+        color: '#2563eb',
+        fillColor: '#38bdf8',
+        fillOpacity: 0.15,
         weight: 1,
         dashArray: '4, 4',
       }).addTo(map);
@@ -1689,23 +1709,22 @@ export const PdfMapNavigator: React.FC = () => {
     if (!mapInstanceRef.current) return;
     try {
       const pdfCoords = gpsToPdf(currentGps.lat, currentGps.lng, activeDoc);
-      if (!pdfCoords.isInside) {
-        let distMsg = '';
-        if (activeDoc.calibration?.ref1 && activeDoc.calibration?.ref2) {
-          const centerLat = (activeDoc.calibration.ref1.lat + activeDoc.calibration.ref2.lat) / 2;
-          const centerLng = (activeDoc.calibration.ref1.lng + activeDoc.calibration.ref2.lng) / 2;
-          if (!isNaN(centerLat) && !isNaN(centerLng)) {
-            const km = (calculateDistanceMeters(currentGps.lat, currentGps.lng, centerLat, centerLng) / 1000).toFixed(1);
-            distMsg = ` (você está a ${km} km de distância desta folha)`;
-          }
-        }
-        notifyWarning('Você Está Fora Desta Planta', `Sua localização atual não coincide com a área geográfica deste mapa${distMsg}. O marcador de satélite só aparece quando você estiver no local da propriedade.`);
-        return;
-      }
-
       if (!isNaN(pdfCoords.x) && !isNaN(pdfCoords.y)) {
         mapInstanceRef.current.panTo([pdfCoords.x, pdfCoords.y], { animate: true, duration: 0.6 });
-        notifySuccess('Posição Centralizada', `Lat: ${currentGps.lat.toFixed(5)} | Lng: ${currentGps.lng.toFixed(5)} (±${currentGps.accuracy?.toFixed(0)}m)`);
+        if (pdfCoords.isInside) {
+          notifySuccess('Posição Centralizada', `Lat: ${currentGps.lat.toFixed(5)} | Lng: ${currentGps.lng.toFixed(5)} (±${currentGps.accuracy?.toFixed(0)}m)`);
+        } else {
+          let distMsg = '';
+          if (activeDoc.calibration?.ref1 && activeDoc.calibration?.ref2) {
+            const centerLat = (activeDoc.calibration.ref1.lat + activeDoc.calibration.ref2.lat) / 2;
+            const centerLng = (activeDoc.calibration.ref1.lng + activeDoc.calibration.ref2.lng) / 2;
+            if (!isNaN(centerLat) && !isNaN(centerLng)) {
+              const km = (calculateDistanceMeters(currentGps.lat, currentGps.lng, centerLat, centerLng) / 1000).toFixed(1);
+              distMsg = ` (a ${km} km da planta)`;
+            }
+          }
+          notifyInfo('Centralizado no Seu GPS', `Você está fora da folha${distMsg}. O GPS está acompanhando seu trajeto até o local.`);
+        }
       }
     } catch (err) {
       console.warn('Error centering on GPS:', err);
@@ -1733,6 +1752,10 @@ export const PdfMapNavigator: React.FC = () => {
       if (gpsAccuracyCircleRef.current && mapInstanceRef.current) {
         mapInstanceRef.current.removeLayer(gpsAccuracyCircleRef.current);
         gpsAccuracyCircleRef.current = null;
+      }
+      if (approachLineRef.current && mapInstanceRef.current) {
+        mapInstanceRef.current.removeLayer(approachLineRef.current);
+        approachLineRef.current = null;
       }
 
       updateDocumentInStore(resetDoc);
@@ -1779,6 +1802,42 @@ export const PdfMapNavigator: React.FC = () => {
       notifyError('Erro de Calibração', 'Não foi possível salvar os parâmetros de escala.');
     }
   }, [activeDoc, currentGps, calibScale, calibRotation, calibNominalScale, updateDocumentInStore, requestCurrentLocation, notifySuccess, notifyWarning, notifyError]);
+
+  // Calibrate map with custom Lat/Lng coordinates for farm/property center
+  const handleCalibrateCustomCenter = useCallback(() => {
+    if (!activeDoc) return;
+    const lat = parseFloat(calibCenterLat);
+    const lng = parseFloat(calibCenterLng);
+
+    if (isNaN(lat) || isNaN(lng) || lat < -90 || lat > 90 || lng < -180 || lng > 180) {
+      notifyWarning('Coordenadas Inválidas', 'Informe Latitude (-90 a 90) e Longitude (-180 a 180) válidas do centro da fazenda/local.');
+      return;
+    }
+
+    try {
+      const newCalibration = createCenteredCalibration(
+        activeDoc,
+        lat,
+        lng,
+        calibScale,
+        calibRotation
+      );
+      newCalibration.nominalScale = calibNominalScale;
+      newCalibration.method = 'user_anchor';
+
+      const updatedDoc: PdfDocument = {
+        ...activeDoc,
+        calibration: newCalibration,
+      };
+
+      updateDocumentInStore(updatedDoc);
+      setIsCalibrationModalOpen(false);
+      notifySuccess('Planta Georreferenciada!', `Vinculada ao local [${lat.toFixed(5)}, ${lng.toFixed(5)}]. O GPS acompanhará seu trajeto até o destino.`);
+    } catch (err) {
+      console.error('Error calibrating custom center:', err);
+      notifyError('Erro de Calibração', 'Não foi possível salvar as coordenadas informadas.');
+    }
+  }, [activeDoc, calibCenterLat, calibCenterLng, calibScale, calibRotation, calibNominalScale, updateDocumentInStore, notifySuccess, notifyWarning, notifyError]);
 
   // Calibrate map with 2 Ground Control Points (GCP)
   const handleCalibrate2Points = useCallback(() => {
@@ -3034,27 +3093,53 @@ export const PdfMapNavigator: React.FC = () => {
           </div>
         )}
 
-        {/* User Outside Calibrated Map Indicator (Bottom Centered) */}
+        {/* User Outside Calibrated Map Indicator (Bottom Centered - Real-time tracking to destination) */}
         {activeDoc && isDocumentCalibrated(activeDoc) && !isUserInsideMap && distanceToMapKm !== null && !isSelectingGcpOnMap && !isRecordingLive && activeTool === 'pan' && (
           <div
             className={`absolute bottom-20 sm:bottom-6 left-1/2 -translate-x-1/2 z-[1000] max-w-md w-[calc(100%-2rem)] transition-opacity duration-300 pointer-events-auto ${
               isMapInteracting ? 'opacity-20 pointer-events-none' : 'opacity-100 pointer-events-auto'
             }`}
           >
-            <div className="bg-slate-950/95 border border-slate-700/80 text-slate-200 px-3.5 py-2 rounded-2xl shadow-2xl backdrop-blur-md flex items-center justify-between gap-2.5">
-              <div className="flex items-center gap-2 text-xs">
-                <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse shrink-0" />
+            <div className="bg-slate-950/95 border border-sky-500/70 text-slate-200 px-4 py-2.5 rounded-2xl shadow-2xl backdrop-blur-md flex items-center justify-between gap-2.5">
+              <div className="flex items-center gap-2.5 text-xs">
+                <span className="w-3 h-3 rounded-full bg-sky-400 animate-ping shrink-0 shadow-[0_0_10px_#38bdf8]" />
                 <div>
-                  <span className="font-bold block text-white text-[11px]">Você está fora desta planta</span>
-                  <span className="text-[10px] text-slate-400">Distância: {distanceToMapKm >= 10 ? distanceToMapKm.toFixed(0) : distanceToMapKm.toFixed(1)} km do mapa</span>
+                  <span className="font-extrabold block text-white text-[12px] leading-tight">
+                    A {distanceToMapKm >= 10 ? distanceToMapKm.toFixed(0) : distanceToMapKm.toFixed(1)} km da planta
+                  </span>
+                  <span className="text-[10px] text-sky-400 font-medium leading-tight">
+                    GPS acompanhando seu trajeto até a chegada
+                  </span>
                 </div>
               </div>
-              <button
-                onClick={() => setIsCalibrationModalOpen(true)}
-                className="shrink-0 px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-[10px] rounded-lg border border-slate-700 cursor-pointer"
-              >
-                Ajustar
-              </button>
+              <div className="flex items-center gap-1.5 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (mapInstanceRef.current && activeDoc && currentGps) {
+                      const p = gpsToPdf(currentGps.lat, currentGps.lng, activeDoc);
+                      const b = L.latLngBounds([[0, 0], [activeDoc.height, activeDoc.width]]);
+                      if (!isNaN(p.x) && !isNaN(p.y)) {
+                        b.extend([p.x, p.y]);
+                      }
+                      mapInstanceRef.current.fitBounds(b, { padding: [50, 50] });
+                    }
+                  }}
+                  className="px-2.5 py-1.5 bg-sky-600 hover:bg-sky-500 text-white font-black text-xs rounded-xl shadow active:scale-95 transition cursor-pointer flex items-center gap-1"
+                  title="Enquadrar Minha Posição e a Folha"
+                >
+                  <Maximize2 className="w-3.5 h-3.5" />
+                  <span>Ver Tudo</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsCalibrationModalOpen(true)}
+                  className="px-2.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-xs rounded-xl border border-slate-700 cursor-pointer"
+                  title="Ajustar Coordenadas da Planta"
+                >
+                  Ajustar
+                </button>
+              </div>
             </div>
           </div>
         )}
@@ -3953,7 +4038,7 @@ export const PdfMapNavigator: React.FC = () => {
                 onClick={() => setCalibTab('gps_anchor')}
                 className={`py-2 text-xs font-black rounded-xl transition ${calibTab === 'gps_anchor' ? 'bg-emerald-500 text-slate-950 shadow' : 'text-slate-400 hover:text-white'}`}
               >
-                📍 GPS Atual
+                📍 Centro / GPS
               </button>
               <button
                 onClick={() => setCalibTab('gcp_2pt')}
@@ -3969,12 +4054,55 @@ export const PdfMapNavigator: React.FC = () => {
               </button>
             </div>
 
-            {/* TAB 1: GPS Anchor */}
+            {/* TAB 1: GPS / Centro da Fazenda */}
             {calibTab === 'gps_anchor' && (
-              <div className="space-y-4 animate-in fade-in">
+              <div className="space-y-3.5 animate-in fade-in">
                 <p className="text-xs text-slate-400 leading-relaxed">
-                  Ancora o centro da folha exatamente nas suas coordenadas atuais de campo. Ajuste a escala e a orientação do Norte para alinhar com o terreno.
+                  Defina as coordenadas geográficas reais do centro da fazenda/propriedade. Se estiver longe, o pontinho azul mostrará seu deslocamento na estrada até chegar ao local!
                 </p>
+
+                {/* Manual Farm / Property Coordinates Input */}
+                <div className="bg-slate-950 p-3 rounded-2xl border border-slate-800 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs text-slate-200 font-bold block">Coordenadas Reais da Fazenda / Local</label>
+                    {currentGps && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setCalibCenterLat(currentGps.lat.toFixed(6));
+                          setCalibCenterLng(currentGps.lng.toFixed(6));
+                        }}
+                        className="text-[10px] font-bold text-sky-400 hover:text-sky-300 transition cursor-pointer"
+                      >
+                        Copiar meu GPS atual
+                      </button>
+                    )}
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <span className="text-[10px] text-slate-400 block mb-0.5">Latitude (Graus):</span>
+                      <input
+                        type="number"
+                        step="any"
+                        placeholder="-18.123456"
+                        value={calibCenterLat}
+                        onChange={(e) => setCalibCenterLat(e.target.value)}
+                        className="w-full bg-slate-900 border border-slate-700 rounded-xl px-2.5 py-1.5 text-xs text-white font-mono focus:border-sky-500 focus:outline-hidden"
+                      />
+                    </div>
+                    <div>
+                      <span className="text-[10px] text-slate-400 block mb-0.5">Longitude (Graus):</span>
+                      <input
+                        type="number"
+                        step="any"
+                        placeholder="-48.123456"
+                        value={calibCenterLng}
+                        onChange={(e) => setCalibCenterLng(e.target.value)}
+                        className="w-full bg-slate-900 border border-slate-700 rounded-xl px-2.5 py-1.5 text-xs text-white font-mono focus:border-sky-500 focus:outline-hidden"
+                      />
+                    </div>
+                  </div>
+                </div>
 
                 {/* Scale presets */}
                 <div>
@@ -4046,13 +4174,24 @@ export const PdfMapNavigator: React.FC = () => {
                   </div>
                 </div>
 
-                <button
-                  onClick={handleCalibrateCurrentGps}
-                  className="w-full flex items-center justify-center gap-2 py-3 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs rounded-2xl shadow-lg active:scale-95 transition"
-                >
-                  <LocateFixed className="w-4 h-4" />
-                  <span>Ancorar Folha no Meu GPS Atual</span>
-                </button>
+                <div className="flex flex-col sm:flex-row gap-2 pt-1">
+                  <button
+                    type="button"
+                    onClick={handleCalibrateCustomCenter}
+                    className="flex-1 flex items-center justify-center gap-2 py-3 bg-sky-600 hover:bg-sky-500 text-white font-black text-xs rounded-2xl shadow-lg active:scale-95 transition cursor-pointer"
+                  >
+                    <MapPin className="w-4 h-4" />
+                    <span>Salvar Coordenadas da Fazenda</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleCalibrateCurrentGps}
+                    className="flex-1 flex items-center justify-center gap-2 py-3 bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs rounded-2xl shadow-lg active:scale-95 transition cursor-pointer"
+                  >
+                    <LocateFixed className="w-4 h-4" />
+                    <span>Ancorar no Meu GPS Atual</span>
+                  </button>
+                </div>
               </div>
             )}
 
