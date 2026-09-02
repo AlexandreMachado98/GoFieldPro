@@ -3068,30 +3068,6 @@ export const PdfMapNavigator: React.FC = () => {
           </div>
         )}
 
-        {/* Uncalibrated Map Warning Banner (Bottom Centered) */}
-        {activeDoc && !isDocumentCalibrated(activeDoc) && !isSelectingGcpOnMap && activeTool === 'pan' && (
-          <div
-            className={`absolute bottom-20 sm:bottom-6 left-1/2 -translate-x-1/2 z-[1000] max-w-md w-[calc(100%-2rem)] transition-opacity duration-300 pointer-events-auto ${
-              isMapInteracting ? 'opacity-20 pointer-events-none' : 'opacity-100 pointer-events-auto'
-            }`}
-          >
-            <div className="bg-slate-950/95 text-white px-3.5 py-2 rounded-2xl shadow-2xl border border-amber-500/70 backdrop-blur-md flex items-center justify-between gap-2.5">
-              <div className="flex items-center gap-2">
-                <span className="text-amber-400 text-sm">⚠️</span>
-                <div className="text-xs">
-                  <span className="block font-black text-amber-300 text-[11px] leading-tight">Planta Não Georreferenciada</span>
-                  <span className="text-[10px] text-slate-400 leading-tight">Vincule a folha às coordenadas reais.</span>
-                </div>
-              </div>
-              <button
-                onClick={() => setIsCalibrationModalOpen(true)}
-                className="shrink-0 px-2.5 py-1 bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-[11px] rounded-xl shadow active:scale-95 transition cursor-pointer"
-              >
-                Calibrar
-              </button>
-            </div>
-          </div>
-        )}
 
         {/* User Outside Calibrated Map Indicator (Bottom Centered - Real-time tracking to destination) */}
         {activeDoc && isDocumentCalibrated(activeDoc) && !isUserInsideMap && distanceToMapKm !== null && !isSelectingGcpOnMap && !isRecordingLive && activeTool === 'pan' && (
