@@ -20,6 +20,7 @@ interface MeasurementControlBarProps {
   onCloseLoop?: () => void;
   onFinishMeasurement: () => void;
   onClose: () => void;
+  positionClassName?: string;
 }
 
 export const MeasurementControlBar: React.FC<MeasurementControlBarProps> = ({
@@ -30,6 +31,7 @@ export const MeasurementControlBar: React.FC<MeasurementControlBarProps> = ({
   onClearMeasurement,
   onFinishMeasurement,
   onClose,
+  positionClassName,
 }) => {
   const safeTotalDist = typeof totalDistanceMeters === 'number' && !isNaN(totalDistanceMeters) ? totalDistanceMeters : 0;
   const formattedDist =
@@ -40,7 +42,7 @@ export const MeasurementControlBar: React.FC<MeasurementControlBarProps> = ({
   const validPoints = Array.isArray(points) ? points : [];
 
   return (
-    <div className="absolute top-3 left-1/2 -translate-x-1/2 z-30 w-auto max-w-[92vw] pointer-events-none animate-in fade-in slide-in-from-top-2 duration-200">
+    <div className={positionClassName || "absolute top-3 left-1/2 -translate-x-1/2 z-30 w-auto max-w-[92vw] pointer-events-none animate-in fade-in slide-in-from-top-2 duration-200"}>
       <div className="pointer-events-auto bg-[#0F172A]/95 backdrop-blur-md border border-rose-500/50 rounded-full px-3.5 py-1.5 shadow-2xl flex items-center gap-2 text-white">
         <div className="w-6 h-6 rounded-full bg-rose-500/20 text-rose-400 flex items-center justify-center shrink-0">
           <Ruler className="w-3.5 h-3.5" />

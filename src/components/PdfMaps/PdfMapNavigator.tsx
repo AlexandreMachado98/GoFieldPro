@@ -2761,24 +2761,25 @@ export const PdfMapNavigator: React.FC = () => {
         </div>
       )}
 
-      {/* Helper Banner for Active Tool */}
+      {/* Helper Banner for Active Tool (Add Point) */}
       {activeTool === 'add_point' && (
-        <div className="absolute top-14 left-1/2 -translate-x-1/2 z-[1000] bg-emerald-600 text-white px-4 py-2 rounded-full shadow-2xl flex items-center gap-2 text-xs font-black animate-bounce pointer-events-auto">
-          <Camera className="w-4 h-4" />
-          <span>Toque na folha do PDF onde deseja marcar o ponto</span>
-          <button
-            onClick={() => setActiveTool('pan')}
-            className="ml-2 bg-emerald-800/80 hover:bg-emerald-900 rounded-full px-2 py-0.5 text-[10px]"
-          >
-            Cancelar
-          </button>
-        </div>
-      )}
-
-      {activeTool === 'draw_track' && (
-        <div className="absolute top-14 left-1/2 -translate-x-1/2 z-[1000] bg-amber-600 text-slate-950 px-4 py-2 rounded-full shadow-2xl flex items-center gap-2 text-xs font-black pointer-events-auto">
-          <Activity className="w-4 h-4" />
-          <span>Toque na folha para adicionar os vértices da rota ({currentTrackPoints.length} marcados)</span>
+        <div
+          className={`absolute bottom-20 sm:bottom-6 left-1/2 -translate-x-1/2 z-[1000] w-auto max-w-[92vw] pointer-events-auto transition-opacity duration-300 ${
+            isMapInteracting ? 'opacity-20 pointer-events-none' : 'opacity-100 pointer-events-auto'
+          }`}
+        >
+          <div className="bg-slate-950/95 backdrop-blur-md border border-emerald-500/80 rounded-full px-4 py-2 shadow-2xl flex items-center gap-2.5 text-xs text-white">
+            <div className="w-6 h-6 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center shrink-0">
+              <Camera className="w-3.5 h-3.5" />
+            </div>
+            <span className="font-semibold text-slate-200">Toque na folha para marcar o ponto com foto</span>
+            <button
+              onClick={() => setActiveTool('pan')}
+              className="ml-1 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-full px-2.5 py-1 text-[11px] font-bold active:scale-95 cursor-pointer"
+            >
+              Cancelar
+            </button>
+          </div>
         </div>
       )}
 
@@ -2798,12 +2799,19 @@ export const PdfMapNavigator: React.FC = () => {
           onCloseLoop={handleCloseLoopPdf}
           onFinishMeasurement={() => setIsMeasureSummaryOpen(true)}
           onClose={() => setActiveTool('pan')}
+          positionClassName={`absolute bottom-20 sm:bottom-6 left-1/2 -translate-x-1/2 z-[1000] w-auto max-w-[92vw] pointer-events-none transition-opacity duration-300 ${
+            isMapInteracting ? 'opacity-20 pointer-events-none' : 'opacity-100 pointer-events-auto'
+          }`}
         />
       )}
 
       {/* Woodpile Active Floating HUD */}
       {activeTool === 'woodpile' && (
-        <div className="absolute top-2 left-1/2 -translate-x-1/2 z-[1000] w-[95%] max-w-xl bg-slate-900/95 backdrop-blur-md border border-amber-500/80 rounded-2xl p-2.5 shadow-2xl flex flex-col sm:flex-row items-center justify-between gap-2.5 animate-in slide-in-from-top duration-200 pointer-events-auto">
+        <div
+          className={`absolute bottom-20 sm:bottom-6 left-1/2 -translate-x-1/2 z-[1000] w-[95%] max-w-lg bg-slate-950/95 backdrop-blur-md border border-amber-500/80 rounded-2xl p-2.5 shadow-2xl flex flex-col sm:flex-row items-center justify-between gap-2.5 pointer-events-auto transition-opacity duration-300 ${
+            isMapInteracting ? 'opacity-20 pointer-events-none' : 'opacity-100 pointer-events-auto'
+          }`}
+        >
           {/* Title & Info */}
           <div className="flex items-center gap-2">
             <div className="w-8 h-8 rounded-xl bg-amber-500/20 border border-amber-500/40 flex items-center justify-center text-amber-400 shrink-0">
@@ -2818,15 +2826,15 @@ export const PdfMapNavigator: React.FC = () => {
               </div>
               <p className="text-[10px] text-slate-400">
                 {woodpileSubMode === 'point'
-                  ? 'Toque na folha para apontar local da pilha com foto e volume'
-                  : 'Toque para marcar os vértices e calcular o comprimento da pilha'}
+                  ? 'Toque na folha para apontar local da pilha'
+                  : 'Toque para marcar os vértices e calcular'}
               </p>
             </div>
           </div>
 
           {/* Submode Switcher & Actions */}
           <div className="flex items-center gap-1.5 w-full sm:w-auto justify-end">
-            <div className="flex bg-slate-950 p-1 rounded-xl border border-slate-800">
+            <div className="flex bg-slate-900 p-1 rounded-xl border border-slate-800">
               <button
                 type="button"
                 onClick={() => {
@@ -2856,7 +2864,7 @@ export const PdfMapNavigator: React.FC = () => {
               >
                 <span>📏 Medir</span>
                 {measurementPoints.length > 0 && (
-                  <span className="w-4 h-4 rounded-full bg-slate-900 text-amber-400 text-[9px] flex items-center justify-center font-bold">
+                  <span className="w-4 h-4 rounded-full bg-slate-950 text-amber-400 text-[9px] flex items-center justify-center font-bold">
                     {measurementPoints.length}
                   </span>
                 )}
@@ -2954,89 +2962,100 @@ export const PdfMapNavigator: React.FC = () => {
           </div>
         )}
 
-        {/* GCP Point Selection Banner */}
+        {/* GCP Point Selection Banner (Bottom Centered) */}
         {isSelectingGcpOnMap && (
-          <div className="absolute top-14 left-1/2 -translate-x-1/2 z-[1100] max-w-md w-[calc(100%-2rem)] bg-emerald-500 text-slate-950 px-4 py-2.5 rounded-2xl shadow-2xl border-2 border-emerald-300 flex items-center justify-between gap-3 animate-in slide-in-from-top pointer-events-auto">
-            <div className="flex items-center gap-2">
-              <span className="text-base font-black">🎯</span>
-              <span className="text-xs font-black">Toque no mapa para posicionar o Ponto {isSelectingGcpOnMap}</span>
-            </div>
-            <button
-              onClick={() => {
-                setIsSelectingGcpOnMap(null);
-                setIsCalibrationModalOpen(true);
-              }}
-              className="px-2.5 py-1 bg-slate-950 text-white font-bold text-[10px] rounded-lg shadow active:scale-95"
-            >
-              Cancelar
-            </button>
-          </div>
-        )}
-
-        {/* Uncalibrated Map Warning Banner */}
-        {activeDoc && !isDocumentCalibrated(activeDoc) && !isSelectingGcpOnMap && (
-          <div className="absolute top-14 left-1/2 -translate-x-1/2 z-[1000] max-w-lg w-[calc(100%-2rem)] bg-amber-500/95 text-slate-950 px-4 py-2.5 rounded-2xl shadow-2xl border border-amber-300 backdrop-blur-md flex items-center justify-between gap-3 animate-in fade-in slide-in-from-top pointer-events-auto">
-            <div className="flex items-center gap-2.5">
-              <span className="text-lg">⚠️</span>
-              <div className="text-xs">
-                <strong className="block font-black leading-tight">Planta Não Georreferenciada</strong>
-                <span className="text-[11px] opacity-90 leading-tight">Vincule a folha às coordenadas reais para ver seu GPS e navegar.</span>
-              </div>
-            </div>
-            <button
-              onClick={() => setIsCalibrationModalOpen(true)}
-              className="shrink-0 px-3 py-1.5 bg-slate-950 hover:bg-slate-900 text-amber-400 font-black text-xs rounded-xl shadow active:scale-95 transition"
-            >
-              Calibrar Agora
-            </button>
-          </div>
-        )}
-
-        {/* User Outside Calibrated Map Indicator */}
-        {activeDoc && isDocumentCalibrated(activeDoc) && !isUserInsideMap && distanceToMapKm !== null && !isSelectingGcpOnMap && !isRecordingLive && (
-          <div className="absolute top-14 left-1/2 -translate-x-1/2 z-[1000] max-w-md w-[calc(100%-2rem)] bg-slate-900/95 border border-slate-700/80 text-slate-200 px-4 py-2 rounded-2xl shadow-2xl backdrop-blur-md flex items-center justify-between gap-3 animate-in fade-in slide-in-from-top pointer-events-auto">
-            <div className="flex items-center gap-2 text-xs">
-              <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse shrink-0" />
-              <div>
-                <span className="font-bold block text-white text-[11px]">Você está fora desta planta</span>
-                <span className="text-[10px] text-slate-400">Distância: {distanceToMapKm >= 10 ? distanceToMapKm.toFixed(0) : distanceToMapKm.toFixed(1)} km do mapa</span>
-              </div>
-            </div>
-            <button
-              onClick={() => setIsCalibrationModalOpen(true)}
-              className="shrink-0 px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-[10px] rounded-lg border border-slate-700"
-            >
-              Ajustar
-            </button>
-          </div>
-        )}
-
-        {/* Live GPS Telemetry Overlay Badge (Bottom Left) */}
-        {isGpsActive && userGps && (
           <div
-            className={`absolute bottom-20 sm:bottom-3 left-3 z-20 pointer-events-auto bg-slate-900/95 backdrop-blur-md border border-slate-700/80 rounded-2xl px-3 py-2 shadow-2xl flex items-center gap-2.5 text-xs text-slate-200 transition-opacity duration-300 ${
+            className={`absolute bottom-20 sm:bottom-6 left-1/2 -translate-x-1/2 z-[1100] max-w-md w-[calc(100%-2rem)] transition-opacity duration-300 pointer-events-auto ${
               isMapInteracting ? 'opacity-20 pointer-events-none' : 'opacity-100 pointer-events-auto'
             }`}
           >
-            <div className="flex items-center gap-1.5">
-              <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse" />
-              <span className="font-mono font-black text-slate-200 text-[11px]">
-                {userGps.lat.toFixed(5)}, {userGps.lng.toFixed(5)}
-              </span>
+            <div className="bg-emerald-500 text-slate-950 px-4 py-2 rounded-2xl shadow-2xl border-2 border-emerald-300 flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2">
+                <span className="text-base font-black">🎯</span>
+                <span className="text-xs font-black">Toque na folha para posicionar o Ponto {isSelectingGcpOnMap}</span>
+              </div>
+              <button
+                onClick={() => {
+                  setIsSelectingGcpOnMap(null);
+                  setIsCalibrationModalOpen(true);
+                }}
+                className="px-2.5 py-1 bg-slate-950 text-white font-bold text-[10px] rounded-lg shadow active:scale-95 cursor-pointer"
+              >
+                Cancelar
+              </button>
             </div>
-            <div className="border-l border-slate-700 pl-2 text-[10px] text-slate-400 flex items-center gap-1.5">
-              <span>±{userGps.accuracy.toFixed(0)}m</span>
-              {userGps.speed !== null && userGps.speed !== undefined && (
-                <span className="text-emerald-400 font-bold">{(userGps.speed * 3.6).toFixed(1)} km/h</span>
-              )}
+          </div>
+        )}
+
+        {/* Helper Banner for Active Tool (Draw Track Initial State) */}
+        {activeTool === 'draw_track' && currentTrackPoints.length === 0 && (
+          <div
+            className={`absolute bottom-20 sm:bottom-6 left-1/2 -translate-x-1/2 z-[1000] w-auto max-w-[92vw] pointer-events-auto transition-opacity duration-300 ${
+              isMapInteracting ? 'opacity-20 pointer-events-none' : 'opacity-100 pointer-events-auto'
+            }`}
+          >
+            <div className="bg-slate-950/95 backdrop-blur-md border border-amber-500/80 rounded-full px-4 py-2 shadow-2xl flex items-center gap-2.5 text-xs text-white">
+              <div className="w-6 h-6 rounded-full bg-amber-500/20 text-amber-400 flex items-center justify-center shrink-0">
+                <Activity className="w-3.5 h-3.5" />
+              </div>
+              <span className="font-semibold text-slate-200">Toque na folha para adicionar os vértices</span>
+              <button
+                onClick={() => setActiveTool('pan')}
+                className="ml-1 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-full px-2.5 py-1 text-[11px] font-bold active:scale-95 cursor-pointer"
+              >
+                Cancelar
+              </button>
             </div>
-            <button
-              onClick={centerOnUserGps}
-              className="p-1 text-emerald-400 hover:text-white rounded-lg hover:bg-slate-800 transition"
-              title="Centralizar na Posição"
-            >
-              <Crosshair className="w-3.5 h-3.5" />
-            </button>
+          </div>
+        )}
+
+        {/* Uncalibrated Map Warning Banner (Bottom Centered) */}
+        {activeDoc && !isDocumentCalibrated(activeDoc) && !isSelectingGcpOnMap && activeTool === 'pan' && (
+          <div
+            className={`absolute bottom-20 sm:bottom-6 left-1/2 -translate-x-1/2 z-[1000] max-w-md w-[calc(100%-2rem)] transition-opacity duration-300 pointer-events-auto ${
+              isMapInteracting ? 'opacity-20 pointer-events-none' : 'opacity-100 pointer-events-auto'
+            }`}
+          >
+            <div className="bg-slate-950/95 text-white px-3.5 py-2 rounded-2xl shadow-2xl border border-amber-500/70 backdrop-blur-md flex items-center justify-between gap-2.5">
+              <div className="flex items-center gap-2">
+                <span className="text-amber-400 text-sm">⚠️</span>
+                <div className="text-xs">
+                  <span className="block font-black text-amber-300 text-[11px] leading-tight">Planta Não Georreferenciada</span>
+                  <span className="text-[10px] text-slate-400 leading-tight">Vincule a folha às coordenadas reais.</span>
+                </div>
+              </div>
+              <button
+                onClick={() => setIsCalibrationModalOpen(true)}
+                className="shrink-0 px-2.5 py-1 bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-[11px] rounded-xl shadow active:scale-95 transition cursor-pointer"
+              >
+                Calibrar
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* User Outside Calibrated Map Indicator (Bottom Centered) */}
+        {activeDoc && isDocumentCalibrated(activeDoc) && !isUserInsideMap && distanceToMapKm !== null && !isSelectingGcpOnMap && !isRecordingLive && activeTool === 'pan' && (
+          <div
+            className={`absolute bottom-20 sm:bottom-6 left-1/2 -translate-x-1/2 z-[1000] max-w-md w-[calc(100%-2rem)] transition-opacity duration-300 pointer-events-auto ${
+              isMapInteracting ? 'opacity-20 pointer-events-none' : 'opacity-100 pointer-events-auto'
+            }`}
+          >
+            <div className="bg-slate-950/95 border border-slate-700/80 text-slate-200 px-3.5 py-2 rounded-2xl shadow-2xl backdrop-blur-md flex items-center justify-between gap-2.5">
+              <div className="flex items-center gap-2 text-xs">
+                <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse shrink-0" />
+                <div>
+                  <span className="font-bold block text-white text-[11px]">Você está fora desta planta</span>
+                  <span className="text-[10px] text-slate-400">Distância: {distanceToMapKm >= 10 ? distanceToMapKm.toFixed(0) : distanceToMapKm.toFixed(1)} km do mapa</span>
+                </div>
+              </div>
+              <button
+                onClick={() => setIsCalibrationModalOpen(true)}
+                className="shrink-0 px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-[10px] rounded-lg border border-slate-700 cursor-pointer"
+              >
+                Ajustar
+              </button>
+            </div>
           </div>
         )}
 
