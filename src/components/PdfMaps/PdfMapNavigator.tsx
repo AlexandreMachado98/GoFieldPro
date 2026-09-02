@@ -1537,19 +1537,6 @@ export const PdfMapNavigator: React.FC = () => {
 
     // Strict validation: if document is not calibrated:
     if (!isDocumentCalibrated(activeDoc)) {
-      // Instant Field Auto-Anchor: when in the field with active GPS, bind document automatically without requiring manual typing!
-      if (currentGps && typeof currentGps.lat === 'number' && typeof currentGps.lng === 'number' && !isNaN(currentGps.lat) && !isNaN(currentGps.lng)) {
-        console.log('[PdfMapNavigator] Uncalibrated map opened in the field. Auto-anchoring to current GPS coordinates...');
-        const autoCal = createCenteredCalibration(activeDoc, currentGps.lat, currentGps.lng, 0.75, 0);
-        const updatedDoc = {
-          ...activeDoc,
-          calibration: autoCal,
-        };
-        updateDocumentInStore(updatedDoc);
-        notifySuccess('Navegação GPS Ativada!', 'A planta foi posicionada automaticamente na sua localização real de campo.');
-        return;
-      }
-
       if (gpsUserMarkerRef.current) {
         map.removeLayer(gpsUserMarkerRef.current);
         gpsUserMarkerRef.current = null;
@@ -1558,6 +1545,12 @@ export const PdfMapNavigator: React.FC = () => {
         map.removeLayer(gpsAccuracyCircleRef.current);
         gpsAccuracyCircleRef.current = null;
       }
+      if (approachLineRef.current) {
+        map.removeLayer(approachLineRef.current);
+        approachLineRef.current = null;
+      }
+      setIsUserInsideMap(false);
+      setDistanceToMapKm(null);
       return;
     }
 
@@ -1602,73 +1595,83 @@ export const PdfMapNavigator: React.FC = () => {
     setIsUserInsideMap(pdfCoords.isInside);
     setDistanceToMapKm(distKm);
 
-    // If user is physically outside the sheet, draw a guide approach line connecting user position to the PDF sheet
+    // If user is physically outside the sheet, do NOT render the blue dot on the sheet!
     if (!pdfCoords.isInside) {
+      if (gpsUserMarkerRef.current) {
+        map.removeLayer(gpsUserMarkerRef.current);
+        gpsUserMarkerRef.current = null;
+      }
+      if (gpsAccuracyCircleRef.current) {
+        map.removeLayer(gpsAccuracyCircleRef.current);
+        gpsAccuracyCircleRef.current = null;
+      }
+
       const centerSheet: [number, number] = [activeDoc.height / 2, activeDoc.width / 2];
       if (approachLineRef.current) {
         approachLineRef.current.setLatLngs([[pdfCoords.x, pdfCoords.y], centerSheet]);
       } else {
         approachLineRef.current = L.polyline([[pdfCoords.x, pdfCoords.y], centerSheet], {
-          color: '#38bdf8',
+          color: '#10b981',
           weight: 2,
           dashArray: '6, 8',
           opacity: 0.8,
         }).addTo(map);
       }
     } else {
+      // User is physically INSIDE the sheet! Remove approach line and show blue GPS marker!
       if (approachLineRef.current) {
         try { map.removeLayer(approachLineRef.current); } catch {}
         approachLineRef.current = null;
       }
-    }
 
-    // PONTINHO AZUL (Iconic Pulsing Blue GPS Marker)
-    const headingDeg = currentGps.heading !== undefined && currentGps.heading !== null && !isNaN(currentGps.heading) ? currentGps.heading : 0;
-    const userMarkerHtml = `
-      <div class="user-gps-pulse-wrapper" style="position: relative; width: 40px; height: 40px; display: flex; align-items: center; justify-content: center;">
-        <div style="position: absolute; inset: 0; border-radius: 50%; background: rgba(59, 130, 246, 0.4); animation: ping 2s cubic-bezier(0, 0, 0.2, 1) infinite;"></div>
-        <div style="width: 22px; height: 22px; border-radius: 50%; background: #2563eb; border: 3.5px solid #ffffff; box-shadow: 0 0 16px rgba(37, 99, 235, 0.95); display: flex; align-items: center; justify-content: center;">
-          <div style="width: 6px; height: 6px; border-radius: 50%; background: #ffffff;"></div>
+      // PONTINHO AZUL (Iconic Pulsing Blue GPS Marker - ONLY when user is physically inside the plant area!)
+      const headingDeg = currentGps.heading !== undefined && currentGps.heading !== null && !isNaN(currentGps.heading) ? currentGps.heading : 0;
+      const userMarkerHtml = `
+        <div class="user-gps-pulse-wrapper" style="position: relative; width: 40px; height: 40px; display: flex; align-items: center; justify-content: center;">
+          <div style="position: absolute; inset: 0; border-radius: 50%; background: rgba(59, 130, 246, 0.4); animation: ping 2s cubic-bezier(0, 0, 0.2, 1) infinite;"></div>
+          <div style="width: 22px; height: 22px; border-radius: 50%; background: #2563eb; border: 3.5px solid #ffffff; box-shadow: 0 0 16px rgba(37, 99, 235, 0.95); display: flex; align-items: center; justify-content: center;">
+            <div style="width: 6px; height: 6px; border-radius: 50%; background: #ffffff;"></div>
+          </div>
+          ${currentGps.heading !== undefined && currentGps.heading !== null ? `
+            <div style="position: absolute; top: -8px; width: 0; height: 0; border-left: 6px solid transparent; border-right: 6px solid transparent; border-bottom: 9px solid #60a5fa; transform: rotate(${headingDeg}deg); transform-origin: 50% 28px;"></div>
+          ` : ''}
         </div>
-        ${currentGps.heading !== undefined && currentGps.heading !== null ? `
-          <div style="position: absolute; top: -8px; width: 0; height: 0; border-left: 6px solid transparent; border-right: 6px solid transparent; border-bottom: 9px solid #60a5fa; transform: rotate(${headingDeg}deg); transform-origin: 50% 28px;"></div>
-        ` : ''}
-      </div>
-    `;
+      `;
 
-    const userIcon = L.divIcon({
-      className: 'custom-user-gps-marker',
-      html: userMarkerHtml,
-      iconSize: [40, 40],
-      iconAnchor: [20, 20],
-    });
+      const userIcon = L.divIcon({
+        className: 'custom-user-gps-marker',
+        html: userMarkerHtml,
+        iconSize: [40, 40],
+        iconAnchor: [20, 20],
+      });
 
-    if (gpsUserMarkerRef.current) {
-      gpsUserMarkerRef.current.setLatLng([pdfCoords.x, pdfCoords.y]);
-      gpsUserMarkerRef.current.setIcon(userIcon);
-    } else {
-      gpsUserMarkerRef.current = L.marker([pdfCoords.x, pdfCoords.y], {
-        icon: userIcon,
-        zIndexOffset: 10000,
-      }).addTo(map);
-    }
+      if (gpsUserMarkerRef.current) {
+        gpsUserMarkerRef.current.setLatLng([pdfCoords.x, pdfCoords.y]);
+        gpsUserMarkerRef.current.setIcon(userIcon);
+      } else {
+        gpsUserMarkerRef.current = L.marker([pdfCoords.x, pdfCoords.y], {
+          icon: userIcon,
+          zIndexOffset: 10000,
+        }).addTo(map);
+      }
 
-    const safeAccuracy = currentGps.accuracy || 5;
-    const scale = activeDoc.calibration?.scaleMetersPerPixel || 0.75;
-    const accuracyRadiusPx = Math.max(12, Math.min(150, safeAccuracy / (scale > 0 ? scale : 0.75)));
+      const safeAccuracy = currentGps.accuracy || 5;
+      const scale = activeDoc.calibration?.scaleMetersPerPixel || 0.75;
+      const accuracyRadiusPx = Math.max(12, Math.min(150, safeAccuracy / (scale > 0 ? scale : 0.75)));
 
-    if (gpsAccuracyCircleRef.current) {
-      gpsAccuracyCircleRef.current.setLatLng([pdfCoords.x, pdfCoords.y]);
-      gpsAccuracyCircleRef.current.setRadius(accuracyRadiusPx);
-    } else {
-      gpsAccuracyCircleRef.current = L.circle([pdfCoords.x, pdfCoords.y], {
-        radius: accuracyRadiusPx,
-        color: '#2563eb',
-        fillColor: '#38bdf8',
-        fillOpacity: 0.15,
-        weight: 1,
-        dashArray: '4, 4',
-      }).addTo(map);
+      if (gpsAccuracyCircleRef.current) {
+        gpsAccuracyCircleRef.current.setLatLng([pdfCoords.x, pdfCoords.y]);
+        gpsAccuracyCircleRef.current.setRadius(accuracyRadiusPx);
+      } else {
+        gpsAccuracyCircleRef.current = L.circle([pdfCoords.x, pdfCoords.y], {
+          radius: accuracyRadiusPx,
+          color: '#2563eb',
+          fillColor: '#38bdf8',
+          fillOpacity: 0.15,
+          weight: 1,
+          dashArray: '4, 4',
+        }).addTo(map);
+      }
     }
 
     // Dynamic real-time update for Target Navigation Guide Line
@@ -2093,11 +2096,8 @@ export const PdfMapNavigator: React.FC = () => {
         if (geoMetadata && geoMetadata.calibration && geoMetadata.calibration.isCalibrated) {
           initialCalibration = geoMetadata.calibration;
           isGeoPdfDetected = true;
-        } else if (currentGps && typeof currentGps.lat === 'number' && typeof currentGps.lng === 'number' && !isNaN(currentGps.lat) && !isNaN(currentGps.lng)) {
-          // Instant Field Auto-Anchor: user is at the property right now
-          initialCalibration = createCenteredCalibration({ width: baseWidth, height: baseHeight }, currentGps.lat, currentGps.lng, 0.75, 0);
         } else {
-          // Standard PDF without embedded GeoPDF tags: starts uncalibrated until GPS connects or GCP added
+          // Standard PDF without embedded GeoPDF tags: starts uncalibrated until user enters coordinates or GCP points
           initialCalibration = {
             isCalibrated: false,
             ref1: { x: baseHeight * 0.9, y: baseWidth * 0.1, lat: NaN, lng: NaN },

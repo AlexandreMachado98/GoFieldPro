@@ -313,7 +313,7 @@ export function gpsToPdf(
   const refMetricDistSq = dNorthM * dNorthM + dEastM * dEastM;
 
   if (refMetricDistSq < 1) {
-    return { x: h / 2, y: w / 2, isInside: false, isCalibrated: false };
+    return { x: -999999, y: -999999, isInside: false, isCalibrated: false };
   }
 
   // Real world metric delta from ref1 to target point
