@@ -1,9 +1,9 @@
 // Centralized App Version and Build Metadata - Auto-generated at Build Time
 export const APP_VERSION = 'v2.6.48318';
-export const APP_BUILD_NUMBER = 1788318376104;
+export const APP_BUILD_NUMBER = 1788318593699;
 export const APP_BUILD_DATE = '01/09/2026';
-export const APP_BUILD_TIME = '23:06:16';
-export const APP_RELEASE_TIMESTAMP = 1788318376104;
+export const APP_BUILD_TIME = '23:09:53';
+export const APP_RELEASE_TIMESTAMP = 1788318593699;
 export const APP_RELEASE_NAME = 'GoField Pro Tactical v2.6.48318';
 
 export interface ChangelogItem {
