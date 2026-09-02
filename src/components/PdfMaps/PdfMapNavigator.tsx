@@ -36,8 +36,10 @@ import {
   Ruler,
   Lock,
   ArrowLeft,
-  EyeOff
+  EyeOff,
+  SlidersHorizontal
 } from 'lucide-react';
+import { BottomSheet } from '../Common/BottomSheet';
 import L from 'leaflet';
 import * as pdfjsLib from 'pdfjs-dist';
 import pdfWorker from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
@@ -194,8 +196,9 @@ export const PdfMapNavigator: React.FC = () => {
   // Tools mode: 'pan', 'add_point', 'draw_track', 'record_track', 'measure', 'woodpile'
   const [activeTool, setActiveTool] = useState<'pan' | 'add_point' | 'draw_track' | 'record_track' | 'measure' | 'woodpile'>('pan');
 
-  // Retractable Tools Panel
-  const [isToolsPanelOpen, setIsToolsPanelOpen] = useState<boolean>(true);
+  // Retractable Tools Panel (Starts CLOSED to avoid screen clutter, like GPS map)
+  const [isToolsPanelOpen, setIsToolsPanelOpen] = useState<boolean>(false);
+  const [isMapInteracting, setIsMapInteracting] = useState<boolean>(false);
 
   // Woodpile Specific Submode & Form State
   const [woodpileSubMode, setWoodpileSubMode] = useState<'point' | 'measure'>('point');
@@ -601,6 +604,14 @@ export const PdfMapNavigator: React.FC = () => {
 
       const measureGroup = L.layerGroup().addTo(map);
       measureLayerRef.current = measureGroup;
+
+      // Listen to user map interaction (drag, zoom, pan) to reduce opacity of overlay controls
+      map.on('movestart zoomstart dragstart', () => {
+        setIsMapInteracting(true);
+      });
+      map.on('moveend zoomend dragend', () => {
+        setIsMapInteracting(false);
+      });
 
       // Click listener uses activeToolRef and state refs to prevent crashes & stale closures
       map.on('click', (e: L.LeafletMouseEvent) => {
@@ -2964,45 +2975,28 @@ export const PdfMapNavigator: React.FC = () => {
           </div>
         )}
 
-        {/* Live Track Recording Indicator Banner & Telemetry */}
-        {isRecordingLive && (
-          <div className="absolute top-14 left-1/2 -translate-x-1/2 z-[1000] bg-rose-950/95 backdrop-blur-md border border-rose-500 rounded-2xl px-4 py-2 shadow-2xl flex items-center gap-3 animate-in fade-in pointer-events-auto">
-            <div className="flex items-center gap-2">
-              <span className="w-3 h-3 rounded-full bg-rose-500 animate-ping" />
-              <span className="text-xs font-black text-rose-200">
-                {isRecordingPaused ? 'PAUSADO' : 'GRAVANDO TRILHA'}
-              </span>
-            </div>
-            <div className="font-mono text-xs font-bold text-white bg-slate-950/90 px-2 py-0.5 rounded-lg border border-slate-800">
-              ⏱️ {formatTimer(recordDuration)}
-            </div>
-            <div className="text-xs font-bold text-amber-300 bg-slate-950/90 px-2 py-0.5 rounded-lg border border-slate-800">
-              📏 {totalRecordedDistanceMeters >= 1000 ? `${(totalRecordedDistanceMeters / 1000).toFixed(2)} km` : `${Math.round(totalRecordedDistanceMeters)} m`}
-            </div>
-            <span className="text-[11px] text-rose-300 font-semibold hidden sm:inline">
-              📍 {recordedPoints.length} pts
-            </span>
-          </div>
-        )}
-
-        {/* Live GPS Telemetry Overlay Badge (Bottom Left - Safe Area above Mobile Nav) */}
+        {/* Live GPS Telemetry Overlay Badge (Bottom Left) */}
         {isGpsActive && userGps && (
-          <div className="absolute bottom-16 sm:bottom-3 left-2.5 z-20 pointer-events-auto bg-slate-900/95 backdrop-blur-md border border-sky-500/80 rounded-2xl px-3 py-2 shadow-2xl flex items-center gap-3 text-xs text-slate-200">
+          <div
+            className={`absolute bottom-20 sm:bottom-3 left-3 z-20 pointer-events-auto bg-slate-900/95 backdrop-blur-md border border-slate-700/80 rounded-2xl px-3 py-2 shadow-2xl flex items-center gap-2.5 text-xs text-slate-200 transition-opacity duration-300 ${
+              isMapInteracting ? 'opacity-20 pointer-events-none' : 'opacity-100 pointer-events-auto'
+            }`}
+          >
             <div className="flex items-center gap-1.5">
-              <span className="w-2.5 h-2.5 rounded-full bg-sky-400 animate-ping" />
-              <span className="font-mono font-black text-sky-300">
+              <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse" />
+              <span className="font-mono font-black text-slate-200 text-[11px]">
                 {userGps.lat.toFixed(5)}, {userGps.lng.toFixed(5)}
               </span>
             </div>
-            <div className="border-l border-slate-700 pl-2 text-[11px] text-slate-400 flex items-center gap-2">
-              <span>±{userGps.accuracy.toFixed(1)}m</span>
+            <div className="border-l border-slate-700 pl-2 text-[10px] text-slate-400 flex items-center gap-1.5">
+              <span>±{userGps.accuracy.toFixed(0)}m</span>
               {userGps.speed !== null && userGps.speed !== undefined && (
                 <span className="text-emerald-400 font-bold">{(userGps.speed * 3.6).toFixed(1)} km/h</span>
               )}
             </div>
             <button
               onClick={centerOnUserGps}
-              className="p-1 text-sky-400 hover:text-white rounded-lg hover:bg-slate-800"
+              className="p-1 text-emerald-400 hover:text-white rounded-lg hover:bg-slate-800 transition"
               title="Centralizar na Posição"
             >
               <Crosshair className="w-3.5 h-3.5" />
@@ -3010,267 +3004,407 @@ export const PdfMapNavigator: React.FC = () => {
           </div>
         )}
 
-        {/* Floating Open Tools Button (When Tools are hidden) */}
-        {activeDoc && !isToolsPanelOpen && (
-          <button
-            onClick={() => setIsToolsPanelOpen(true)}
-            className="absolute right-3 top-3 z-[1000] px-3 py-2 rounded-xl bg-slate-900/95 backdrop-blur-md border border-slate-700/80 hover:border-emerald-500/80 text-slate-200 hover:text-white font-extrabold text-xs flex items-center gap-1.5 shadow-2xl transition-all active:scale-95 pointer-events-auto cursor-pointer"
-            title="Abrir Barra de Ferramentas"
+        {/* ------------------------------------------------------------- */}
+        {/* TOP-RIGHT CORNER: DISCRETE TOOLS BUTTON STACK (GPS MAP STYLE) */}
+        {/* ------------------------------------------------------------- */}
+        {activeDoc && (
+          <div
+            className={`absolute top-3 right-3 z-20 pointer-events-auto flex flex-col gap-2 transition-opacity duration-300 ${
+              isMapInteracting ? 'opacity-20 pointer-events-none' : 'opacity-100 pointer-events-auto'
+            }`}
           >
-            <Layers className="w-4 h-4 text-emerald-400" />
-            <span>Ferramentas</span>
-          </button>
+            {/* 1. Ferramentas (SlidersHorizontal - Opens Discrete Menu) */}
+            <button
+              onClick={() => setIsToolsPanelOpen(true)}
+              className="w-10 h-10 rounded-2xl bg-slate-900/95 hover:bg-slate-900 text-sky-400 border border-slate-700/80 shadow-xl flex items-center justify-center transition-all active:scale-95 cursor-pointer backdrop-blur-md"
+              title="Ferramentas do Mapa PDF"
+            >
+              <SlidersHorizontal className="w-4 h-4 text-sky-400" />
+            </button>
+
+            {/* 2. Centralizar GPS */}
+            <button
+              onClick={centerOnUserGps}
+              className={`w-10 h-10 rounded-2xl border shadow-xl flex items-center justify-center transition-all active:scale-95 cursor-pointer backdrop-blur-md ${
+                isGpsActive && userGps
+                  ? 'bg-slate-900/95 text-emerald-400 border-slate-700/80 hover:bg-slate-900'
+                  : 'bg-slate-900/95 text-slate-400 border-slate-700/80 hover:bg-slate-900'
+              }`}
+              title="Centralizar Minha Posição"
+            >
+              <Crosshair className="w-4 h-4" />
+            </button>
+
+            {/* 3. Zoom In */}
+            <button
+              onClick={() => mapInstanceRef.current?.zoomIn()}
+              className="w-10 h-10 rounded-2xl bg-slate-900/95 hover:bg-slate-900 text-slate-300 border border-slate-700/80 shadow-xl flex items-center justify-center transition-all active:scale-95 cursor-pointer backdrop-blur-md"
+              title="Aproximar Zoom (+)"
+            >
+              <ZoomIn className="w-4 h-4" />
+            </button>
+
+            {/* 4. Zoom Out */}
+            <button
+              onClick={() => mapInstanceRef.current?.zoomOut()}
+              className="w-10 h-10 rounded-2xl bg-slate-900/95 hover:bg-slate-900 text-slate-300 border border-slate-700/80 shadow-xl flex items-center justify-center transition-all active:scale-95 cursor-pointer backdrop-blur-md"
+              title="Afastar Zoom (-)"
+            >
+              <ZoomOut className="w-4 h-4" />
+            </button>
+
+            {/* 5. Ajustar Folha à Tela */}
+            <button
+              onClick={handleFitBounds}
+              className="w-10 h-10 rounded-2xl bg-slate-900/95 hover:bg-slate-900 text-slate-300 border border-slate-700/80 shadow-xl flex items-center justify-center transition-all active:scale-95 cursor-pointer backdrop-blur-md"
+              title="Enquadrar Folha"
+            >
+              <Maximize2 className="w-4 h-4" />
+            </button>
+          </div>
         )}
 
-        {/* Lateral Tactical Action Dock (Right Side - Sleek & Ultra-Compact) */}
-        {activeDoc && isToolsPanelOpen && (
-          <div className="absolute right-3 top-3 z-[1000] flex flex-col items-end gap-2 pointer-events-none max-h-[calc(100dvh-4.5rem)] animate-in slide-in-from-right duration-200">
-            
-            {/* Context Sub-Tool Bar (Drawing Actions - positioned to the left of the dock) */}
-            {activeTool === 'draw_track' && currentTrackPoints.length > 0 && (
-              <div className="bg-slate-900/95 backdrop-blur-md border border-amber-500/80 rounded-2xl p-2 shadow-2xl flex flex-col sm:flex-row items-center gap-1.5 pointer-events-auto animate-in slide-in-from-right duration-200">
-                <div className="flex items-center gap-1">
-                  <span className="text-xs font-bold text-amber-400 px-2">
-                    {currentTrackPoints.length} pts
-                  </span>
-                  <button
-                    onClick={() => setCurrentTrackPoints((prev) => prev.slice(0, -1))}
-                    className="p-2 bg-slate-800 text-slate-200 rounded-xl hover:bg-slate-700 active:scale-95 cursor-pointer"
-                    title="Desfazer último vértice"
-                  >
-                    <Undo2 className="w-4 h-4" />
-                  </button>
-                </div>
-                <div className="flex items-center gap-1">
-                  <button
-                    onClick={() => setIsTrackModalOpen(true)}
-                    className="px-3 py-2 bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs rounded-xl shadow flex items-center gap-1 active:scale-95 cursor-pointer"
-                  >
-                    <Check className="w-4 h-4" />
-                    Salvar
-                  </button>
-                  <button
-                    onClick={() => {
-                      setCurrentTrackPoints([]);
-                      setActiveTool('pan');
-                    }}
-                    className="px-2.5 py-2 bg-slate-800 text-slate-300 font-bold text-xs rounded-xl hover:bg-slate-700 active:scale-95 cursor-pointer"
-                  >
-                    Cancelar
-                  </button>
-                </div>
+        {/* ------------------------------------------------------------- */}
+        {/* BOTTOM FLOATING BAR: DISCRETE LIVE TRACK RECORDING CONTROLLER */}
+        {/* ------------------------------------------------------------- */}
+        {isRecordingLive && (
+          <div
+            className={`absolute bottom-20 sm:bottom-6 left-1/2 -translate-x-1/2 z-[1000] transition-opacity duration-300 pointer-events-auto ${
+              isMapInteracting ? 'opacity-20 pointer-events-none' : 'opacity-100 pointer-events-auto'
+            }`}
+          >
+            <div className="bg-slate-950/95 backdrop-blur-md border border-slate-700/90 rounded-full px-3 py-1.5 shadow-2xl flex items-center gap-2 text-white">
+              {/* Status Pulse */}
+              <div className="flex items-center gap-1.5 pl-1.5 pr-0.5">
+                <span className={`w-2.5 h-2.5 rounded-full ${isRecordingPaused ? 'bg-amber-400' : 'bg-rose-500 animate-ping'}`} />
+                <span className="text-[10px] font-black uppercase tracking-wider text-slate-300">
+                  {isRecordingPaused ? 'Pausado' : 'Gravando'}
+                </span>
               </div>
-            )}
 
-            {/* Context Sub-Tool Bar (Live Recording Actions - positioned to the left of the dock) */}
-            {activeTool === 'record_track' && isRecordingLive && (
-              <div className="bg-slate-900/95 backdrop-blur-md border border-rose-500/80 rounded-2xl p-2 shadow-2xl flex flex-col sm:flex-row items-center gap-1.5 pointer-events-auto animate-in slide-in-from-right duration-200">
-                <button
-                  onClick={() => {
-                    try {
-                      if (userGps && activeDoc) {
-                        const p = gpsToPdf(userGps.lat, userGps.lng, activeDoc);
-                        if (!isNaN(p.x) && !isNaN(p.y)) {
-                          setRecordedPoints((prev) => [
-                            ...prev,
-                            { 
-                              x: p.x, 
-                              y: p.y, 
-                              lat: userGps.lat, 
-                              lng: userGps.lng, 
-                              time: new Date().toLocaleTimeString('pt-BR'),
-                              speed: userGps.speed !== null ? userGps.speed : undefined,
-                              altitude: userGps.altitude !== null ? userGps.altitude : undefined
-                            }
-                          ]);
-                        }
-                      } else if (mapInstanceRef.current) {
-                        const center = mapInstanceRef.current.getCenter();
-                        if (!isNaN(center.lat) && !isNaN(center.lng)) {
-                          setRecordedPoints((prev) => [
-                            ...prev,
-                            { x: center.lat, y: center.lng, time: new Date().toLocaleTimeString('pt-BR') }
-                          ]);
-                        }
+              {/* + Ponto */}
+              <button
+                onClick={() => {
+                  try {
+                    if (currentGps && activeDoc) {
+                      const p = gpsToPdf(currentGps.lat, currentGps.lng, activeDoc);
+                      if (!isNaN(p.x) && !isNaN(p.y)) {
+                        setRecordedPoints((prev) => [
+                          ...prev,
+                          {
+                            x: p.x,
+                            y: p.y,
+                            lat: currentGps.lat,
+                            lng: currentGps.lng,
+                            time: new Date().toLocaleTimeString('pt-BR'),
+                            speed: currentGps.speed !== undefined ? currentGps.speed : undefined,
+                            altitude: currentGps.altitude !== undefined ? currentGps.altitude : undefined,
+                          },
+                        ]);
+                        notifySuccess('Ponto Gravado', `Vértice #${recordedPoints.length + 1} registrado na trilha.`);
                       }
-                    } catch (err) {
-                      console.warn('Error recording point:', err);
+                    } else if (mapInstanceRef.current) {
+                      const center = mapInstanceRef.current.getCenter();
+                      if (!isNaN(center.lat) && !isNaN(center.lng)) {
+                        setRecordedPoints((prev) => [
+                          ...prev,
+                          { x: center.lat, y: center.lng, time: new Date().toLocaleTimeString('pt-BR') },
+                        ]);
+                        notifySuccess('Ponto Gravado', `Vértice #${recordedPoints.length + 1} registrado na tela.`);
+                      }
                     }
-                  }}
-                  className="w-full sm:w-auto px-3 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-xl flex items-center justify-center gap-1 active:scale-95 cursor-pointer"
-                >
-                  <Plus className="w-4 h-4" />
-                  + Ponto
-                </button>
-
-                <div className="flex items-center gap-1 w-full sm:w-auto justify-between">
-                  <button
-                    onClick={() => setIsRecordingPaused(!isRecordingPaused)}
-                    className="p-2 bg-slate-800 text-slate-200 rounded-xl active:scale-95 cursor-pointer"
-                    title={isRecordingPaused ? 'Retomar' : 'Pausar'}
-                  >
-                    {isRecordingPaused ? <Play className="w-4 h-4 text-emerald-400" /> : <Pause className="w-4 h-4 text-amber-400" />}
-                  </button>
-
-                  <button
-                    onClick={handleStopAndSaveLiveRecording}
-                    className="px-3 py-2 bg-rose-600 hover:bg-rose-500 text-white font-black text-xs rounded-xl shadow flex items-center gap-1 active:scale-95 cursor-pointer"
-                  >
-                    <Square className="w-4 h-4" />
-                    Finalizar
-                  </button>
-                </div>
-              </div>
-            )}
-
-            {/* Sleek Compact Tactical GIS Tool Rail */}
-            <div className="bg-slate-900/95 backdrop-blur-md border border-slate-700/80 rounded-2xl p-1.5 shadow-2xl flex flex-col gap-1.5 pointer-events-auto items-center">
-              {/* Ocultar / Fechar */}
-              <button
-                onClick={() => setIsToolsPanelOpen(false)}
-                title="Ocultar Barra de Ferramentas"
-                className="w-11 h-11 rounded-xl flex items-center justify-center text-slate-400 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer"
-              >
-                <X className="w-5 h-5" />
-              </button>
-
-              <div className="w-full h-px bg-slate-800" />
-
-              {/* 1. Navegar */}
-              <button
-                onClick={() => { setActiveTool('pan'); setCurrentTrackPoints([]); }}
-                title="Navegar no Mapa"
-                className={`w-11 h-11 rounded-xl flex items-center justify-center transition-all cursor-pointer ${
-                  activeTool === 'pan' ? 'bg-sky-600 text-white shadow-md' : 'text-slate-400 hover:text-white hover:bg-slate-800/70'
-                }`}
-              >
-                <MousePointer className="w-5 h-5 text-sky-400" />
-              </button>
-
-              {/* 2. Marcar Ponto com Foto */}
-              <button
-                onClick={() => { setActiveTool('add_point'); setCurrentTrackPoints([]); }}
-                title="Adicionar Ponto de Campo com Foto"
-                className={`w-11 h-11 rounded-xl flex items-center justify-center transition-all cursor-pointer ${
-                  activeTool === 'add_point' ? 'bg-emerald-600 text-white shadow-md' : 'text-slate-400 hover:text-emerald-400 hover:bg-slate-800/70'
-                }`}
-              >
-                <Camera className="w-5 h-5 text-emerald-400" />
-              </button>
-
-              {/* 3. Régua / Medir Área & Distância */}
-              <button
-                onClick={() => {
-                  if (activeTool === 'measure' && measurementPoints.length > 0) {
-                    setIsMeasureSummaryOpen(true);
-                  } else {
-                    setActiveTool('measure');
-                    setCurrentTrackPoints([]);
+                  } catch (err) {
+                    console.warn('Error recording point:', err);
                   }
                 }}
-                title="Régua de Medição e Área"
-                className={`w-11 h-11 rounded-xl flex items-center justify-center transition-all relative cursor-pointer ${
-                  activeTool === 'measure' ? 'bg-rose-600 text-white shadow-md' : 'text-slate-400 hover:text-rose-400 hover:bg-slate-800/70'
-                }`}
+                className="flex items-center gap-1 px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-emerald-400 font-black text-xs rounded-full transition active:scale-95 cursor-pointer"
+                title="Adicionar Ponto na Trilha"
               >
-                <Ruler className="w-5 h-5 text-rose-400" />
-                {measurementPoints.length > 0 && activeTool === 'measure' && (
-                  <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-amber-500 text-slate-950 text-[9px] font-black flex items-center justify-center">
-                    {measurementPoints.length}
-                  </span>
-                )}
+                <Plus className="w-3.5 h-3.5" />
+                <span>Ponto</span>
               </button>
 
-              {/* 4. Gravar Rota em Tempo Real */}
+              {/* Pausar / Retomar */}
               <button
-                onClick={handleStartLiveRecording}
-                title="Gravar Rota GPS em Tempo Real"
-                className={`w-11 h-11 rounded-xl flex items-center justify-center transition-all cursor-pointer ${
-                  activeTool === 'record_track' ? 'bg-rose-600 text-white shadow-md' : 'text-slate-400 hover:text-rose-400 hover:bg-slate-800/70'
-                }`}
+                onClick={() => setIsRecordingPaused(!isRecordingPaused)}
+                className="p-1.5 text-amber-400 hover:text-amber-300 rounded-full hover:bg-slate-800 transition active:scale-95 cursor-pointer"
+                title={isRecordingPaused ? 'Retomar Gravação' : 'Pausar Gravação'}
               >
-                <Footprints className="w-5 h-5 text-rose-400" />
+                {isRecordingPaused ? <Play className="w-4 h-4 fill-amber-400" /> : <Pause className="w-4 h-4 fill-amber-400" />}
               </button>
 
-              {/* 5. Traçar Rota Manualmente */}
-              <button
-                onClick={() => { setActiveTool('draw_track'); setCurrentTrackPoints([]); }}
-                title="Traçar Rota Manualmente"
-                className={`w-11 h-11 rounded-xl flex items-center justify-center transition-all cursor-pointer ${
-                  activeTool === 'draw_track' ? 'bg-amber-600 text-white shadow-md' : 'text-slate-400 hover:text-amber-400 hover:bg-slate-800/70'
-                }`}
-              >
-                <Activity className="w-5 h-5 text-amber-400" />
-              </button>
+              <div className="h-4 w-px bg-slate-800 shrink-0" />
 
-              {/* 6. Cubagem de Pilha de Madeira */}
+              {/* Finalizar / Desativar */}
               <button
-                onClick={() => {
-                  if (activeTool === 'woodpile' && measurementPoints.length > 0 && woodpileSubMode === 'measure') {
-                    setIsMeasureSummaryOpen(true);
-                  } else {
-                    setActiveTool('woodpile');
-                    setCurrentTrackPoints([]);
-                  }
-                }}
-                title="Cubagem de Madeira"
-                className={`w-11 h-11 rounded-xl flex items-center justify-center transition-all cursor-pointer ${
-                  activeTool === 'woodpile' ? 'bg-amber-600 text-white shadow-md' : 'text-slate-400 hover:text-amber-400 hover:bg-slate-800/70'
-                }`}
+                onClick={handleStopAndSaveLiveRecording}
+                className="flex items-center gap-1 px-3 py-1.5 bg-rose-600 hover:bg-rose-500 text-white rounded-full text-xs font-black shadow transition active:scale-95 cursor-pointer"
+                title="Finalizar e Salvar Trilha"
               >
-                <WoodpileIcon className="w-5 h-5 text-amber-400" />
-              </button>
-
-              <div className="w-full h-px bg-slate-800" />
-
-              {/* 7. GPS Live Toggle */}
-              <button
-                onClick={() => toggleGps()}
-                title={isGpsActive ? 'Desativar GPS' : 'Ativar Meu GPS'}
-                className={`w-11 h-11 rounded-xl flex items-center justify-center transition-all cursor-pointer ${
-                  isGpsActive ? 'bg-sky-600 text-white shadow-md' : 'text-slate-400 hover:text-sky-400 hover:bg-slate-800/70'
-                }`}
-              >
-                <LocateFixed className={`w-5 h-5 ${isGpsActive ? 'animate-spin text-white' : 'text-sky-400'}`} style={{ animationDuration: '4s' }} />
-              </button>
-
-              {/* 8. Calibrar Georreferenciamento */}
-              <button
-                onClick={() => setIsCalibrationModalOpen(true)}
-                title="Calibrar Georreferenciamento da Folha"
-                className="w-11 h-11 rounded-xl flex items-center justify-center text-slate-400 hover:text-amber-400 hover:bg-slate-800/70 transition-colors cursor-pointer"
-              >
-                <Sliders className="w-5 h-5 text-amber-400" />
-              </button>
-
-              {/* 9. Exportar & Compartilhar */}
-              <button
-                onClick={() => setIsExportModalOpen(true)}
-                title="Exportar & Compartilhar Mapa"
-                className="w-11 h-11 rounded-xl flex items-center justify-center text-slate-400 hover:text-emerald-400 hover:bg-slate-800/70 transition-colors cursor-pointer"
-              >
-                <Share2 className="w-5 h-5 text-emerald-400" />
-              </button>
-
-              {/* 10. Camadas / Lista de Pontos */}
-              <button
-                onClick={() => setIsDrawerOpen(true)}
-                title="Camadas & Lista de Pontos"
-                className="w-11 h-11 rounded-xl flex items-center justify-center text-slate-400 hover:text-teal-400 hover:bg-slate-800/70 transition-colors cursor-pointer"
-              >
-                <Layers className="w-5 h-5 text-teal-400" />
-              </button>
-
-              {/* 11. Ajustar à Tela */}
-              <button
-                onClick={handleFitBounds}
-                title="Ajustar Mapa à Tela"
-                className="w-11 h-11 rounded-xl flex items-center justify-center text-slate-400 hover:text-white hover:bg-slate-800/70 transition-colors cursor-pointer"
-              >
-                <Maximize2 className="w-5 h-5" />
+                <Square className="w-3 h-3 fill-white" />
+                <span>Finalizar</span>
               </button>
             </div>
           </div>
+        )}
+
+        {/* ------------------------------------------------------------- */}
+        {/* BOTTOM FLOATING BAR: MANUAL DRAWING CONTROLLER               */}
+        {/* ------------------------------------------------------------- */}
+        {activeTool === 'draw_track' && currentTrackPoints.length > 0 && (
+          <div
+            className={`absolute bottom-20 sm:bottom-6 left-1/2 -translate-x-1/2 z-[1000] transition-opacity duration-300 pointer-events-auto ${
+              isMapInteracting ? 'opacity-20 pointer-events-none' : 'opacity-100 pointer-events-auto'
+            }`}
+          >
+            <div className="bg-slate-950/95 backdrop-blur-md border border-amber-500/80 rounded-full px-3.5 py-1.5 shadow-2xl flex items-center gap-2 text-white">
+              <span className="text-xs font-bold text-amber-400 px-1">
+                {currentTrackPoints.length} pts
+              </span>
+              <button
+                onClick={() => setCurrentTrackPoints((prev) => prev.slice(0, -1))}
+                className="p-1.5 bg-slate-800 text-slate-200 rounded-full hover:bg-slate-700 active:scale-95 cursor-pointer"
+                title="Desfazer último vértice"
+              >
+                <Undo2 className="w-3.5 h-3.5" />
+              </button>
+              <button
+                onClick={() => setIsTrackModalOpen(true)}
+                className="flex items-center gap-1 px-3 py-1 bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs rounded-full shadow active:scale-95 cursor-pointer"
+              >
+                <Check className="w-3.5 h-3.5" />
+                <span>Salvar</span>
+              </button>
+              <button
+                onClick={() => {
+                  setCurrentTrackPoints([]);
+                  setActiveTool('pan');
+                }}
+                className="px-2.5 py-1 text-slate-400 hover:text-white text-xs font-bold rounded-full cursor-pointer"
+              >
+                Cancelar
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* ------------------------------------------------------------- */}
+        {/* BOTTOM SHEET: DISCRETE TOOLS MENU (IDENTICAL TO GPS MAP)     */}
+        {/* ------------------------------------------------------------- */}
+        {activeDoc && (
+          <BottomSheet
+            isOpen={isToolsPanelOpen}
+            onClose={() => setIsToolsPanelOpen(false)}
+            title="Ferramentas do Mapa PDF"
+            subtitle={activeDoc.name}
+            icon={<SlidersHorizontal className="w-5 h-5" />}
+          >
+            <div className="p-4 space-y-4 max-h-[75dvh] overflow-y-auto">
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
+                {/* 1. Marcar Ponto */}
+                <button
+                  onClick={() => {
+                    setActiveTool('add_point');
+                    setCurrentTrackPoints([]);
+                    setIsToolsPanelOpen(false);
+                    notifyInfo('Marcar Ponto Ativado', 'Toque em qualquer local do mapa para adicionar um ponto com foto.');
+                  }}
+                  className={`p-3.5 rounded-2xl border text-left flex flex-col gap-2 transition-all active:scale-95 cursor-pointer ${
+                    activeTool === 'add_point'
+                      ? 'bg-emerald-500/20 border-emerald-500/50 text-white'
+                      : 'bg-slate-900/90 border-slate-800 text-slate-300 hover:border-slate-700 hover:bg-slate-800/80'
+                  }`}
+                >
+                  <div className="w-9 h-9 rounded-xl bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 flex items-center justify-center">
+                    <Camera className="w-4.5 h-4.5" />
+                  </div>
+                  <div>
+                    <strong className="block text-xs text-white font-extrabold">Marcar Ponto</strong>
+                    <span className="text-[10px] text-slate-400">Ponto de campo com foto</span>
+                  </div>
+                </button>
+
+                {/* 2. Gravar Trilha GPS */}
+                <button
+                  onClick={() => {
+                    setIsToolsPanelOpen(false);
+                    handleStartLiveRecording();
+                  }}
+                  className={`p-3.5 rounded-2xl border text-left flex flex-col gap-2 transition-all active:scale-95 cursor-pointer ${
+                    isRecordingLive
+                      ? 'bg-rose-500/20 border-rose-500/50 text-white'
+                      : 'bg-slate-900/90 border-slate-800 text-slate-300 hover:border-slate-700 hover:bg-slate-800/80'
+                  }`}
+                >
+                  <div className="w-9 h-9 rounded-xl bg-rose-500/10 text-rose-400 border border-rose-500/20 flex items-center justify-center">
+                    <Footprints className="w-4.5 h-4.5" />
+                  </div>
+                  <div>
+                    <strong className="block text-xs text-white font-extrabold">Gravar Trilha</strong>
+                    <span className="text-[10px] text-slate-400">Rastreio em tempo real</span>
+                  </div>
+                </button>
+
+                {/* 3. Traçar Rota Manual */}
+                <button
+                  onClick={() => {
+                    setActiveTool('draw_track');
+                    setCurrentTrackPoints([]);
+                    setIsToolsPanelOpen(false);
+                    notifyInfo('Traçado Manual', 'Toque no mapa para desenhar os vértices do trajeto.');
+                  }}
+                  className={`p-3.5 rounded-2xl border text-left flex flex-col gap-2 transition-all active:scale-95 cursor-pointer ${
+                    activeTool === 'draw_track'
+                      ? 'bg-amber-500/20 border-amber-500/50 text-white'
+                      : 'bg-slate-900/90 border-slate-800 text-slate-300 hover:border-slate-700 hover:bg-slate-800/80'
+                  }`}
+                >
+                  <div className="w-9 h-9 rounded-xl bg-amber-500/10 text-amber-400 border border-amber-500/20 flex items-center justify-center">
+                    <Activity className="w-4.5 h-4.5" />
+                  </div>
+                  <div>
+                    <strong className="block text-xs text-white font-extrabold">Traçar Rota</strong>
+                    <span className="text-[10px] text-slate-400">Desenho de polilinha</span>
+                  </div>
+                </button>
+
+                {/* 4. Régua / Medir Distância */}
+                <button
+                  onClick={() => {
+                    setActiveTool('measure');
+                    setCurrentTrackPoints([]);
+                    setIsToolsPanelOpen(false);
+                    notifyInfo('Modo Medição', 'Toque no mapa para marcar pontos e calcular distâncias e área.');
+                  }}
+                  className={`p-3.5 rounded-2xl border text-left flex flex-col gap-2 transition-all active:scale-95 cursor-pointer ${
+                    activeTool === 'measure'
+                      ? 'bg-sky-500/20 border-sky-500/50 text-white'
+                      : 'bg-slate-900/90 border-slate-800 text-slate-300 hover:border-slate-700 hover:bg-slate-800/80'
+                  }`}
+                >
+                  <div className="w-9 h-9 rounded-xl bg-sky-500/10 text-sky-400 border border-sky-500/20 flex items-center justify-center">
+                    <Ruler className="w-4.5 h-4.5" />
+                  </div>
+                  <div>
+                    <strong className="block text-xs text-white font-extrabold">Régua / Área</strong>
+                    <span className="text-[10px] text-slate-400">Distâncias e polígonos</span>
+                  </div>
+                </button>
+
+                {/* 5. Cubagem de Madeira */}
+                <button
+                  onClick={() => {
+                    setActiveTool('woodpile');
+                    setCurrentTrackPoints([]);
+                    setIsToolsPanelOpen(false);
+                  }}
+                  className={`p-3.5 rounded-2xl border text-left flex flex-col gap-2 transition-all active:scale-95 cursor-pointer ${
+                    activeTool === 'woodpile'
+                      ? 'bg-amber-500/20 border-amber-500/50 text-white'
+                      : 'bg-slate-900/90 border-slate-800 text-slate-300 hover:border-slate-700 hover:bg-slate-800/80'
+                  }`}
+                >
+                  <div className="w-9 h-9 rounded-xl bg-amber-500/10 text-amber-400 border border-amber-500/20 flex items-center justify-center">
+                    <WoodpileIcon className="w-4.5 h-4.5" />
+                  </div>
+                  <div>
+                    <strong className="block text-xs text-white font-extrabold">Cubagem Madeira</strong>
+                    <span className="text-[10px] text-slate-400">Cálculo de estéreo</span>
+                  </div>
+                </button>
+
+                {/* 6. Calibrar Georreferenciamento */}
+                <button
+                  onClick={() => {
+                    setIsToolsPanelOpen(false);
+                    setIsCalibrationModalOpen(true);
+                  }}
+                  className="p-3.5 rounded-2xl border border-slate-800 bg-slate-900/90 text-left flex flex-col gap-2 hover:border-slate-700 hover:bg-slate-800/80 transition-all active:scale-95 cursor-pointer"
+                >
+                  <div className="w-9 h-9 rounded-xl bg-amber-500/10 text-amber-400 border border-amber-500/20 flex items-center justify-center">
+                    <Sliders className="w-4.5 h-4.5" />
+                  </div>
+                  <div>
+                    <strong className="block text-xs text-white font-extrabold">Calibrar Planta</strong>
+                    <span className="text-[10px] text-slate-400">2 Pontos GCP / GPS / Moldura</span>
+                  </div>
+                </button>
+
+                {/* 7. Folhas & Camadas */}
+                <button
+                  onClick={() => {
+                    setIsToolsPanelOpen(false);
+                    setIsDrawerOpen(true);
+                  }}
+                  className="p-3.5 rounded-2xl border border-slate-800 bg-slate-900/90 text-left flex flex-col gap-2 hover:border-slate-700 hover:bg-slate-800/80 transition-all active:scale-95 cursor-pointer"
+                >
+                  <div className="w-9 h-9 rounded-xl bg-teal-500/10 text-teal-400 border border-teal-500/20 flex items-center justify-center">
+                    <Layers className="w-4.5 h-4.5" />
+                  </div>
+                  <div>
+                    <strong className="block text-xs text-white font-extrabold">Folhas & Páginas</strong>
+                    <span className="text-[10px] text-slate-400">Gerenciar mapas salvos</span>
+                  </div>
+                </button>
+
+                {/* 8. Importar KML / KMZ */}
+                <button
+                  onClick={() => {
+                    setIsToolsPanelOpen(false);
+                    triggerFileInput(importKmlInputRef);
+                  }}
+                  className="p-3.5 rounded-2xl border border-slate-800 bg-slate-900/90 text-left flex flex-col gap-2 hover:border-slate-700 hover:bg-slate-800/80 transition-all active:scale-95 cursor-pointer"
+                >
+                  <div className="w-9 h-9 rounded-xl bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 flex items-center justify-center">
+                    <UploadCloud className="w-4.5 h-4.5" />
+                  </div>
+                  <div>
+                    <strong className="block text-xs text-white font-extrabold">Importar KML</strong>
+                    <span className="text-[10px] text-slate-400">Sobrepor vetores</span>
+                  </div>
+                </button>
+
+                {/* 9. Exportar / Compartilhar */}
+                <button
+                  onClick={() => {
+                    setIsToolsPanelOpen(false);
+                    setIsExportModalOpen(true);
+                  }}
+                  className="p-3.5 rounded-2xl border border-slate-800 bg-slate-900/90 text-left flex flex-col gap-2 hover:border-slate-700 hover:bg-slate-800/80 transition-all active:scale-95 cursor-pointer"
+                >
+                  <div className="w-9 h-9 rounded-xl bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 flex items-center justify-center">
+                    <Share2 className="w-4.5 h-4.5" />
+                  </div>
+                  <div>
+                    <strong className="block text-xs text-white font-extrabold">Exportar / Enviar</strong>
+                    <span className="text-[10px] text-slate-400">Compartilhar mapa e dados</span>
+                  </div>
+                </button>
+
+                {/* 10. Modo Navegação (Pan) */}
+                <button
+                  onClick={() => {
+                    setActiveTool('pan');
+                    setCurrentTrackPoints([]);
+                    setIsToolsPanelOpen(false);
+                  }}
+                  className={`p-3.5 rounded-2xl border text-left flex flex-col gap-2 transition-all active:scale-95 cursor-pointer ${
+                    activeTool === 'pan'
+                      ? 'bg-slate-800/90 border-slate-600 text-white'
+                      : 'bg-slate-900/90 border-slate-800 text-slate-300 hover:border-slate-700'
+                  }`}
+                >
+                  <div className="w-9 h-9 rounded-xl bg-slate-800 text-slate-300 border border-slate-700 flex items-center justify-center">
+                    <MousePointer className="w-4.5 h-4.5" />
+                  </div>
+                  <div>
+                    <strong className="block text-xs text-white font-extrabold">Modo Navegar</strong>
+                    <span className="text-[10px] text-slate-400">Apenas mover e dar zoom</span>
+                  </div>
+                </button>
+              </div>
+            </div>
+          </BottomSheet>
         )}
 
         {/* Bottom Status Badge */}
