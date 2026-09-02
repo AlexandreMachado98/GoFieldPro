@@ -219,7 +219,7 @@ export const FireIncidentsPanel: React.FC = () => {
           <div className="flex flex-wrap items-center gap-2">
             <button
               onClick={handleOpenNewModal}
-              className="flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl bg-gradient-to-r from-rose-600 to-amber-600 hover:from-rose-500 hover:to-amber-500 text-white font-extrabold text-xs shadow-lg shadow-rose-950/50 transition-all active:scale-95 cursor-pointer"
+              className="flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs shadow-md transition-all active:scale-95 cursor-pointer"
             >
               <Plus className="w-4 h-4" />
               <span>Registrar Foco</span>
@@ -239,7 +239,7 @@ export const FireIncidentsPanel: React.FC = () => {
               disabled={totalCount === 0}
               className="flex items-center justify-center gap-1.5 px-3.5 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-200 font-bold text-xs shadow transition-all active:scale-95 cursor-pointer disabled:opacity-50"
             >
-              <Globe className="w-4 h-4 text-sky-400" />
+              <Globe className="w-4 h-4 text-emerald-400" />
               <span>KML</span>
             </button>
           </div>
@@ -247,34 +247,34 @@ export const FireIncidentsPanel: React.FC = () => {
 
         {/* KPI Telemetry Cards */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          <div className="bg-slate-900/90 border border-slate-800/80 rounded-2xl p-4 flex items-center gap-3">
-            <div className="p-3 rounded-xl bg-rose-500/10 text-rose-400">
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 flex items-center gap-3">
+            <div className="p-3 rounded-xl bg-slate-800 text-rose-400">
               <Flame className="w-5 h-5" />
             </div>
             <div>
-              <div className="text-lg sm:text-2xl font-extrabold text-white">{activeCount}</div>
+              <div className="text-lg sm:text-2xl font-bold text-white font-mono">{activeCount}</div>
               <div className="text-[11px] text-slate-400 font-medium">Focos Ativos</div>
             </div>
           </div>
 
-          <div className="bg-slate-900/90 border border-slate-800/80 rounded-2xl p-4 flex items-center gap-3">
-            <div className="p-3 rounded-xl bg-amber-500/10 text-amber-400">
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 flex items-center gap-3">
+            <div className="p-3 rounded-xl bg-slate-800 text-amber-400">
               <Layers className="w-5 h-5" />
             </div>
             <div>
-              <div className="text-lg sm:text-2xl font-extrabold text-white">
+              <div className="text-lg sm:text-2xl font-bold text-white font-mono">
                 {totalHectares > 0 ? totalHectares.toLocaleString('pt-BR') : '0'} <span className="text-xs font-semibold text-amber-400">ha</span>
               </div>
               <div className="text-[11px] text-slate-400 font-medium">Área Afetada</div>
             </div>
           </div>
 
-          <div className="bg-slate-900/90 border border-slate-800/80 rounded-2xl p-4 flex items-center gap-3">
-            <div className="p-3 rounded-xl bg-emerald-500/10 text-emerald-400">
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 flex items-center gap-3">
+            <div className="p-3 rounded-xl bg-slate-800 text-emerald-400">
               <CheckCircle2 className="w-5 h-5" />
             </div>
             <div>
-              <div className="text-lg sm:text-2xl font-extrabold text-white">{extinguishedCount + controlledCount}</div>
+              <div className="text-lg sm:text-2xl font-bold text-white font-mono">{extinguishedCount + controlledCount}</div>
               <div className="text-[11px] text-slate-400 font-medium">Extintos / Controlados</div>
             </div>
           </div>
