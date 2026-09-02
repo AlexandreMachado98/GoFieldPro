@@ -13,7 +13,7 @@ export const MobileBottomNav: React.FC = () => {
   ];
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-40 bg-[#0B0F17]/95 backdrop-blur-md border-t border-slate-800/80 px-4 pt-2 pb-[calc(0.6rem+env(safe-area-inset-bottom,0px))] flex items-center justify-around select-none shadow-[0_-8px_20px_rgba(0,0,0,0.5)]">
+    <nav className="fixed bottom-0 left-0 right-0 z-40 bg-slate-950/95 backdrop-blur-md border-t border-slate-800 px-3 pt-1.5 pb-[calc(0.5rem+env(safe-area-inset-bottom,0px))] flex items-center justify-around select-none shadow-xl">
       {navItems.map((item) => {
         const Icon = item.icon;
         const isActive =
@@ -29,21 +29,21 @@ export const MobileBottomNav: React.FC = () => {
           >
             {/* Android Material 3 Active Indicator Pill */}
             <div
-              className={`px-5 py-1.5 rounded-full transition-all flex items-center justify-center ${
+              className={`px-4 py-1.5 rounded-full transition-all flex items-center justify-center ${
                 isActive
-                  ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 shadow-[0_0_12px_rgba(16,185,129,0.2)]'
+                  ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30'
                   : 'text-slate-400 group-hover:text-slate-200'
               }`}
             >
               <Icon
                 className={`w-5 h-5 transition-transform ${
-                  isActive ? 'scale-105 stroke-[2.4]' : 'stroke-[1.8]'
+                  isActive ? 'scale-105 stroke-[2.2]' : 'stroke-[1.8]'
                 }`}
               />
             </div>
             <span
-              className={`text-[11px] mt-1 tracking-tight font-medium transition-colors ${
-                isActive ? 'font-black text-emerald-400' : 'text-slate-400'
+              className={`text-[10px] mt-0.5 tracking-tight transition-colors ${
+                isActive ? 'font-bold text-emerald-400' : 'font-medium text-slate-400'
               }`}
             >
               {item.label}

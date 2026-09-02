@@ -193,10 +193,10 @@ export const MapToolsController: React.FC<MapToolsControllerProps> = ({
         {/* Tools Drawer Button */}
         <button
           onClick={() => setIsToolsBottomSheetOpen(true)}
-          className="w-10 h-10 rounded-xl bg-slate-950/90 hover:bg-slate-900 text-sky-400 border border-slate-800 shadow-lg flex items-center justify-center transition-all active:scale-95 cursor-pointer backdrop-blur-md"
+          className="w-10 h-10 rounded-xl bg-slate-950/90 hover:bg-slate-900 text-slate-200 hover:text-emerald-400 border border-slate-800 shadow-lg flex items-center justify-center transition-all active:scale-95 cursor-pointer backdrop-blur-md"
           title="Ferramentas do Mapa"
         >
-          <SlidersHorizontal className="w-4 h-4 text-sky-400" />
+          <SlidersHorizontal className="w-4 h-4" />
         </button>
 
         {/* Recenter GPS */}
@@ -216,7 +216,7 @@ export const MapToolsController: React.FC<MapToolsControllerProps> = ({
         {onZoomIn && (
           <button
             onClick={onZoomIn}
-            className="w-10 h-10 rounded-xl bg-slate-950/90 hover:bg-slate-900 text-slate-200 border border-slate-800 shadow-lg flex items-center justify-center transition-all active:scale-95 cursor-pointer"
+            className="w-10 h-10 rounded-xl bg-slate-950/90 hover:bg-slate-900 text-slate-300 border border-slate-800 shadow-lg flex items-center justify-center transition-all active:scale-95 cursor-pointer"
             title="Aproximar Zoom (+)"
           >
             <ZoomIn className="w-4.5 h-4.5" />
@@ -227,7 +227,7 @@ export const MapToolsController: React.FC<MapToolsControllerProps> = ({
         {onZoomOut && (
           <button
             onClick={onZoomOut}
-            className="w-10 h-10 rounded-xl bg-slate-950/90 hover:bg-slate-900 text-slate-200 border border-slate-800 shadow-lg flex items-center justify-center transition-all active:scale-95 cursor-pointer"
+            className="w-10 h-10 rounded-xl bg-slate-950/90 hover:bg-slate-900 text-slate-300 border border-slate-800 shadow-lg flex items-center justify-center transition-all active:scale-95 cursor-pointer"
             title="Afastar Zoom (-)"
           >
             <ZoomOut className="w-4.5 h-4.5" />
@@ -238,7 +238,7 @@ export const MapToolsController: React.FC<MapToolsControllerProps> = ({
         {onFitBounds && (
           <button
             onClick={onFitBounds}
-            className="w-10 h-10 rounded-xl bg-slate-950/90 hover:bg-slate-900 text-slate-200 border border-slate-800 shadow-lg flex items-center justify-center transition-all active:scale-95 cursor-pointer"
+            className="w-10 h-10 rounded-xl bg-slate-950/90 hover:bg-slate-900 text-slate-300 border border-slate-800 shadow-lg flex items-center justify-center transition-all active:scale-95 cursor-pointer"
             title="Enquadrar Todas as Camadas"
           >
             <Maximize2 className="w-4.5 h-4.5" />

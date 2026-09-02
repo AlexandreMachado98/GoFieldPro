@@ -1534,8 +1534,21 @@ export const PdfMapNavigator: React.FC = () => {
     if (!mapInstanceRef.current || !activeDoc) return;
     const map = mapInstanceRef.current;
 
-    // Strict validation: NEVER plot markers if the document is not calibrated!
+    // Strict validation: if document is not calibrated:
     if (!isDocumentCalibrated(activeDoc)) {
+      // Instant Field Auto-Anchor: when in the field with active GPS, bind document automatically without requiring manual typing!
+      if (currentGps && typeof currentGps.lat === 'number' && typeof currentGps.lng === 'number' && !isNaN(currentGps.lat) && !isNaN(currentGps.lng)) {
+        console.log('[PdfMapNavigator] Uncalibrated map opened in the field. Auto-anchoring to current GPS coordinates...');
+        const autoCal = createCenteredCalibration(currentGps.lat, currentGps.lng, 0.75, activeDoc);
+        const updatedDoc = {
+          ...activeDoc,
+          calibration: autoCal,
+        };
+        updateDocumentInStore(updatedDoc);
+        notifySuccess('Navegação GPS Ativada!', 'A planta foi posicionada automaticamente na sua localização real de campo.');
+        return;
+      }
+
       if (gpsUserMarkerRef.current) {
         map.removeLayer(gpsUserMarkerRef.current);
         gpsUserMarkerRef.current = null;
@@ -2070,8 +2083,11 @@ export const PdfMapNavigator: React.FC = () => {
         if (geoMetadata && geoMetadata.calibration && geoMetadata.calibration.isCalibrated) {
           initialCalibration = geoMetadata.calibration;
           isGeoPdfDetected = true;
+        } else if (currentGps && typeof currentGps.lat === 'number' && typeof currentGps.lng === 'number' && !isNaN(currentGps.lat) && !isNaN(currentGps.lng)) {
+          // Instant Field Auto-Anchor: user is at the property right now
+          initialCalibration = createCenteredCalibration(currentGps.lat, currentGps.lng, 0.75, { width: baseWidth, height: baseHeight });
         } else {
-          // Standard PDF without embedded GeoPDF tags: starts strictly UNCALIBRATED!
+          // Standard PDF without embedded GeoPDF tags: starts uncalibrated until GPS connects or GCP added
           initialCalibration = {
             isCalibrated: false,
             ref1: { x: baseHeight * 0.9, y: baseWidth * 0.1, lat: NaN, lng: NaN },

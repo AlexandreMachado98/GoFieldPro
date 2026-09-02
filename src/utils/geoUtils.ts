@@ -152,6 +152,67 @@ export function latLngToUTM(lat: number, lng: number): { zone: string; easting: 
 }
 
 /**
+ * Exact inverse conversion from UTM (Easting, Northing, Zone, Hemisphere) to WGS84 (Lat, Lng)
+ */
+export function utmToLatLng(
+  easting: number,
+  northing: number,
+  zoneNumber: number = 23,
+  isSouthernHemisphere: boolean = true
+): { lat: number; lng: number } {
+  if (typeof easting !== 'number' || typeof northing !== 'number' || isNaN(easting) || isNaN(northing)) {
+    return { lat: 0, lng: 0 };
+  }
+
+  const k0 = 0.9996;
+  const a = 6378137.0; // WGS84 Semi-major axis
+  const f = 1 / 298.257223563;
+  const e = Math.sqrt(2 * f - f * f);
+  const e1 = (1 - Math.sqrt(1 - e * e)) / (1 + Math.sqrt(1 - e * e));
+  const ePrimeSq = (e * e) / (1 - e * e);
+
+  const x = easting - 500000;
+  const y = isSouthernHemisphere ? northing - 10000000 : northing;
+
+  const m = y / k0;
+  const mu = m / (a * (1 - (e * e) / 4 - (3 * Math.pow(e, 4)) / 64 - (5 * Math.pow(e, 6)) / 256));
+
+  const phi1Rad =
+    mu +
+    ((3 * e1) / 2 - (27 * Math.pow(e1, 3)) / 32) * Math.sin(2 * mu) +
+    ((21 * e1 * e1) / 16 - (55 * Math.pow(e1, 4)) / 32) * Math.sin(4 * mu) +
+    ((151 * Math.pow(e1, 3)) / 96) * Math.sin(6 * mu);
+
+  const n1 = a / Math.sqrt(1 - e * e * Math.sin(phi1Rad) * Math.sin(phi1Rad));
+  const t1 = Math.tan(phi1Rad) * Math.tan(phi1Rad);
+  const c1 = ePrimeSq * Math.cos(phi1Rad) * Math.cos(phi1Rad);
+  const r1 = (a * (1 - e * e)) / Math.pow(1 - e * e * Math.sin(phi1Rad) * Math.sin(phi1Rad), 1.5);
+  const d = x / (n1 * k0);
+
+  const latRad =
+    phi1Rad -
+    ((n1 * Math.tan(phi1Rad)) / r1) *
+      ((d * d) / 2 -
+        ((5 + 3 * t1 + 10 * c1 - 4 * c1 * c1 - 9 * ePrimeSq) * Math.pow(d, 4)) / 24 +
+        ((61 + 90 * t1 + 298 * c1 + 45 * t1 * t1 - 252 * ePrimeSq - 3 * c1 * c1) * Math.pow(d, 6)) / 720);
+
+  const lngRad =
+    (d -
+      ((1 + 2 * t1 + c1) * Math.pow(d, 3)) / 6 +
+      ((5 - 2 * c1 + 28 * t1 - 3 * c1 * c1 + 8 * ePrimeSq + 24 * t1 * t1) * Math.pow(d, 5)) / 120) /
+    Math.cos(phi1Rad);
+
+  const centralMeridianRad = (((zoneNumber - 1) * 6 - 180 + 3) * Math.PI) / 180;
+  const lat = (latRad * 180) / Math.PI;
+  const lng = ((centralMeridianRad + lngRad) * 180) / Math.PI;
+
+  return {
+    lat: isNaN(lat) ? 0 : +lat.toFixed(7),
+    lng: isNaN(lng) ? 0 : +lng.toFixed(7),
+  };
+}
+
+/**
  * Calculates Cross Track Error (XTE) in meters from current position to a route segment
  */
 export function calculateCrossTrackError(

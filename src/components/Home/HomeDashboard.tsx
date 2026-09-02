@@ -77,17 +77,17 @@ export const HomeDashboard: React.FC = () => {
           <div className="mt-5 grid grid-cols-2 gap-3">
             <button
               onClick={() => setActiveTab('map')}
-              className="flex items-center justify-center gap-2 py-3 px-4 rounded-2xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs uppercase tracking-wider shadow-lg shadow-emerald-500/20 active:scale-95 transition-all cursor-pointer"
+              className="flex items-center justify-center gap-2 py-3 px-4 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-extrabold text-xs uppercase tracking-wider shadow-md active:scale-95 transition-all cursor-pointer"
             >
-              <MapIcon className="w-4 h-4 stroke-[2.5]" />
+              <MapIcon className="w-4 h-4 stroke-[2.2]" />
               <span>Abrir Mapa GPS</span>
             </button>
 
             <button
               onClick={() => setActiveTab('pdf_maps')}
-              className="flex items-center justify-center gap-2 py-3 px-4 rounded-2xl bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs active:scale-95 transition-all cursor-pointer border border-slate-700"
+              className="flex items-center justify-center gap-2 py-3 px-4 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs active:scale-95 transition-all cursor-pointer border border-slate-700"
             >
-              <FileText className="w-4 h-4 text-sky-400" />
+              <FileText className="w-4 h-4 text-emerald-400" />
               <span>Plantas PDF</span>
             </button>
           </div>
@@ -95,60 +95,60 @@ export const HomeDashboard: React.FC = () => {
 
         {/* Quick Tools Grid */}
         <div className="space-y-3">
-          <h2 className="text-xs font-black uppercase tracking-wider text-slate-400 px-1">
+          <h2 className="text-xs font-bold uppercase tracking-wider text-slate-400 px-1">
             Ferramentas de Campo
           </h2>
 
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             <button
               onClick={() => setIsWoodpileModalOpen(true)}
-              className="bg-[#0F172A] border border-slate-800 hover:border-emerald-500/40 p-4 rounded-2xl flex flex-col items-start gap-2.5 text-left active:scale-95 transition-all cursor-pointer group"
+              className="bg-slate-900 border border-slate-800 hover:border-emerald-500/40 p-4 rounded-2xl flex flex-col items-start gap-2.5 text-left active:scale-95 transition-all cursor-pointer group"
             >
-              <div className="w-10 h-10 rounded-xl bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 flex items-center justify-center group-hover:scale-105 transition-transform">
+              <div className="w-10 h-10 rounded-xl bg-slate-800 text-emerald-400 border border-slate-700/60 flex items-center justify-center group-hover:scale-105 transition-transform">
                 <Trees className="w-5 h-5" />
               </div>
               <div>
-                <span className="block text-xs font-black text-white">Cubagem m³</span>
+                <span className="block text-xs font-bold text-white">Cubagem m³</span>
                 <span className="text-[10px] text-slate-400">Pilha de madeira</span>
               </div>
             </button>
 
             <button
               onClick={() => setActiveTab('field_rounds')}
-              className="bg-[#0F172A] border border-slate-800 hover:border-sky-500/40 p-4 rounded-2xl flex flex-col items-start gap-2.5 text-left active:scale-95 transition-all cursor-pointer group"
+              className="bg-slate-900 border border-slate-800 hover:border-emerald-500/40 p-4 rounded-2xl flex flex-col items-start gap-2.5 text-left active:scale-95 transition-all cursor-pointer group"
             >
-              <div className="w-10 h-10 rounded-xl bg-sky-500/10 text-sky-400 border border-sky-500/20 flex items-center justify-center group-hover:scale-105 transition-transform">
+              <div className="w-10 h-10 rounded-xl bg-slate-800 text-emerald-400 border border-slate-700/60 flex items-center justify-center group-hover:scale-105 transition-transform">
                 <Gauge className="w-5 h-5" />
               </div>
               <div>
-                <span className="block text-xs font-black text-white">Rondas</span>
+                <span className="block text-xs font-bold text-white">Rondas & Frota</span>
                 <span className="text-[10px] text-slate-400">{fieldRounds.length} registros</span>
               </div>
             </button>
 
             <button
               onClick={() => setActiveTab('fire_incidents')}
-              className="bg-[#0F172A] border border-slate-800 hover:border-rose-500/40 p-4 rounded-2xl flex flex-col items-start gap-2.5 text-left active:scale-95 transition-all cursor-pointer group"
+              className="bg-slate-900 border border-slate-800 hover:border-rose-500/40 p-4 rounded-2xl flex flex-col items-start gap-2.5 text-left active:scale-95 transition-all cursor-pointer group"
             >
-              <div className="w-10 h-10 rounded-xl bg-rose-500/10 text-rose-400 border border-rose-500/20 flex items-center justify-center group-hover:scale-105 transition-transform">
+              <div className="w-10 h-10 rounded-xl bg-slate-800 text-rose-400 border border-slate-700/60 flex items-center justify-center group-hover:scale-105 transition-transform">
                 <Flame className="w-5 h-5" />
               </div>
               <div>
-                <span className="block text-xs font-black text-white">Incêndios</span>
-                <span className="text-[10px] text-slate-400">Focos de calor</span>
+                <span className="block text-xs font-bold text-white">Incêndios</span>
+                <span className="text-[10px] text-slate-400">Focos e combate</span>
               </div>
             </button>
 
             <button
               onClick={() => setActiveTab('offline')}
-              className="bg-[#0F172A] border border-slate-800 hover:border-purple-500/40 p-4 rounded-2xl flex flex-col items-start gap-2.5 text-left active:scale-95 transition-all cursor-pointer group"
+              className="bg-slate-900 border border-slate-800 hover:border-emerald-500/40 p-4 rounded-2xl flex flex-col items-start gap-2.5 text-left active:scale-95 transition-all cursor-pointer group"
             >
-              <div className="w-10 h-10 rounded-xl bg-purple-500/10 text-purple-400 border border-purple-500/20 flex items-center justify-center group-hover:scale-105 transition-transform">
+              <div className="w-10 h-10 rounded-xl bg-slate-800 text-slate-300 border border-slate-700/60 flex items-center justify-center group-hover:scale-105 transition-transform">
                 <HardDrive className="w-5 h-5" />
               </div>
               <div>
-                <span className="block text-xs font-black text-white">Sincronização</span>
-                <span className="text-[10px] text-slate-400">Modo offline</span>
+                <span className="block text-xs font-bold text-white">Sincronização</span>
+                <span className="text-[10px] text-slate-400">Dados offline</span>
               </div>
             </button>
           </div>
