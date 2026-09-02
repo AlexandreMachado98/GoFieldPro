@@ -1474,16 +1474,18 @@ export const PdfMapNavigator: React.FC = () => {
       }
 
       if (activeNavPoint && typeof activeNavPoint.x === 'number' && typeof activeNavPoint.y === 'number' && !isNaN(activeNavPoint.x) && !isNaN(activeNavPoint.y)) {
-        let startPoint: [number, number];
-        if (userGps && typeof userGps.lat === 'number' && typeof userGps.lng === 'number' && !isNaN(userGps.lat) && !isNaN(userGps.lng)) {
+        let startPoint: [number, number] | null = null;
+        if (gpsUserMarkerRef.current) {
+          const pos = gpsUserMarkerRef.current.getLatLng();
+          startPoint = [pos.lat, pos.lng];
+        } else if (userGps && typeof userGps.lat === 'number' && typeof userGps.lng === 'number' && !isNaN(userGps.lat) && !isNaN(userGps.lng)) {
           const userPdf = gpsToPdf(userGps.lat, userGps.lng, activeDoc);
-          startPoint = [userPdf.x, userPdf.y];
-        } else {
-          const center = map.getCenter();
-          startPoint = [center.lat, center.lng];
+          if (!isNaN(userPdf.x) && !isNaN(userPdf.y)) {
+            startPoint = [userPdf.x, userPdf.y];
+          }
         }
 
-        if (!isNaN(startPoint[0]) && !isNaN(startPoint[1])) {
+        if (startPoint && !isNaN(startPoint[0]) && !isNaN(startPoint[1])) {
           targetGuideLineRef.current = L.polyline([startPoint, [activeNavPoint.x, activeNavPoint.y]], {
             color: '#38bdf8',
             weight: 3,
@@ -1644,6 +1646,29 @@ export const PdfMapNavigator: React.FC = () => {
         weight: 1,
         dashArray: '4, 4',
       }).addTo(map);
+    }
+
+    // Dynamic real-time update for Target Navigation Guide Line
+    if (activeNavPoint && typeof activeNavPoint.x === 'number' && typeof activeNavPoint.y === 'number' && !isNaN(activeNavPoint.x) && !isNaN(activeNavPoint.y)) {
+      if (targetGuideLineRef.current) {
+        targetGuideLineRef.current.setLatLngs([
+          [pdfCoords.x, pdfCoords.y],
+          [activeNavPoint.x, activeNavPoint.y],
+        ]);
+      } else {
+        targetGuideLineRef.current = L.polyline(
+          [
+            [pdfCoords.x, pdfCoords.y],
+            [activeNavPoint.x, activeNavPoint.y],
+          ],
+          {
+            color: '#38bdf8',
+            weight: 3,
+            dashArray: '6, 6',
+            opacity: 0.9,
+          }
+        ).addTo(map);
+      }
     }
 
     if (activeToolRef.current === 'record_track' && !isRecordingPaused) {
@@ -2789,34 +2814,40 @@ export const PdfMapNavigator: React.FC = () => {
       </div>
     )}
 
-      {/* Target Navigation Live HUD */}
+      {/* Target Navigation Live HUD (Bottom Centered - Compact & Proportional) */}
       {activeNavPoint && navMetrics && (
-        <div className="absolute top-14 left-1/2 -translate-x-1/2 z-[1000] bg-slate-900/95 backdrop-blur-md border border-sky-500 rounded-2xl px-4 py-2 shadow-2xl flex items-center gap-3 text-xs font-bold text-white pointer-events-auto animate-in fade-in">
-          <div className="flex items-center gap-2">
-            <div className="w-6 h-6 rounded-lg bg-sky-500/20 border border-sky-500 flex items-center justify-center text-sky-400">
-              <Navigation className="w-3.5 h-3.5 transform rotate-45" />
+        <div
+          className={`absolute bottom-20 sm:bottom-6 left-1/2 -translate-x-1/2 z-[1000] w-auto max-w-[92vw] pointer-events-auto transition-opacity duration-300 ${
+            isMapInteracting ? 'opacity-20 pointer-events-none' : 'opacity-100 pointer-events-auto'
+          }`}
+        >
+          <div className="bg-slate-950/95 backdrop-blur-md border border-sky-500/80 rounded-2xl px-3.5 py-2 shadow-2xl flex items-center gap-3 text-xs text-white">
+            <div className="flex items-center gap-2">
+              <div className="w-7 h-7 rounded-xl bg-sky-500/20 border border-sky-500/40 flex items-center justify-center text-sky-400 shrink-0">
+                <Navigation className="w-3.5 h-3.5 transform rotate-45" />
+              </div>
+              <div className="min-w-0 max-w-[120px] sm:max-w-[160px]">
+                <span className="text-[10px] text-sky-300 font-medium block leading-tight">Navegando até</span>
+                <span className="font-extrabold text-white text-xs truncate block leading-tight">{activeNavPoint.title}</span>
+              </div>
             </div>
-            <div>
-              <div className="text-[10px] text-sky-300 font-normal">Navegando até</div>
-              <div className="font-extrabold text-white truncate max-w-[130px]">{activeNavPoint.title}</div>
+
+            <div className="border-l border-slate-700 pl-2.5 flex items-center gap-1.5 shrink-0">
+              <span className="text-emerald-400 font-black text-xs">{navMetrics.formattedDistance}</span>
+              <span className="text-[10px] text-slate-400 font-mono">
+                {navMetrics.cardinal} ({navMetrics.bearingDegrees.toFixed(0)}°)
+              </span>
             </div>
-          </div>
 
-          <div className="border-l border-slate-700 pl-3 flex items-center gap-2">
-            <span className="text-emerald-400 font-black text-sm">{navMetrics.formattedDistance}</span>
-            <span className="text-[11px] text-slate-400 font-mono">
-              {navMetrics.cardinal} ({navMetrics.bearingDegrees.toFixed(0)}°)
-            </span>
+            <button
+              type="button"
+              onClick={() => setActiveNavPoint(null)}
+              className="p-1.5 bg-rose-500/20 hover:bg-rose-500 text-rose-400 hover:text-white rounded-xl active:scale-95 transition cursor-pointer shrink-0"
+              title="Encerrar Navegação"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
           </div>
-
-          <button
-            onClick={() => setActiveNavPoint(null)}
-            className="ml-2 px-3 py-1.5 rounded-lg bg-rose-500 hover:bg-rose-600 text-white flex items-center gap-1.5 shadow-md active:scale-95 transition-all"
-            title="Encerrar Navegação"
-          >
-            <X className="w-3.5 h-3.5" />
-            <span className="uppercase tracking-wider font-extrabold text-[10px]">Parar</span>
-          </button>
         </div>
       )}
 

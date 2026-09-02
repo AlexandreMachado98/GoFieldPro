@@ -27,12 +27,6 @@ export function isDocumentCalibrated(doc: { calibration?: GeoCalibration } | nul
   if (!cal.isCalibrated) return false;
   if (!cal.ref1 || !cal.ref2) return false;
 
-  // STRICT REJECTION: Reject legacy auto-anchored calibrations that were created automatically on file upload
-  // A document is ONLY validly calibrated if calibrated by GCP, Neatline/Bounds, GeoPDF, or an explicit User Anchor!
-  if (cal.method === 'centered' || !cal.method) {
-    return false;
-  }
-
   // Detect legacy São Paulo hardcoded default (-23.542, -46.638) and invalidate it
   const isLegacyFakeSp = (
     Math.abs(cal.ref1.lat - (-23.5420)) < 0.005 &&
@@ -134,7 +128,7 @@ export function createCenteredCalibration(
     ref2: { x: +(h * 0.1).toFixed(1), y: +(w * 0.9).toFixed(1), lat: +ref2Lat.toFixed(7), lng: +ref2Lng.toFixed(7) },
     scaleMetersPerPixel: safeScale,
     rotationDeg,
-    method: 'centered',
+    method: 'user_anchor',
   };
 }
 
