@@ -15,7 +15,7 @@ export interface GeoCalibration {
   nominalScale?: string;
   rotationDeg?: number;
   datum?: string;
-  method?: 'centered' | 'gcp_2pt' | 'gcp_4pt' | 'geopdf';
+  method?: 'centered' | 'gcp_2pt' | 'gcp_4pt' | 'geopdf' | 'user_anchor';
 }
 
 export interface PdfMarker {

@@ -780,7 +780,33 @@ export const PdfMapNavigator: React.FC = () => {
     let mounted = true;
     (async () => {
       try {
-        const docs = await getAllPdfDocuments(currentUserId);
+        const rawDocs = await getAllPdfDocuments(currentUserId);
+        // Automatically sanitize and cleanse any legacy auto-anchored fake calibrations from previous versions
+        const docs = await Promise.all(
+          rawDocs.map(async (doc) => {
+            if (doc.calibration && doc.calibration.isCalibrated) {
+              if (doc.calibration.method === 'centered' || !doc.calibration.method) {
+                const cleanedDoc: PdfDocument = {
+                  ...doc,
+                  calibration: {
+                    isCalibrated: false,
+                    ref1: { x: doc.height * 0.9, y: doc.width * 0.1, lat: NaN, lng: NaN },
+                    ref2: { x: doc.height * 0.1, y: doc.width * 0.9, lat: NaN, lng: NaN },
+                    scaleMetersPerPixel: 0.75,
+                  },
+                };
+                try {
+                  await savePdfDocument(cleanedDoc, currentUserId);
+                } catch (err) {
+                  console.warn('Failed to persist cleaned calibration:', err);
+                }
+                return cleanedDoc;
+              }
+            }
+            return doc;
+          })
+        );
+
         if (mounted) {
           if (docs.length > 0) {
             setDocuments(docs);
@@ -897,6 +923,18 @@ export const PdfMapNavigator: React.FC = () => {
           }
         } catch (err) {
           console.warn('Error loading image overlay:', err);
+        }
+      }
+
+      // If document is not calibrated, strictly ensure no GPS markers exist on sheet
+      if (!isDocumentCalibrated(activeDoc)) {
+        if (gpsUserMarkerRef.current) {
+          try { map.removeLayer(gpsUserMarkerRef.current); } catch {}
+          gpsUserMarkerRef.current = null;
+        }
+        if (gpsAccuracyCircleRef.current) {
+          try { map.removeLayer(gpsAccuracyCircleRef.current); } catch {}
+          gpsAccuracyCircleRef.current = null;
         }
       }
 
@@ -1726,6 +1764,7 @@ export const PdfMapNavigator: React.FC = () => {
         calibRotation
       );
       newCalibration.nominalScale = calibNominalScale;
+      newCalibration.method = 'user_anchor';
 
       const updatedDoc: PdfDocument = {
         ...activeDoc,
@@ -1947,9 +1986,8 @@ export const PdfMapNavigator: React.FC = () => {
         if (geoMetadata && geoMetadata.calibration && geoMetadata.calibration.isCalibrated) {
           initialCalibration = geoMetadata.calibration;
           isGeoPdfDetected = true;
-        } else if (currentGps && typeof currentGps.lat === 'number' && !isNaN(currentGps.lat) && (currentGps.accuracy || 100) <= 60) {
-          initialCalibration = createCenteredCalibration({ width: baseWidth, height: baseHeight }, currentGps.lat, currentGps.lng, 0.75);
         } else {
+          // Standard PDF without embedded GeoPDF tags: starts strictly UNCALIBRATED!
           initialCalibration = {
             isCalibrated: false,
             ref1: { x: baseHeight * 0.9, y: baseWidth * 0.1, lat: NaN, lng: NaN },
@@ -2006,14 +2044,12 @@ export const PdfMapNavigator: React.FC = () => {
             const imgWidth = img.naturalWidth || 1600;
             const imgHeight = img.naturalHeight || 1200;
 
-            const initialImgCalibration = (currentGps && typeof currentGps.lat === 'number' && !isNaN(currentGps.lat) && (currentGps.accuracy || 100) <= 60)
-              ? createCenteredCalibration({ width: imgWidth, height: imgHeight }, currentGps.lat, currentGps.lng, 0.75)
-              : {
-                  isCalibrated: false,
-                  ref1: { x: imgHeight * 0.9, y: imgWidth * 0.1, lat: NaN, lng: NaN },
-                  ref2: { x: imgHeight * 0.1, y: imgWidth * 0.9, lat: NaN, lng: NaN },
-                  scaleMetersPerPixel: 0.75,
-                };
+            const initialImgCalibration: GeoCalibration = {
+              isCalibrated: false,
+              ref1: { x: imgHeight * 0.9, y: imgWidth * 0.1, lat: NaN, lng: NaN },
+              ref2: { x: imgHeight * 0.1, y: imgWidth * 0.9, lat: NaN, lng: NaN },
+              scaleMetersPerPixel: 0.75,
+            };
 
             const newDoc: PdfDocument = {
               id: `img-${Date.now()}`,

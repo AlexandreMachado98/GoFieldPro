@@ -27,6 +27,12 @@ export function isDocumentCalibrated(doc: { calibration?: GeoCalibration } | nul
   if (!cal.isCalibrated) return false;
   if (!cal.ref1 || !cal.ref2) return false;
 
+  // STRICT REJECTION: Reject legacy auto-anchored calibrations that were created automatically on file upload
+  // A document is ONLY validly calibrated if calibrated by GCP, Neatline/Bounds, GeoPDF, or an explicit User Anchor!
+  if (cal.method === 'centered' || !cal.method) {
+    return false;
+  }
+
   // Detect legacy São Paulo hardcoded default (-23.542, -46.638) and invalidate it
   const isLegacyFakeSp = (
     Math.abs(cal.ref1.lat - (-23.5420)) < 0.005 &&
@@ -252,8 +258,8 @@ export function gpsToPdf(
   const safeX = isNaN(x) ? h / 2 : +x.toFixed(1);
   const safeY = isNaN(y) ? w / 2 : +y.toFixed(1);
   
-  // Safe margin of 20 pixels around sheet
-  const isInside = safeX >= -20 && safeX <= h + 20 && safeY >= -20 && safeY <= w + 20;
+  // Strict bounds check: point must fall strictly within the PDF page dimensions [0, h] and [0, w]
+  const isInside = safeX >= 0 && safeX <= h && safeY >= 0 && safeY <= w;
 
   return { x: safeX, y: safeY, isInside, isCalibrated: true };
 }
