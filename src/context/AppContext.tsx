@@ -633,15 +633,15 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   );
 
   const notifySuccess = useCallback(
-    (title: string, message: string) => notify({ title, message, type: 'success' }),
+    (title: string, message: string, showToast = false) => notify({ title, message, type: 'success', silentToast: !showToast }),
     [notify]
   );
   const notifyError = useCallback(
-    (title: string, message: string) => notify({ title, message, type: 'error', duration: 4500 }),
+    (title: string, message: string) => notify({ title, message, type: 'error', duration: 4000 }),
     [notify]
   );
   const notifyWarning = useCallback(
-    (title: string, message: string) => notify({ title, message, type: 'warning', duration: 3500 }),
+    (title: string, message: string) => notify({ title, message, type: 'warning', duration: 3000 }),
     [notify]
   );
   const notifyInfo = useCallback(
