@@ -1,0 +1,39 @@
+{
+  "project_info": {
+    "project_number": "597933094119",
+    "project_id": "gen-lang-client-0080340137",
+    "storage_bucket": "gen-lang-client-0080340137.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:597933094119:android:191ef6ba39cd83b0d5de42",
+        "android_client_info": {
+          "package_name": "com.gofield.pro"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "597933094119-hfgjg1ca5jb0ncu6mgfl23j5hir7u7i8.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBPuu4oQHt4feN_EAciTAgpxffnn7L0vHo"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "597933094119-hfgjg1ca5jb0ncu6mgfl23j5hir7u7i8.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
