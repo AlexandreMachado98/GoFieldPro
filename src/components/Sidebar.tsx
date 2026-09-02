@@ -218,23 +218,23 @@ export const Sidebar: React.FC = () => {
                 title={isCollapsed ? tab.label : undefined}
                 className={`w-full flex items-center ${
                   isCollapsed ? 'justify-center px-2 py-3' : 'justify-between px-3.5 py-3'
-                } rounded-xl text-sm font-extrabold transition-all active:scale-98 relative group cursor-pointer ${
+                } rounded-xl text-sm font-bold transition-all active:scale-98 relative group cursor-pointer ${
                   isActive
-                    ? 'bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-lg shadow-emerald-950/60 ring-1 ring-emerald-400/40'
-                    : 'text-slate-300 hover:text-white hover:bg-[#0D121D] border border-transparent hover:border-slate-800/60'
+                    ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/40 shadow-sm'
+                    : 'text-slate-300 hover:text-white hover:bg-slate-900/90 border border-transparent'
                 }`}
               >
                 <div className="flex items-center gap-3">
                   <Icon
                     className={`w-5 h-5 shrink-0 ${
-                      isActive ? 'text-white' : tab.iconColor || 'text-emerald-400'
+                      isActive ? 'text-emerald-400' : 'text-slate-400 group-hover:text-slate-200'
                     }`}
                   />
                   {!isCollapsed && (
                     <div className="flex items-center justify-between gap-2 w-full truncate">
                       <span className="truncate">{tab.label}</span>
                       {(tab as any).isPremium && !hasFeatureAccess(tab.id) && (
-                        <span className="text-[9px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded-md bg-amber-500/20 text-amber-300 border border-amber-500/40 flex items-center gap-1 shadow-sm shrink-0">
+                        <span className="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-md bg-amber-500/15 text-amber-300 border border-amber-500/30 flex items-center gap-1 shrink-0">
                           <Lock className="w-2.5 h-2.5 text-amber-400" />
                           PRO
                         </span>
@@ -245,7 +245,7 @@ export const Sidebar: React.FC = () => {
 
                 {badgeCount > 0 && (
                   <span
-                    className={`px-2 py-0.5 rounded-full text-[10px] font-black text-white shadow-md animate-pulse ${
+                    className={`px-2 py-0.5 rounded-full text-[10px] font-bold text-white shadow-md ${
                       tab.badgeColor || 'bg-amber-500'
                     } ${isCollapsed ? 'absolute -top-1 -right-1 w-4 h-4 p-0 flex items-center justify-center text-[9px]' : ''}`}
                   >
@@ -271,17 +271,17 @@ export const Sidebar: React.FC = () => {
               title={isSidebarCollapsed && !isMobileMenuOpen ? 'Cubagem Florestal (m³)' : undefined}
               className={`w-full flex items-center ${
                 isSidebarCollapsed && !isMobileMenuOpen ? 'justify-center p-2.5' : 'justify-between px-3.5 py-2.5'
-              } rounded-xl text-xs font-extrabold text-emerald-400 bg-emerald-950/40 border border-emerald-500/30 hover:bg-emerald-900/40 transition-all active:scale-98 cursor-pointer`}
+              } rounded-xl text-xs font-semibold text-slate-200 bg-slate-900/80 border border-slate-800 hover:border-emerald-500/40 hover:bg-slate-850 transition-all active:scale-98 cursor-pointer`}
             >
               <div className="flex items-center gap-3">
                 <Trees className="w-5 h-5 text-emerald-400 shrink-0" />
                 {(!isSidebarCollapsed || isMobileMenuOpen) && <span>Cubagem Florestal</span>}
               </div>
               {(!isSidebarCollapsed || isMobileMenuOpen) && (
-                <span className={`text-[9px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded-md border flex items-center gap-1 shadow-sm ${
+                <span className={`text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-md border flex items-center gap-1 ${
                   !hasFeatureAccess('woodpile_cubage')
-                    ? 'bg-amber-500/20 text-amber-300 border-amber-500/40' 
-                    : 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
+                    ? 'bg-amber-500/15 text-amber-300 border-amber-500/30' 
+                    : 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30'
                 }`}>
                   {!hasFeatureAccess('woodpile_cubage') && <Lock className="w-2.5 h-2.5 text-amber-400" />}
                   {!hasFeatureAccess('woodpile_cubage') ? 'PRO' : 'm³'}
@@ -298,9 +298,9 @@ export const Sidebar: React.FC = () => {
               title={isSidebarCollapsed && !isMobileMenuOpen ? 'Configurações' : undefined}
               className={`w-full flex items-center ${
                 isSidebarCollapsed && !isMobileMenuOpen ? 'justify-center p-2.5' : 'gap-3 px-3.5 py-2.5'
-              } rounded-xl text-xs font-bold text-slate-300 hover:text-white hover:bg-slate-900/80 transition-all active:scale-98`}
+              } rounded-xl text-xs font-semibold text-slate-300 hover:text-white hover:bg-slate-900/80 transition-all active:scale-98`}
             >
-              <Settings className="w-5 h-5 text-sky-400 shrink-0" />
+              <Settings className="w-5 h-5 text-slate-400 shrink-0" />
               {(!isSidebarCollapsed || isMobileMenuOpen) && <span>Configurações</span>}
             </button>
 
@@ -313,86 +313,16 @@ export const Sidebar: React.FC = () => {
               title={isSidebarCollapsed && !isMobileMenuOpen ? 'Políticas & LGPD' : undefined}
               className={`w-full flex items-center ${
                 isSidebarCollapsed && !isMobileMenuOpen ? 'justify-center p-2.5' : 'gap-3 px-3.5 py-2.5'
-              } rounded-xl text-xs font-bold text-slate-300 hover:text-white hover:bg-slate-900/80 transition-all active:scale-98`}
+              } rounded-xl text-xs font-semibold text-slate-300 hover:text-white hover:bg-slate-900/80 transition-all active:scale-98`}
             >
-              <ShieldCheck className="w-5 h-5 text-emerald-400 shrink-0" />
+              <ShieldCheck className="w-5 h-5 text-slate-400 shrink-0" />
               {(!isSidebarCollapsed || isMobileMenuOpen) && <span>Políticas & LGPD</span>}
             </button>
-
-          {/* Pro Informative Card for Free Users */}
-          {!hasFullProAccess && (!isSidebarCollapsed || isMobileMenuOpen) && (
-            <div className="p-2.5 bg-gradient-to-br from-emerald-500/10 via-slate-900 to-transparent border border-emerald-500/20 rounded-2xl space-y-2 mt-2">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-1.5">
-                  <Crown className="w-4 h-4 text-emerald-400" />
-                  <span className="text-xs font-black text-white">GoField Pro</span>
-                </div>
-                <span className="text-[9px] font-extrabold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 px-1.5 py-0.5 rounded-full">
-                  PRO
-                </span>
-              </div>
-              <p className="text-[10px] text-slate-400 leading-tight">
-                Recursos profissionais de geoprocessamento, cubagem e SST de campo.
-              </p>
-              <a
-                href="https://amtst.vercel.app/#apps"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="w-full py-2 px-3 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 font-black text-xs rounded-xl shadow-md transition-all flex items-center justify-center gap-1.5 active:scale-95"
-              >
-                <Sparkles className="w-3.5 h-3.5" />
-                <span>Conhecer na AM TST</span>
-              </a>
-            </div>
-          )}
-
           </div>
         </nav>
 
         {/* Footer */}
         <div className="p-2.5 sm:p-3 border-t border-slate-800/80 bg-slate-950 shrink-0 space-y-2">
-          {/* Check Updates Button in Footer */}
-          <button
-            type="button"
-            onClick={handleCheckUpdates}
-            disabled={isCheckingUpdate || isApplyingUpdate}
-            title={isSidebarCollapsed && !isMobileMenuOpen ? 'Verificar Atualizações & Limpar Cache' : undefined}
-            className={`w-full flex items-center ${
-              isSidebarCollapsed && !isMobileMenuOpen ? 'justify-center p-2.5' : 'justify-between px-3 py-2'
-            } rounded-xl bg-gradient-to-r from-sky-950/80 to-slate-900 border border-sky-500/40 text-sky-300 hover:text-white hover:border-sky-400 text-xs font-bold transition-all active:scale-98 shadow-sm cursor-pointer disabled:opacity-50`}
-          >
-            <div className="flex items-center gap-2">
-              <RefreshCw className={`w-4 h-4 text-sky-400 shrink-0 ${isCheckingUpdate || isApplyingUpdate ? 'animate-spin' : ''}`} />
-              {(!isSidebarCollapsed || isMobileMenuOpen) && <span>Verificar Atualizações</span>}
-            </div>
-            {(!isSidebarCollapsed || isMobileMenuOpen) && (
-              <span className={`text-[9px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded-md border flex items-center gap-1 ${
-                isUpdateAvailable
-                  ? 'bg-amber-500 text-slate-950 border-amber-400 animate-bounce'
-                  : 'bg-sky-500/20 text-sky-300 border-sky-500/30'
-              }`}>
-                {isCheckingUpdate ? '...' : isUpdateAvailable ? 'Novo' : 'Checar'}
-              </span>
-            )}
-          </button>
-
-          {/* Update Available Badge */}
-          {isUpdateAvailable && (!isSidebarCollapsed || isMobileMenuOpen) && (
-            <button
-              type="button"
-              onClick={applyUpdate}
-              className="w-full flex items-center justify-between px-3 py-2 rounded-xl bg-gradient-to-r from-sky-600/30 to-emerald-600/30 border border-sky-500/50 text-sky-300 text-xs font-bold transition-all hover:scale-[1.02] active:scale-95 animate-pulse cursor-pointer"
-            >
-              <div className="flex items-center gap-1.5">
-                <Sparkles className="w-3.5 h-3.5 text-amber-400" />
-                <span>Instalar {latestVersion}</span>
-              </div>
-              <span className="text-[10px] bg-sky-500 text-slate-950 px-2 py-0.5 rounded-full font-black">
-                Instalar
-              </span>
-            </button>
-          )}
-
           {/* Logout */}
           <button
             type="button"
@@ -400,7 +330,7 @@ export const Sidebar: React.FC = () => {
             title={isSidebarCollapsed && !isMobileMenuOpen ? 'Sair do Aplicativo' : undefined}
             className={`w-full flex items-center ${
               isSidebarCollapsed && !isMobileMenuOpen ? 'justify-center p-2.5' : 'justify-center gap-2 px-3 py-2.5'
-            } rounded-xl bg-rose-950/40 hover:bg-rose-900/60 border border-rose-900/60 text-rose-300 hover:text-rose-200 text-xs font-bold transition-all active:scale-98`}
+            } rounded-xl bg-slate-900 hover:bg-rose-950/40 border border-slate-800 hover:border-rose-900/60 text-slate-400 hover:text-rose-300 text-xs font-bold transition-all active:scale-98`}
           >
             <LogOut className="w-4 h-4 shrink-0" />
             {(!isSidebarCollapsed || isMobileMenuOpen) && <span>Sair</span>}
@@ -408,18 +338,13 @@ export const Sidebar: React.FC = () => {
 
           {/* App Version Info */}
           {(!isSidebarCollapsed || isMobileMenuOpen) && (
-            <button
-              type="button"
-              onClick={handleCheckUpdates}
-              title="Clique para checar atualizações e limpar cache"
-              className="w-full flex items-center justify-between text-[10px] text-slate-400 hover:text-slate-200 px-1 py-0.5 rounded transition-colors group cursor-pointer"
-            >
-              <span className="font-semibold text-slate-500 group-hover:text-slate-400">GoField Pro</span>
+            <div className="w-full flex items-center justify-between text-[10px] text-slate-400 px-1 py-0.5">
+              <span className="font-semibold text-slate-500">GoField Pro</span>
               <span className="flex items-center gap-1.5 font-mono text-emerald-400 font-bold">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
                 {APP_VERSION}
               </span>
-            </button>
+            </div>
           )}
         </div>
       </aside>
