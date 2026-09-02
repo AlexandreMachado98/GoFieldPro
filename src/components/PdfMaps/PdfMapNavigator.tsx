@@ -1539,7 +1539,7 @@ export const PdfMapNavigator: React.FC = () => {
       // Instant Field Auto-Anchor: when in the field with active GPS, bind document automatically without requiring manual typing!
       if (currentGps && typeof currentGps.lat === 'number' && typeof currentGps.lng === 'number' && !isNaN(currentGps.lat) && !isNaN(currentGps.lng)) {
         console.log('[PdfMapNavigator] Uncalibrated map opened in the field. Auto-anchoring to current GPS coordinates...');
-        const autoCal = createCenteredCalibration(currentGps.lat, currentGps.lng, 0.75, activeDoc);
+        const autoCal = createCenteredCalibration(activeDoc, currentGps.lat, currentGps.lng, 0.75, 0);
         const updatedDoc = {
           ...activeDoc,
           calibration: autoCal,
@@ -1565,8 +1565,17 @@ export const PdfMapNavigator: React.FC = () => {
     // Calculate distance between user GPS and the calibrated document center
     let distKm = 0;
     if (activeDoc.calibration?.ref1 && activeDoc.calibration?.ref2) {
-      const centerLat = (activeDoc.calibration.ref1.lat + activeDoc.calibration.ref2.lat) / 2;
-      const centerLng = (activeDoc.calibration.ref1.lng + activeDoc.calibration.ref2.lng) / 2;
+      let centerLat = (activeDoc.calibration.ref1.lat + activeDoc.calibration.ref2.lat) / 2;
+      let centerLng = (activeDoc.calibration.ref1.lng + activeDoc.calibration.ref2.lng) / 2;
+
+      // Auto-heal calibrations where latitude/longitude were saved positive in South America
+      if (currentGps.lat < 0 && centerLat > 0 && centerLat < 35 && currentGps.lng < 0 && (centerLng < -30 || centerLng > 30)) {
+        centerLat = -centerLat;
+      }
+      if (currentGps.lng < 0 && centerLng > 30 && centerLng < 75) {
+        centerLng = -centerLng;
+      }
+
       if (!isNaN(centerLat) && !isNaN(centerLng)) {
         distKm = +(calculateDistanceMeters(currentGps.lat, currentGps.lng, centerLat, centerLng) / 1000).toFixed(1);
       }
@@ -2085,7 +2094,7 @@ export const PdfMapNavigator: React.FC = () => {
           isGeoPdfDetected = true;
         } else if (currentGps && typeof currentGps.lat === 'number' && typeof currentGps.lng === 'number' && !isNaN(currentGps.lat) && !isNaN(currentGps.lng)) {
           // Instant Field Auto-Anchor: user is at the property right now
-          initialCalibration = createCenteredCalibration(currentGps.lat, currentGps.lng, 0.75, { width: baseWidth, height: baseHeight });
+          initialCalibration = createCenteredCalibration({ width: baseWidth, height: baseHeight }, currentGps.lat, currentGps.lng, 0.75, 0);
         } else {
           // Standard PDF without embedded GeoPDF tags: starts uncalibrated until GPS connects or GCP added
           initialCalibration = {
@@ -3123,14 +3132,14 @@ export const PdfMapNavigator: React.FC = () => {
               isMapInteracting ? 'opacity-20 pointer-events-none' : 'opacity-100 pointer-events-auto'
             }`}
           >
-            <div className="bg-slate-950/95 border border-sky-500/70 text-slate-200 px-4 py-2.5 rounded-2xl shadow-2xl backdrop-blur-md flex items-center justify-between gap-2.5">
+            <div className="bg-slate-950/95 border border-emerald-500/40 text-slate-200 px-4 py-2.5 rounded-2xl shadow-2xl backdrop-blur-md flex items-center justify-between gap-2.5">
               <div className="flex items-center gap-2.5 text-xs">
-                <span className="w-3 h-3 rounded-full bg-sky-400 animate-ping shrink-0 shadow-[0_0_10px_#38bdf8]" />
+                <span className="w-3 h-3 rounded-full bg-emerald-400 animate-ping shrink-0 shadow-[0_0_10px_#10b981]" />
                 <div>
                   <span className="font-extrabold block text-white text-[12px] leading-tight">
                     A {distanceToMapKm >= 10 ? distanceToMapKm.toFixed(0) : distanceToMapKm.toFixed(1)} km da planta
                   </span>
-                  <span className="text-[10px] text-sky-400 font-medium leading-tight">
+                  <span className="text-[10px] text-emerald-400 font-medium leading-tight">
                     GPS acompanhando seu trajeto até a chegada
                   </span>
                 </div>
@@ -3148,7 +3157,7 @@ export const PdfMapNavigator: React.FC = () => {
                       mapInstanceRef.current.fitBounds(b, { padding: [50, 50] });
                     }
                   }}
-                  className="px-2.5 py-1.5 bg-sky-600 hover:bg-sky-500 text-white font-black text-xs rounded-xl shadow active:scale-95 transition cursor-pointer flex items-center gap-1"
+                  className="px-2.5 py-1.5 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs rounded-xl shadow active:scale-95 transition cursor-pointer flex items-center gap-1"
                   title="Enquadrar Minha Posição e a Folha"
                 >
                   <Maximize2 className="w-3.5 h-3.5" />
