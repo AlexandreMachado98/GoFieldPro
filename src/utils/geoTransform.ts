@@ -1,139 +1,309 @@
 import { PdfDocument, GeoCalibration } from './pdfStorage';
 import { calculateDistanceMeters, calculateBearingDegrees, bearingToCardinal } from './geoUtils';
 
-// Default reference coordinates for demo maps or uncalibrated documents (SIRGAS 2000 / WGS84)
-const DEFAULT_REF = {
-  northLat: -23.5420,
-  southLat: -23.5540,
-  westLng: -46.6380,
-  eastLng: -46.6220,
-};
+/**
+ * High-Precision Cartographic Transformation Engine for GoField Pro
+ * 
+ * Supports:
+ * - 2-Point Ground Control Point (GCP) Conformal Similarity Transformation (Scale, Rotation, Translation)
+ * - Neatline Bounding Box Calibration (North, South, East, West)
+ * - Centered Anchor with real cartographic scale and rotation
+ * - Zero fallback to hardcoded fake coordinates (avoids projecting users into São Paulo)
+ */
+
+export interface GpsToPdfResult {
+  x: number;
+  y: number;
+  isInside: boolean;
+  isCalibrated: boolean;
+}
 
 /**
- * Ensures a document has a valid calibration structure or generates a default bounding box
+ * Checks if a document has valid, genuine georeferencing calibration
+ */
+export function isDocumentCalibrated(doc: { calibration?: GeoCalibration } | null | undefined): boolean {
+  if (!doc || !doc.calibration) return false;
+  const cal = doc.calibration;
+  if (!cal.isCalibrated) return false;
+  if (!cal.ref1 || !cal.ref2) return false;
+  
+  // Must have valid non-NaN coordinates
+  if (isNaN(cal.ref1.lat) || isNaN(cal.ref1.lng) || isNaN(cal.ref2.lat) || isNaN(cal.ref2.lng)) return false;
+  if (isNaN(cal.ref1.x) || isNaN(cal.ref1.y) || isNaN(cal.ref2.x) || isNaN(cal.ref2.y)) return false;
+
+  // Must have non-zero distance between reference points
+  const dLat = Math.abs(cal.ref2.lat - cal.ref1.lat);
+  const dLng = Math.abs(cal.ref2.lng - cal.ref1.lng);
+  const dPixel = Math.hypot(cal.ref2.x - cal.ref1.x, cal.ref2.y - cal.ref1.y);
+
+  return (dLat > 0.00001 || dLng > 0.00001) && dPixel > 10;
+}
+
+/**
+ * Returns document calibration or a clean uncalibrated sentinel
  */
 export function getDocumentCalibration(doc: PdfDocument | null | undefined): GeoCalibration {
-  if (!doc) {
-    return {
-      isCalibrated: false,
-      ref1: { x: 1020, y: 240, lat: DEFAULT_REF.northLat, lng: DEFAULT_REF.westLng },
-      ref2: { x: 180, y: 1360, lat: DEFAULT_REF.southLat, lng: DEFAULT_REF.eastLng },
-      scaleMetersPerPixel: 0.85,
-    };
+  if (doc && isDocumentCalibrated(doc)) {
+    return doc.calibration!;
   }
 
-  if (doc.calibration && doc.calibration.isCalibrated && doc.calibration.ref1 && doc.calibration.ref2) {
-    return doc.calibration;
-  }
-
-  const h = doc.height && !isNaN(doc.height) ? doc.height : 1200;
-  const w = doc.width && !isNaN(doc.width) ? doc.width : 1600;
+  const h = doc?.height && !isNaN(doc.height) && doc.height > 0 ? doc.height : 1200;
+  const w = doc?.width && !isNaN(doc.width) && doc.width > 0 ? doc.width : 1600;
 
   return {
     isCalibrated: false,
-    ref1: { x: h * 0.85, y: w * 0.15, lat: DEFAULT_REF.northLat, lng: DEFAULT_REF.westLng },
-    ref2: { x: h * 0.15, y: w * 0.85, lat: DEFAULT_REF.southLat, lng: DEFAULT_REF.eastLng },
+    ref1: { x: h * 0.9, y: w * 0.1, lat: NaN, lng: NaN },
+    ref2: { x: h * 0.1, y: w * 0.9, lat: NaN, lng: NaN },
     scaleMetersPerPixel: 0.85,
   };
 }
 
 /**
- * Calibrates a document or dimensional sheet around the user's current GPS position
+ * Calibrates a document around a central coordinate with a specified scale and rotation
  */
 export function createCenteredCalibration(
   doc: { width?: number; height?: number; calibration?: GeoCalibration } | null | undefined,
   centerLat: number,
   centerLng: number,
-  scaleMetersPerPixel = 0.75
+  scaleMetersPerPixel = 0.75,
+  rotationDeg = 0
 ): GeoCalibration {
-  const safeLat = typeof centerLat === 'number' && !isNaN(centerLat) ? centerLat : DEFAULT_REF.northLat;
-  const safeLng = typeof centerLng === 'number' && !isNaN(centerLng) ? centerLng : DEFAULT_REF.westLng;
-  const safeScale = typeof scaleMetersPerPixel === 'number' && !isNaN(scaleMetersPerPixel) && scaleMetersPerPixel > 0 ? scaleMetersPerPixel : 0.75;
+  if (typeof centerLat !== 'number' || typeof centerLng !== 'number' || isNaN(centerLat) || isNaN(centerLng)) {
+    throw new Error('Coordenadas de centro inválidas para calibração.');
+  }
+
+  const safeScale = typeof scaleMetersPerPixel === 'number' && !isNaN(scaleMetersPerPixel) && scaleMetersPerPixel > 0
+    ? scaleMetersPerPixel
+    : 0.75;
 
   const h = doc?.height && !isNaN(doc.height) && doc.height > 0 ? doc.height : 1200;
   const w = doc?.width && !isNaN(doc.width) && doc.width > 0 ? doc.width : 1600;
 
-  // 1 degree latitude ~ 111,320 meters (WGS84 ellipsoidal approximation)
-  const degPerMeterLat = 1 / 111320;
-  const latRad = (safeLat * Math.PI) / 180;
-  const cosLat = Math.cos(latRad);
-  // 1 degree longitude ~ 111,320 * cos(lat) meters
-  const degPerMeterLng = 1 / (111320 * (Math.abs(cosLat) > 0.01 ? cosLat : 1));
+  // WGS84 Geodetic ellipsoidal meters per degree
+  const latRad = (centerLat * Math.PI) / 180;
+  const metersPerDegLat = 111132.92 - 559.82 * Math.cos(2 * latRad) + 1.175 * Math.cos(4 * latRad);
+  const metersPerDegLng = 111412.84 * Math.cos(latRad) - 93.5 * Math.cos(3 * latRad);
 
-  const halfHeightMeters = (h / 2) * safeScale;
-  const halfWidthMeters = (w / 2) * safeScale;
+  const degPerMeterLat = 1 / Math.max(1000, metersPerDegLat);
+  const degPerMeterLng = 1 / Math.max(1000, Math.abs(metersPerDegLng));
 
-  const northLat = safeLat + halfHeightMeters * degPerMeterLat;
-  const southLat = safeLat - halfHeightMeters * degPerMeterLat;
-  const westLng = safeLng - halfWidthMeters * degPerMeterLng;
-  const eastLng = safeLng + halfWidthMeters * degPerMeterLng;
+  // Offset in meters from center for Top-Left (x: 90% h, y: 10% w)
+  // Leaflet CRS.Simple: x is vertical (lat, 0 to h), y is horizontal (lng, 0 to w)
+  const dyTopLeftMeters = (h * 0.4) * safeScale; // North
+  const dxTopLeftMeters = -(w * 0.4) * safeScale; // West
+
+  // Offset in meters from center for Bottom-Right (x: 10% h, y: 90% w)
+  const dyBottomRightMeters = -(h * 0.4) * safeScale; // South
+  const dxBottomRightMeters = (w * 0.4) * safeScale; // East
+
+  // Apply rotation if present
+  const rotRad = (rotationDeg * Math.PI) / 180;
+  const cosR = Math.cos(rotRad);
+  const sinR = Math.sin(rotRad);
+
+  // Rotate Top-Left vector
+  const rDxTL = dxTopLeftMeters * cosR - dyTopLeftMeters * sinR;
+  const rDyTL = dxTopLeftMeters * sinR + dyTopLeftMeters * cosR;
+
+  // Rotate Bottom-Right vector
+  const rDxBR = dxBottomRightMeters * cosR - dyBottomRightMeters * sinR;
+  const rDyBR = dxBottomRightMeters * sinR + dyBottomRightMeters * cosR;
+
+  const ref1Lat = centerLat + rDyTL * degPerMeterLat;
+  const ref1Lng = centerLng + rDxTL * degPerMeterLng;
+
+  const ref2Lat = centerLat + rDyBR * degPerMeterLat;
+  const ref2Lng = centerLng + rDxBR * degPerMeterLng;
 
   return {
     isCalibrated: true,
-    ref1: { x: +(h * 0.9).toFixed(1), y: +(w * 0.1).toFixed(1), lat: +northLat.toFixed(7), lng: +westLng.toFixed(7) },
-    ref2: { x: +(h * 0.1).toFixed(1), y: +(w * 0.9).toFixed(1), lat: +southLat.toFixed(7), lng: +eastLng.toFixed(7) },
+    ref1: { x: +(h * 0.9).toFixed(1), y: +(w * 0.1).toFixed(1), lat: +ref1Lat.toFixed(7), lng: +ref1Lng.toFixed(7) },
+    ref2: { x: +(h * 0.1).toFixed(1), y: +(w * 0.9).toFixed(1), lat: +ref2Lat.toFixed(7), lng: +ref2Lng.toFixed(7) },
     scaleMetersPerPixel: safeScale,
+    rotationDeg,
+    method: 'centered',
   };
 }
 
 /**
- * Converts PDF Pixel Coordinates (x: vertical Leaflet lat, y: horizontal Leaflet lng) to WGS84 (Lat, Lng)
+ * Creates calibration from 2 Ground Control Points (GCP 1 and GCP 2)
  */
-export function pdfToGps(x: number, y: number, doc: { width?: number; height?: number; calibration?: GeoCalibration } | null | undefined): { lat: number; lng: number } {
-  if (typeof x !== 'number' || typeof y !== 'number' || isNaN(x) || isNaN(y)) {
-    return { lat: DEFAULT_REF.northLat, lng: DEFAULT_REF.westLng };
+export function create2PointCalibration(
+  pt1: { x: number; y: number; lat: number; lng: number },
+  pt2: { x: number; y: number; lat: number; lng: number },
+  nominalScale?: string
+): GeoCalibration {
+  if (isNaN(pt1.lat) || isNaN(pt1.lng) || isNaN(pt2.lat) || isNaN(pt2.lng)) {
+    throw new Error('Coordenadas geográficas dos pontos de controle são inválidas.');
+  }
+  if (isNaN(pt1.x) || isNaN(pt1.y) || isNaN(pt2.x) || isNaN(pt2.y)) {
+    throw new Error('Coordenadas da folha PDF dos pontos de controle são inválidas.');
   }
 
-  const cal = getDocumentCalibration(doc as any);
-  const { ref1, ref2 } = cal;
+  const pixelDist = Math.hypot(pt2.x - pt1.x, pt2.y - pt1.y);
+  if (pixelDist < 10) {
+    throw new Error('Os pontos de controle devem estar separados por uma distância maior na folha.');
+  }
 
-  // Linear interpolation with safeguards against 0 division
-  const dx = (ref2.x - ref1.x) || 1;
-  const dy = (ref2.y - ref1.y) || 1;
-
-  const latRatio = (x - ref1.x) / dx;
-  const lngRatio = (y - ref1.y) / dy;
-
-  const lat = ref1.lat + latRatio * (ref2.lat - ref1.lat);
-  const lng = ref1.lng + lngRatio * (ref2.lng - ref1.lng);
+  const realDistMeters = calculateDistanceMeters(pt1.lat, pt1.lng, pt2.lat, pt2.lng);
+  const scaleMetersPerPixel = realDistMeters > 0 ? +(realDistMeters / pixelDist).toFixed(4) : 0.75;
 
   return {
-    lat: isNaN(lat) ? DEFAULT_REF.northLat : +lat.toFixed(7),
-    lng: isNaN(lng) ? DEFAULT_REF.westLng : +lng.toFixed(7),
+    isCalibrated: true,
+    ref1: { x: +pt1.x.toFixed(1), y: +pt1.y.toFixed(1), lat: +pt1.lat.toFixed(7), lng: +pt1.lng.toFixed(7) },
+    ref2: { x: +pt2.x.toFixed(1), y: +pt2.y.toFixed(1), lat: +pt2.lat.toFixed(7), lng: +pt2.lng.toFixed(7) },
+    scaleMetersPerPixel,
+    nominalScale,
+    method: 'gcp_2pt',
   };
 }
 
 /**
- * Converts WGS84 (Lat, Lng) to PDF Pixel Coordinates (x: vertical Leaflet lat, y: horizontal Leaflet lng)
+ * Creates calibration from Neatline Bounding Box (North, South, West, East)
  */
-export function gpsToPdf(lat: number, lng: number, doc: { width?: number; height?: number; calibration?: GeoCalibration } | null | undefined): { x: number; y: number; isInside: boolean } {
+export function createBoundingBoxCalibration(
+  doc: { width?: number; height?: number } | null | undefined,
+  bounds: { northLat: number; southLat: number; westLng: number; eastLng: number }
+): GeoCalibration {
+  const { northLat, southLat, westLng, eastLng } = bounds;
+  if (isNaN(northLat) || isNaN(southLat) || isNaN(westLng) || isNaN(eastLng)) {
+    throw new Error('Coordenadas da moldura inválidas.');
+  }
+
+  const h = doc?.height && !isNaN(doc.height) && doc.height > 0 ? doc.height : 1200;
+  const w = doc?.width && !isNaN(doc.width) && doc.width > 0 ? doc.width : 1600;
+
+  const realDistHeight = calculateDistanceMeters(southLat, (westLng + eastLng) / 2, northLat, (westLng + eastLng) / 2);
+  const scaleMetersPerPixel = realDistHeight > 0 ? +(realDistHeight / h).toFixed(4) : 0.75;
+
+  return {
+    isCalibrated: true,
+    ref1: { x: h, y: 0, lat: +northLat.toFixed(7), lng: +westLng.toFixed(7) },
+    ref2: { x: 0, y: w, lat: +southLat.toFixed(7), lng: +eastLng.toFixed(7) },
+    scaleMetersPerPixel,
+    method: 'gcp_4pt',
+  };
+}
+
+/**
+ * Converts WGS84 (Lat, Lng) to PDF Pixel Coordinates (x: Leaflet lat, y: Leaflet lng)
+ */
+export function gpsToPdf(
+  lat: number,
+  lng: number,
+  doc: { width?: number; height?: number; calibration?: GeoCalibration } | null | undefined
+): GpsToPdfResult {
   const h = doc?.height && !isNaN(doc.height) && doc.height > 0 ? doc.height : 1200;
   const w = doc?.width && !isNaN(doc.width) && doc.width > 0 ? doc.width : 1600;
 
   if (typeof lat !== 'number' || typeof lng !== 'number' || isNaN(lat) || isNaN(lng)) {
-    return { x: h / 2, y: w / 2, isInside: true };
+    return { x: h / 2, y: w / 2, isInside: false, isCalibrated: false };
   }
 
-  const cal = getDocumentCalibration(doc as any);
+  if (!doc || !isDocumentCalibrated(doc)) {
+    return { x: h / 2, y: w / 2, isInside: false, isCalibrated: false };
+  }
+
+  const cal = doc.calibration!;
   const { ref1, ref2 } = cal;
 
-  const dLat = (ref2.lat - ref1.lat);
-  const dLng = (ref2.lng - ref1.lng);
+  // Check if points have rotation
+  const dLat = ref2.lat - ref1.lat;
+  const dLng = ref2.lng - ref1.lng;
+  const dx = ref2.x - ref1.x;
+  const dy = ref2.y - ref1.y;
 
-  const safeDLat = Math.abs(dLat) > 0.0000001 ? dLat : 0.0001;
-  const safeDLng = Math.abs(dLng) > 0.0000001 ? dLng : 0.0001;
+  // Mid-latitude ellipsoidal meters per degree
+  const midLat = (ref1.lat + ref2.lat) / 2;
+  const latRad = (midLat * Math.PI) / 180;
+  const metersPerDegLat = 111132.92 - 559.82 * Math.cos(2 * latRad) + 1.175 * Math.cos(4 * latRad);
+  const metersPerDegLng = (111412.84 * Math.cos(latRad) - 93.5 * Math.cos(3 * latRad)) || 111320;
 
-  const latRatio = (lat - ref1.lat) / safeDLat;
-  const lngRatio = (lng - ref1.lng) / safeDLng;
+  // Real world metric delta between ref1 and ref2
+  const dNorthM = dLat * metersPerDegLat;
+  const dEastM = dLng * metersPerDegLng;
+  const refMetricDistSq = dNorthM * dNorthM + dEastM * dEastM;
 
-  const x = ref1.x + latRatio * (ref2.x - ref1.x);
-  const y = ref1.y + lngRatio * (ref2.y - ref1.y);
+  if (refMetricDistSq < 1) {
+    return { x: h / 2, y: w / 2, isInside: false, isCalibrated: false };
+  }
+
+  // Real world metric delta from ref1 to target point
+  const pNorthM = (lat - ref1.lat) * metersPerDegLat;
+  const pEastM = (lng - ref1.lng) * metersPerDegLng;
+
+  // Conformal Similarity Transformation (Scale + Rotation + Translation)
+  const dot = (pNorthM * dNorthM + pEastM * dEastM) / refMetricDistSq;
+  const cross = (pEastM * dNorthM - pNorthM * dEastM) / refMetricDistSq;
+
+  // In Leaflet CRS.Simple:
+  // dx is change in vertical (x), dy is change in horizontal (y)
+  // Perpendicular vector to (dx, dy) rotated +90° is (-dy, dx)
+  const x = ref1.x + dot * dx + cross * (-dy);
+  const y = ref1.y + dot * dy + cross * dx;
 
   const safeX = isNaN(x) ? h / 2 : +x.toFixed(1);
   const safeY = isNaN(y) ? w / 2 : +y.toFixed(1);
-  const isInside = safeX >= 0 && safeX <= h && safeY >= 0 && safeY <= w;
+  
+  // Safe margin of 20 pixels around sheet
+  const isInside = safeX >= -20 && safeX <= h + 20 && safeY >= -20 && safeY <= w + 20;
 
-  return { x: safeX, y: safeY, isInside };
+  return { x: safeX, y: safeY, isInside, isCalibrated: true };
+}
+
+/**
+ * Converts PDF Pixel Coordinates (x: Leaflet lat, y: Leaflet lng) to WGS84 (Lat, Lng)
+ */
+export function pdfToGps(
+  x: number,
+  y: number,
+  doc: { width?: number; height?: number; calibration?: GeoCalibration } | null | undefined
+): { lat: number; lng: number; isCalibrated: boolean } {
+  if (typeof x !== 'number' || typeof y !== 'number' || isNaN(x) || isNaN(y)) {
+    return { lat: 0, lng: 0, isCalibrated: false };
+  }
+
+  if (!doc || !isDocumentCalibrated(doc)) {
+    return { lat: 0, lng: 0, isCalibrated: false };
+  }
+
+  const cal = doc.calibration!;
+  const { ref1, ref2 } = cal;
+
+  const dx = ref2.x - ref1.x;
+  const dy = ref2.y - ref1.y;
+  const pixelDistSq = dx * dx + dy * dy;
+
+  if (pixelDistSq < 1) {
+    return { lat: ref1.lat, lng: ref1.lng, isCalibrated: true };
+  }
+
+  const midLat = (ref1.lat + ref2.lat) / 2;
+  const latRad = (midLat * Math.PI) / 180;
+  const metersPerDegLat = 111132.92 - 559.82 * Math.cos(2 * latRad) + 1.175 * Math.cos(4 * latRad);
+  const metersPerDegLng = (111412.84 * Math.cos(latRad) - 93.5 * Math.cos(3 * latRad)) || 111320;
+
+  const dNorthM = (ref2.lat - ref1.lat) * metersPerDegLat;
+  const dEastM = (ref2.lng - ref1.lng) * metersPerDegLng;
+
+  // Inverse Conformal Transformation
+  const px = x - ref1.x;
+  const py = y - ref1.y;
+
+  const dot = (px * dx + py * dy) / pixelDistSq;
+  const cross = (py * dx - px * dy) / pixelDistSq;
+
+  const pNorthM = dot * dNorthM - cross * dEastM;
+  const pEastM = dot * dEastM + cross * dNorthM;
+
+  const lat = ref1.lat + pNorthM / metersPerDegLat;
+  const lng = ref1.lng + pEastM / metersPerDegLng;
+
+  return {
+    lat: isNaN(lat) ? ref1.lat : +lat.toFixed(7),
+    lng: isNaN(lng) ? ref1.lng : +lng.toFixed(7),
+    isCalibrated: true,
+  };
 }
 
 /**
@@ -163,8 +333,17 @@ export function calculateNavigationToMarker(
 
   if (targetLat === undefined || targetLng === undefined || isNaN(targetLat) || isNaN(targetLng)) {
     const computed = pdfToGps(marker.x, marker.y, doc);
-    targetLat = computed.lat;
-    targetLng = computed.lng;
+    if (computed.isCalibrated) {
+      targetLat = computed.lat;
+      targetLng = computed.lng;
+    } else {
+      return {
+        distanceMeters: 0,
+        formattedDistance: 'Planta não calibrada',
+        bearingDegrees: 0,
+        cardinal: 'N',
+      };
+    }
   }
 
   const distanceMeters = calculateDistanceMeters(

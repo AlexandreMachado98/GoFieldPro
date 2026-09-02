@@ -2,7 +2,6 @@ import React, { useState, useRef } from 'react';
 import { useApp } from '../../context/AppContext';
 import { LayerItem, BasemapType, PDFMapOverlay } from '../../types';
 import { parseKMLString, parseKMZFile } from '../../utils/kmlParser';
-import { generateSyntheticCartographicMapDataUrl } from '../../utils/pdfMapEngine';
 import {
   X,
   Upload,

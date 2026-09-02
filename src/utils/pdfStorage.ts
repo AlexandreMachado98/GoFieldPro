@@ -9,7 +9,13 @@ export interface GeoCalibration {
   isCalibrated: boolean;
   ref1: { x: number; y: number; lat: number; lng: number };
   ref2: { x: number; y: number; lat: number; lng: number };
+  ref3?: { x: number; y: number; lat: number; lng: number };
+  ref4?: { x: number; y: number; lat: number; lng: number };
   scaleMetersPerPixel?: number;
+  nominalScale?: string;
+  rotationDeg?: number;
+  datum?: string;
+  method?: 'centered' | 'gcp_2pt' | 'gcp_4pt' | 'geopdf';
 }
 
 export interface PdfMarker {
