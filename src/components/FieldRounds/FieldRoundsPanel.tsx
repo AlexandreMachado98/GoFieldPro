@@ -56,16 +56,16 @@ export const FieldRoundsPanel: React.FC = () => {
   if (!hasFullAccess) {
     return (
       <div className="flex-1 h-full w-full bg-slate-950 flex items-center justify-center p-4">
-        <div className="max-w-md w-full bg-slate-900 border-2 border-amber-500/40 rounded-3xl p-6 sm:p-8 text-center space-y-4 shadow-2xl animate-in fade-in">
-          <div className="w-16 h-16 rounded-3xl bg-amber-500/20 text-amber-400 border border-amber-500/30 flex items-center justify-center mx-auto shadow-lg">
+        <div className="max-w-md w-full bg-slate-900 border border-amber-500/40 rounded-3xl p-6 sm:p-8 text-center space-y-4 shadow-2xl animate-in fade-in">
+          <div className="w-16 h-16 rounded-2xl bg-amber-500/15 text-amber-400 border border-amber-500/30 flex items-center justify-center mx-auto shadow-md">
             <Lock className="w-8 h-8" />
           </div>
           <div className="space-y-1.5">
-            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/40 text-[10px] font-black uppercase tracking-wider">
+            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-500/15 text-amber-300 border border-amber-500/30 text-[10px] font-bold uppercase tracking-wider">
               <Crown className="w-3.5 h-3.5" />
               Recurso Exclusivo Pro
             </div>
-            <h3 className="text-xl sm:text-2xl font-black text-white">Registro de Atividades Bloqueado</h3>
+            <h3 className="text-xl sm:text-2xl font-bold text-white">Registro de Atividades Bloqueado</h3>
             <p className="text-xs text-slate-300 leading-relaxed">
               O módulo de controle de rondas, frota, odômetro e relatórios de campo em PDF com fotos é exclusivo para assinantes com plano ativo.
             </p>
@@ -73,7 +73,7 @@ export const FieldRoundsPanel: React.FC = () => {
           <button
             type="button"
             onClick={() => openUpgradeModal('Registro de Atividades de Campo')}
-            className="w-full py-3.5 px-4 bg-gradient-to-r from-amber-500 via-sky-500 to-amber-500 hover:from-amber-400 hover:to-sky-400 text-slate-950 font-black text-xs sm:text-sm uppercase tracking-wider rounded-2xl shadow-xl flex items-center justify-center gap-2 cursor-pointer active:scale-95 transition-all"
+            className="w-full py-3.5 px-4 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs sm:text-sm uppercase tracking-wider rounded-xl shadow-lg flex items-center justify-center gap-2 cursor-pointer active:scale-95 transition-all"
           >
             <Zap className="w-4 h-4 fill-current" />
             <span>Liberar Registro de Atividades via PIX</span>
@@ -385,7 +385,7 @@ export const FieldRoundsPanel: React.FC = () => {
                 <ArrowLeft className="w-3.5 h-3.5 text-sky-400" />
                 <span>← Voltar ao Mapa</span>
               </button>
-              <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wider bg-sky-500/10 text-sky-400 border border-sky-500/20 flex items-center gap-1">
+              <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 flex items-center gap-1">
                 <Gauge className="w-3 h-3" />
                 Controle de Atividades & Quilometragem
               </span>
@@ -396,8 +396,8 @@ export const FieldRoundsPanel: React.FC = () => {
                 </span>
               )}
             </div>
-            <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">
-              Registrar <span className="text-sky-400">Atividade</span>
+            <h1 className="text-2xl sm:text-3xl font-bold text-white tracking-tight">
+              Registrar <span className="text-emerald-400">Atividade</span>
             </h1>
             <p className="text-xs sm:text-sm text-slate-400 mt-1 max-w-xl">
               Registre a quilometragem inicial e final de cada dia de viagem, calcule a distância percorrida automaticamente, anexe fotos do odômetro e gere relatórios em PDF oficiais.
@@ -408,15 +408,15 @@ export const FieldRoundsPanel: React.FC = () => {
           <div className="grid grid-cols-2 sm:flex sm:items-center gap-2 sm:gap-3 w-full sm:w-auto">
             <button
               onClick={handleGeneratePdf}
-              className="flex items-center justify-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-700 hover:border-slate-600 text-white font-bold text-[11px] sm:text-xs shadow transition-all active:scale-95 cursor-pointer truncate"
+              className="flex items-center justify-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-700 hover:border-slate-600 text-slate-200 font-bold text-[11px] sm:text-xs shadow transition-all active:scale-95 cursor-pointer truncate"
             >
-              <FileDown className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-sky-400 shrink-0" />
+              <FileDown className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-emerald-400 shrink-0" />
               <span className="truncate">Relatório PDF</span>
             </button>
 
             <button
               onClick={handleOpenCreateModal}
-              className="flex items-center justify-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2.5 rounded-xl bg-gradient-to-r from-sky-600 to-emerald-600 hover:from-sky-500 hover:to-emerald-500 text-white font-bold text-[11px] sm:text-xs shadow-lg shadow-sky-950/50 transition-all active:scale-95 cursor-pointer truncate"
+              className="flex items-center justify-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-[11px] sm:text-xs shadow-md transition-all active:scale-95 cursor-pointer truncate"
             >
               <Plus className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" />
               <span className="truncate">Nova Atividade</span>
@@ -426,49 +426,49 @@ export const FieldRoundsPanel: React.FC = () => {
 
         {/* Telemetry KPI Cards */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          <div className="bg-slate-900/90 border border-slate-800/80 rounded-2xl p-4 flex items-center gap-3">
-            <div className="p-3 rounded-xl bg-sky-500/10 text-sky-400">
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 flex items-center gap-3">
+            <div className="p-3 rounded-xl bg-slate-800 text-emerald-400">
               <Gauge className="w-5 h-5" />
             </div>
             <div>
-              <div className="text-lg sm:text-2xl font-extrabold text-white">
-                {totalKmAll.toLocaleString('pt-BR')} <span className="text-xs font-semibold text-sky-400">km</span>
+              <div className="text-lg sm:text-2xl font-bold text-white font-mono">
+                {totalKmAll.toLocaleString('pt-BR')} <span className="text-xs font-semibold text-emerald-400">km</span>
               </div>
               <div className="text-[11px] text-slate-400 font-medium">Total Rodado</div>
             </div>
           </div>
 
-          <div className="bg-slate-900/90 border border-slate-800/80 rounded-2xl p-4 flex items-center gap-3">
-            <div className="p-3 rounded-xl bg-emerald-500/10 text-emerald-400">
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 flex items-center gap-3">
+            <div className="p-3 rounded-xl bg-slate-800 text-emerald-400">
               <CheckCircle2 className="w-5 h-5" />
             </div>
             <div>
-              <div className="text-lg sm:text-2xl font-extrabold text-white">
+              <div className="text-lg sm:text-2xl font-bold text-white font-mono">
                 {completedRoundCount}
               </div>
               <div className="text-[11px] text-slate-400 font-medium">Viagens Finalizadas</div>
             </div>
           </div>
 
-          <div className="bg-slate-900/90 border border-slate-800/80 rounded-2xl p-4 flex items-center gap-3">
-            <div className="p-3 rounded-xl bg-amber-500/10 text-amber-400">
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 flex items-center gap-3">
+            <div className="p-3 rounded-xl bg-slate-800 text-amber-400">
               <Clock className="w-5 h-5" />
             </div>
             <div>
-              <div className="text-lg sm:text-2xl font-extrabold text-white">
+              <div className="text-lg sm:text-2xl font-bold text-white font-mono">
                 {activeRoundCount}
               </div>
               <div className="text-[11px] text-slate-400 font-medium">Em Deslocamento</div>
             </div>
           </div>
 
-          <div className="bg-slate-900/90 border border-slate-800/80 rounded-2xl p-4 flex items-center gap-3">
-            <div className="p-3 rounded-xl bg-purple-500/10 text-purple-400">
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 flex items-center gap-3">
+            <div className="p-3 rounded-xl bg-slate-800 text-slate-300">
               <MapPin className="w-5 h-5" />
             </div>
             <div>
-              <div className="text-lg sm:text-2xl font-extrabold text-white">
-                {avgKmPerRound} <span className="text-xs font-semibold text-purple-400">km</span>
+              <div className="text-lg sm:text-2xl font-bold text-white font-mono">
+                {avgKmPerRound} <span className="text-xs font-semibold text-slate-400">km</span>
               </div>
               <div className="text-[11px] text-slate-400 font-medium">Média / Viagem</div>
             </div>

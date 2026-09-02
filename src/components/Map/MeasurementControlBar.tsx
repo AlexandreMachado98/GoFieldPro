@@ -42,14 +42,14 @@ export const MeasurementControlBar: React.FC<MeasurementControlBarProps> = ({
   const validPoints = Array.isArray(points) ? points : [];
 
   return (
-    <div className={positionClassName || "absolute top-3 left-1/2 -translate-x-1/2 z-30 w-auto max-w-[92vw] pointer-events-none animate-in fade-in slide-in-from-top-2 duration-200"}>
-      <div className="pointer-events-auto bg-[#0F172A]/95 backdrop-blur-md border border-rose-500/50 rounded-full px-3.5 py-1.5 shadow-2xl flex items-center gap-2 text-white">
-        <div className="w-6 h-6 rounded-full bg-rose-500/20 text-rose-400 flex items-center justify-center shrink-0">
+    <div className={positionClassName || "absolute bottom-20 sm:bottom-6 left-1/2 -translate-x-1/2 z-30 w-auto max-w-[92vw] pointer-events-none animate-in fade-in slide-in-from-bottom-2 duration-200"}>
+      <div className="pointer-events-auto bg-slate-900/95 backdrop-blur-md border border-amber-500/40 rounded-full px-3.5 py-1.5 shadow-2xl flex items-center gap-2 text-white">
+        <div className="w-6 h-6 rounded-full bg-amber-500/15 text-amber-400 flex items-center justify-center shrink-0">
           <Ruler className="w-3.5 h-3.5" />
         </div>
 
         <div className="flex items-center gap-1.5 text-xs">
-          <span className="font-mono font-black text-rose-400">{formattedDist}</span>
+          <span className="font-mono font-bold text-amber-400">{formattedDist}</span>
           <span className="text-[10px] text-slate-400 font-semibold">({validPoints.length} pts)</span>
         </div>
 
@@ -58,7 +58,7 @@ export const MeasurementControlBar: React.FC<MeasurementControlBarProps> = ({
         <button
           onClick={onAddCurrentGpsPoint}
           title="Adicionar Ponto no GPS Atual"
-          className="p-1 text-sky-400 hover:text-sky-300 rounded-full active:scale-95 transition-transform cursor-pointer"
+          className="p-1 text-emerald-400 hover:text-emerald-300 rounded-full active:scale-95 transition-transform cursor-pointer"
         >
           <Crosshair className="w-4 h-4" />
         </button>

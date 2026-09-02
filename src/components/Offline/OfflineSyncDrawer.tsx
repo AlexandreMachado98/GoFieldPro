@@ -49,25 +49,13 @@ export const OfflineSyncDrawer: React.FC = () => {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 sm:flex sm:flex-wrap items-center gap-2 w-full sm:w-auto shrink-0">
+        <div className="flex items-center gap-2 w-full sm:w-auto shrink-0">
           <button
             onClick={() => setIsDownloadModalOpen(true)}
-            className="w-full sm:w-auto px-4 py-2.5 rounded-xl text-xs font-bold bg-emerald-600 hover:bg-emerald-500 text-white flex items-center justify-center gap-1.5 shadow-lg transition-all active:scale-95 border border-emerald-400/40"
+            className="w-full sm:w-auto px-4 py-2.5 rounded-xl text-xs font-bold bg-emerald-500 hover:bg-emerald-400 text-slate-950 flex items-center justify-center gap-1.5 shadow-md transition-all active:scale-95 cursor-pointer"
           >
             <Download className="w-4 h-4" />
             <span>Baixar Mapa Offline</span>
-          </button>
-
-          <button
-            id="btn-toggle-field-offline-mode"
-            onClick={() => setIsOffline(!isOffline)}
-            className={`w-full sm:w-auto px-4 py-2.5 rounded-xl text-xs font-bold flex items-center justify-center transition-all ${
-              isOffline
-                ? 'bg-amber-600 hover:bg-amber-500 text-white shadow-lg'
-                : 'bg-slate-800 hover:bg-slate-700 text-slate-300'
-            }`}
-          >
-            {isOffline ? 'Simular Reconexão (Online)' : 'Simular Modo Offline'}
           </button>
         </div>
       </div>
@@ -76,10 +64,10 @@ export const OfflineSyncDrawer: React.FC = () => {
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         <div className="bg-slate-900 border border-slate-800 p-4 rounded-2xl shadow-xl">
           <div className="text-[10px] text-slate-400 uppercase font-semibold flex items-center gap-1">
-            <HardDrive className="w-3.5 h-3.5 text-sky-400" />
+            <HardDrive className="w-3.5 h-3.5 text-slate-300" />
             Armazenamento Local Utilizado
           </div>
-          <div className="text-2xl font-black font-mono text-white mt-1">
+          <div className="text-2xl font-bold font-mono text-white mt-1">
             {cachedStorageMB.toFixed(1)} <span className="text-xs font-normal text-slate-400">MB</span>
           </div>
           <div className="text-[11px] text-slate-400 mt-1">Limite alocado: 500 MB (IndexedDB)</div>
@@ -90,7 +78,7 @@ export const OfflineSyncDrawer: React.FC = () => {
             <Layers className="w-3.5 h-3.5 text-emerald-400" />
             Mapas e Folhas Pré-Carregadas
           </div>
-          <div className="text-2xl font-black font-mono text-white mt-1">
+          <div className="text-2xl font-bold font-mono text-white mt-1">
             {layers.filter((l) => l.isOfflineCached).length} <span className="text-xs font-normal text-slate-400">camadas</span>
           </div>
           <div className="text-[11px] text-emerald-400 mt-1">Disponíveis para zoom 10-18 offline</div>
@@ -98,10 +86,10 @@ export const OfflineSyncDrawer: React.FC = () => {
 
         <div className="bg-slate-900 border border-slate-800 p-4 rounded-2xl shadow-xl">
           <div className="text-[10px] text-slate-400 uppercase font-semibold flex items-center gap-1">
-            <RefreshCw className="w-3.5 h-3.5 text-purple-400" />
+            <RefreshCw className="w-3.5 h-3.5 text-amber-400" />
             Fila de Envio Pendente
           </div>
-          <div className="text-2xl font-black font-mono text-purple-400 mt-1">
+          <div className="text-2xl font-bold font-mono text-amber-400 mt-1">
             {offlineQueue.length} <span className="text-xs font-normal text-slate-400">itens</span>
           </div>
           <div className="text-[11px] text-slate-400 mt-1">
@@ -122,7 +110,7 @@ export const OfflineSyncDrawer: React.FC = () => {
             id="btn-trigger-manual-sync-queue"
             onClick={triggerManualSync}
             disabled={isSyncing}
-            className="bg-sky-600 hover:bg-sky-500 disabled:bg-sky-900 text-white font-bold text-xs px-4 py-2 rounded-xl flex items-center gap-1.5 shadow-lg transition-colors"
+            className="bg-slate-800 hover:bg-slate-700 disabled:bg-slate-900 border border-slate-700 text-white font-bold text-xs px-4 py-2 rounded-xl flex items-center gap-1.5 shadow transition-colors cursor-pointer"
           >
             <RefreshCw className={`w-3.5 h-3.5 ${isSyncing ? 'animate-spin' : ''}`} />
             {isSyncing ? t.syncing : t.syncNow}

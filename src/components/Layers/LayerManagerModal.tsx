@@ -203,9 +203,9 @@ export const LayerManagerModal: React.FC = () => {
           <button
             id="tab-active-layers"
             onClick={() => { setActiveSubTab('layers'); setSelectedLayerForFeatures(null); }}
-            className={`py-3 px-3 sm:px-4 text-xs font-bold border-b-2 transition-colors flex items-center gap-1.5 whitespace-nowrap shrink-0 ${
+            className={`py-3 px-3 sm:px-4 text-xs font-bold border-b-2 transition-colors flex items-center gap-1.5 whitespace-nowrap shrink-0 cursor-pointer ${
               activeSubTab === 'layers'
-                ? 'border-sky-500 text-sky-400'
+                ? 'border-emerald-500 text-emerald-400'
                 : 'border-transparent text-slate-400 hover:text-slate-200'
             }`}
           >
@@ -220,7 +220,7 @@ export const LayerManagerModal: React.FC = () => {
                 className="hidden"
                 data-old-class={`py-3 px-4 text-xs font-bold border-b-2 transition-colors flex items-center gap-1.5 ${
                   activeSubTab === 'import_pdf'
-                    ? 'border-sky-500 text-sky-400'
+                    ? 'border-emerald-500 text-emerald-400'
                     : 'border-transparent text-slate-400 hover:text-slate-200'
                 }`}
               >
@@ -231,9 +231,9 @@ export const LayerManagerModal: React.FC = () => {
               <button
                 id="tab-import-kml"
                 onClick={() => setActiveSubTab('import_kml')}
-                className={`py-3 px-3 sm:px-4 text-xs font-bold border-b-2 transition-colors flex items-center gap-1.5 whitespace-nowrap shrink-0 ${
+                className={`py-3 px-3 sm:px-4 text-xs font-bold border-b-2 transition-colors flex items-center gap-1.5 whitespace-nowrap shrink-0 cursor-pointer ${
                   activeSubTab === 'import_kml'
-                    ? 'border-sky-500 text-sky-400'
+                    ? 'border-emerald-500 text-emerald-400'
                     : 'border-transparent text-slate-400 hover:text-slate-200'
                 }`}
               >
@@ -246,9 +246,9 @@ export const LayerManagerModal: React.FC = () => {
           <button
             id="tab-select-basemap"
             onClick={() => setActiveSubTab('basemap')}
-            className={`py-3 px-3 sm:px-4 text-xs font-bold border-b-2 transition-colors flex items-center gap-1.5 whitespace-nowrap shrink-0 ${
+            className={`py-3 px-3 sm:px-4 text-xs font-bold border-b-2 transition-colors flex items-center gap-1.5 whitespace-nowrap shrink-0 cursor-pointer ${
               activeSubTab === 'basemap'
-                ? 'border-sky-500 text-sky-400'
+                ? 'border-emerald-500 text-emerald-400'
                 : 'border-transparent text-slate-400 hover:text-slate-200'
             }`}
           >
