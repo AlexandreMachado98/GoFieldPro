@@ -142,12 +142,25 @@ export async function parseGeoPdfMetadata(
             // In Geographic Lat/Lng: check order (Lat, Lng vs Lng, Lat)
             let lat = val1;
             let lng = val2;
+
+            // If coordinates were exported without minus signs in South America (Lat: 0..35, Lng: 30..75)
+            if (lat > 0 && lat < 35 && lng > 30 && lng < 75) {
+              lat = -lat;
+              lng = -lng;
+            } else if (lng > 0 && lng < 35 && lat > 30 && lat < 75) {
+              // Swapped positive
+              const tmp = lat;
+              lat = -lng;
+              lng = -tmp;
+            }
+
             if (Math.abs(val1) > 90 && Math.abs(val2) <= 90) {
               lng = val1;
               lat = val2;
-            } else if (Math.abs(val1) > Math.abs(val2) && val1 < -30 && val2 < 0 && val2 > -35) {
-              lng = val1;
-              lat = val2;
+            } else if (Math.abs(lat) > Math.abs(lng) && lat < -30 && lng > -35 && lng < 0) {
+              const tmp = lat;
+              lat = lng;
+              lng = tmp;
             }
             groundPoints.push({ lat: +lat.toFixed(7), lng: +lng.toFixed(7) });
           }
