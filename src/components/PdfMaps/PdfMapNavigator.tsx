@@ -185,6 +185,7 @@ export const PdfMapNavigator: React.FC = () => {
     notifyInfo,
     showConfirm,
     setActiveTab,
+    setNavTarget,
   } = useApp();
   
   // Storage state
@@ -3145,6 +3146,35 @@ export const PdfMapNavigator: React.FC = () => {
                 </div>
               </div>
               <div className="flex items-center gap-1.5 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (activeDoc?.calibration?.ref1 && activeDoc?.calibration?.ref2 && currentGps) {
+                      let cLat = (activeDoc.calibration.ref1.lat + activeDoc.calibration.ref2.lat) / 2;
+                      let cLng = (activeDoc.calibration.ref1.lng + activeDoc.calibration.ref2.lng) / 2;
+                      if (currentGps.lat < 0 && cLat > 0 && cLat < 35) cLat = -cLat;
+                      if (currentGps.lng < 0 && cLng > 30 && cLng < 75) cLng = -cLng;
+
+                      setNavTarget({
+                        id: activeDoc.id,
+                        name: `Planta: ${activeDoc.name}`,
+                        lat: cLat,
+                        lng: cLng,
+                        distanceMeters: Math.round((distanceToMapKm || 0) * 1000),
+                        bearingDegrees: 0,
+                        azimuthString: '',
+                        estimatedTimeArrivalMin: Math.max(1, Math.round(((distanceToMapKm || 0) * 1000) / (4000 / 60))),
+                        crossTrackErrorMeters: 0,
+                      });
+                      setActiveTab('map');
+                    }
+                  }}
+                  className="px-2.5 py-1.5 bg-slate-900 border border-slate-700 hover:border-emerald-500 text-emerald-400 hover:text-white font-bold text-xs rounded-xl shadow active:scale-95 transition cursor-pointer flex items-center gap-1"
+                  title="Traçar Rota até a Planta no Mapa Satélite"
+                >
+                  <Navigation className="w-3.5 h-3.5" />
+                  <span>Navegar</span>
+                </button>
                 <button
                   type="button"
                   onClick={() => {
