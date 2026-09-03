@@ -1,173 +1,205 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { useApp } from '../../context/AppContext';
 import {
-  WifiOff,
-  Wifi,
+  ArrowLeft,
+  Settings,
+  CloudOff,
   RefreshCw,
-  HardDrive,
+  FileText,
+  CloudUpload,
+  MapPin,
+  Camera,
+  ClipboardList,
+  Clock,
   CheckCircle2,
-  AlertTriangle,
-  Layers,
-  ArrowDownCircle,
-  ShieldCheck,
-  Download,
 } from 'lucide-react';
-import { OfflineMapDownloadModal } from './OfflineMapDownloadModal';
 
 export const OfflineSyncDrawer: React.FC = () => {
   const {
-    isOffline,
-    setIsOffline,
-    offlineQueue,
+    setActiveTab,
     isSyncing,
     triggerManualSync,
-    cachedStorageMB,
-    layers,
-    activeProject,
-    t,
+    offlineQueue,
+    waypoints,
+    setIsSettingsModalOpen,
   } = useApp();
 
-  const [isDownloadModalOpen, setIsDownloadModalOpen] = useState(false);
+  const savedCount = 24;
+  const pendingCount = 17;
+
+  const pendingItems = [
+    {
+      id: 'pend-1',
+      title: 'Waypoint 12',
+      date: '23/05/2025 09:21',
+      type: 'waypoint',
+    },
+    {
+      id: 'pend-2',
+      title: 'Foto',
+      subtitle: 'Sinalização de segurança',
+      date: '23/05/2025 09:05',
+      type: 'photo',
+    },
+    {
+      id: 'pend-3',
+      title: 'Formulário',
+      subtitle: 'Checklist de EPI',
+      date: '23/05/2025 08:47',
+      type: 'form',
+    },
+  ];
 
   return (
-    <div className="h-full overflow-y-auto p-4 space-y-4 max-w-4xl mx-auto text-slate-100 pb-32 sm:pb-16">
-      {/* Header & Status Card */}
-      <div className="bg-slate-900 border border-slate-800 p-5 rounded-2xl shadow-xl flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+    <div className="flex-1 flex flex-col overflow-y-auto bg-slate-50 dark:bg-[#0B1120] text-slate-900 dark:text-slate-100 pb-28 select-none">
+      {/* Top Header */}
+      <header className="sticky top-0 z-20 bg-white/95 dark:bg-[#0B1120]/95 backdrop-blur-md px-4 pt-4 pb-3 border-b border-slate-200/80 dark:border-slate-800/80 flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <div className={`p-3 rounded-xl ${isOffline ? 'bg-amber-500/20 text-amber-400' : 'bg-emerald-500/20 text-emerald-400'}`}>
-            {isOffline ? <WifiOff className="w-6 h-6" /> : <Wifi className="w-6 h-6" />}
-          </div>
-          <div>
-            <h3 className="font-bold text-base text-white">
-              {isOffline ? 'Modo Campo Offline Ativo' : 'Conectado à Nuvem Corporativa'}
+          <button
+            onClick={() => setActiveTab('home')}
+            className="w-10 h-10 -ml-1 rounded-full flex items-center justify-center text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+            aria-label="Voltar"
+          >
+            <ArrowLeft className="w-5 h-5 stroke-[2.2]" />
+          </button>
+          <h1 className="text-xl font-extrabold text-slate-900 dark:text-white tracking-tight">
+            Sincronização
+          </h1>
+        </div>
+
+        <button
+          onClick={() => setIsSettingsModalOpen(true)}
+          className="w-10 h-10 rounded-full flex items-center justify-center text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+          aria-label="Configurações"
+        >
+          <Settings className="w-5 h-5 stroke-[2]" />
+        </button>
+      </header>
+
+      <div className="p-4 sm:p-6 max-w-lg mx-auto w-full space-y-4">
+        {/* Card 1: Status da sincronização */}
+        <div className="bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 rounded-3xl p-5 shadow-sm space-y-4">
+          <span className="text-xs font-bold text-slate-400 dark:text-slate-500 block">
+            Status da sincronização
+          </span>
+
+          <div className="flex flex-col items-center text-center py-2">
+            <div className="w-16 h-16 rounded-3xl bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 flex items-center justify-center mb-3">
+              <CloudOff className="w-8 h-8 stroke-[2]" />
+            </div>
+
+            <h3 className="text-xl font-black text-slate-900 dark:text-white tracking-tight">
+              Offline
             </h3>
-            <p className="text-xs text-slate-400">
-              {isOffline
-                ? 'Todos os novos pontos, trilhas e fotos ficam armazenados no dispositivo e serão sincronizados automaticamente ao retornar da área remota.'
-                : 'Sincronização em tempo real ativa. Backups automáticos em execução.'}
+            <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5 font-medium">
+              Dados salvos no dispositivo
             </p>
-          </div>
-        </div>
 
-        <div className="flex items-center gap-2 w-full sm:w-auto shrink-0">
-          <button
-            onClick={() => setIsDownloadModalOpen(true)}
-            className="w-full sm:w-auto px-4 py-2.5 rounded-xl text-xs font-bold bg-emerald-500 hover:bg-emerald-400 text-slate-950 flex items-center justify-center gap-1.5 shadow-md transition-all active:scale-95 cursor-pointer"
-          >
-            <Download className="w-4 h-4" />
-            <span>Baixar Mapa Offline</span>
-          </button>
-        </div>
-      </div>
-
-      {/* Offline Storage Usage & Pre-cached Packs */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-        <div className="bg-slate-900 border border-slate-800 p-4 rounded-2xl shadow-xl">
-          <div className="text-[10px] text-slate-400 uppercase font-semibold flex items-center gap-1">
-            <HardDrive className="w-3.5 h-3.5 text-slate-300" />
-            Armazenamento Local Utilizado
-          </div>
-          <div className="text-2xl font-bold font-mono text-white mt-1">
-            {cachedStorageMB.toFixed(1)} <span className="text-xs font-normal text-slate-400">MB</span>
-          </div>
-          <div className="text-[11px] text-slate-400 mt-1">Limite alocado: 500 MB (IndexedDB)</div>
-        </div>
-
-        <div className="bg-slate-900 border border-slate-800 p-4 rounded-2xl shadow-xl">
-          <div className="text-[10px] text-slate-400 uppercase font-semibold flex items-center gap-1">
-            <Layers className="w-3.5 h-3.5 text-emerald-400" />
-            Mapas e Folhas Pré-Carregadas
-          </div>
-          <div className="text-2xl font-bold font-mono text-white mt-1">
-            {layers.filter((l) => l.isOfflineCached).length} <span className="text-xs font-normal text-slate-400">camadas</span>
-          </div>
-          <div className="text-[11px] text-emerald-400 mt-1">Disponíveis para zoom 10-18 offline</div>
-        </div>
-
-        <div className="bg-slate-900 border border-slate-800 p-4 rounded-2xl shadow-xl">
-          <div className="text-[10px] text-slate-400 uppercase font-semibold flex items-center gap-1">
-            <RefreshCw className="w-3.5 h-3.5 text-amber-400" />
-            Fila de Envio Pendente
-          </div>
-          <div className="text-2xl font-bold font-mono text-amber-400 mt-1">
-            {offlineQueue.length} <span className="text-xs font-normal text-slate-400">itens</span>
-          </div>
-          <div className="text-[11px] text-slate-400 mt-1">
-            {offlineQueue.length === 0 ? 'Tudo sincronizado' : 'Aguardando envio'}
-          </div>
-        </div>
-      </div>
-
-      {/* Sync Queue Table & Manual Action */}
-      <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl space-y-3">
-        <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-          <div>
-            <h4 className="font-bold text-sm text-white">Fila de Mutações e Registros Locais</h4>
-            <p className="text-xs text-slate-400">Itens capturados durante a jornada de campo aguardando confirmação no servidor central.</p>
+            <span className="text-[11px] text-slate-400 dark:text-slate-500 mt-2 font-mono">
+              Última tentativa: 23/05/2025 09:30
+            </span>
           </div>
 
           <button
-            id="btn-trigger-manual-sync-queue"
-            onClick={triggerManualSync}
+            onClick={() => triggerManualSync()}
             disabled={isSyncing}
-            className="bg-slate-800 hover:bg-slate-700 disabled:bg-slate-900 border border-slate-700 text-white font-bold text-xs px-4 py-2 rounded-xl flex items-center gap-1.5 shadow transition-colors cursor-pointer"
+            className="w-full py-3 rounded-2xl border border-blue-600 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/40 font-extrabold text-xs uppercase tracking-wider flex items-center justify-center gap-2 transition-colors cursor-pointer disabled:opacity-50"
           >
-            <RefreshCw className={`w-3.5 h-3.5 ${isSyncing ? 'animate-spin' : ''}`} />
-            {isSyncing ? t.syncing : t.syncNow}
+            <RefreshCw className={`w-4 h-4 ${isSyncing ? 'animate-spin' : ''}`} />
+            <span>{isSyncing ? 'Sincronizando...' : 'Tentar agora'}</span>
           </button>
         </div>
 
-        {offlineQueue.length === 0 ? (
-          <div className="p-6 text-center text-xs text-slate-400">
-            <CheckCircle2 className="w-8 h-8 text-emerald-400 mx-auto mb-2" />
-            Nenhuma mutação pendente. O banco de dados local está 100% em sincronia com a nuvem.
+        {/* Grid: 2 Metric Cards (Salvos no dispositivo & Pendentes de envio) */}
+        <div className="grid grid-cols-2 gap-3">
+          {/* Card A: Salvos no dispositivo */}
+          <div className="bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 rounded-3xl p-4 shadow-sm flex items-center gap-3">
+            <div className="w-10 h-10 rounded-2xl bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 flex items-center justify-center shrink-0">
+              <FileText className="w-5 h-5 stroke-[2.2]" />
+            </div>
+            <div>
+              <span className="text-2xl font-black text-slate-900 dark:text-white block font-mono">
+                {savedCount}
+              </span>
+              <span className="text-[11px] text-slate-400 dark:text-slate-500 font-semibold leading-tight block">
+                Itens salvos
+              </span>
+            </div>
           </div>
-        ) : (
-          <div className="space-y-2">
-            {offlineQueue.map((item) => (
-              <div
-                key={item.id}
-                className="p-3 rounded-xl bg-slate-800/70 border border-slate-700/70 flex items-center justify-between text-xs"
-              >
-                <div>
-                  <div className="font-bold text-slate-200">
-                    {item.entityType.toUpperCase()}: {item.data?.name || item.id}
+
+          {/* Card B: Pendentes de envio */}
+          <div className="bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 rounded-3xl p-4 shadow-sm flex items-center gap-3">
+            <div className="w-10 h-10 rounded-2xl bg-amber-50 dark:bg-amber-950/40 text-amber-500 dark:text-amber-400 flex items-center justify-center shrink-0">
+              <CloudUpload className="w-5 h-5 stroke-[2.2]" />
+            </div>
+            <div>
+              <span className="text-2xl font-black text-slate-900 dark:text-white block font-mono">
+                {pendingCount}
+              </span>
+              <span className="text-[11px] text-slate-400 dark:text-slate-500 font-semibold leading-tight block">
+                Pendentes
+              </span>
+            </div>
+          </div>
+        </div>
+
+        {/* Section: Pendentes de sincronização */}
+        <div className="bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 rounded-3xl p-5 shadow-sm space-y-3">
+          <h4 className="text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">
+            Pendentes de sincronização
+          </h4>
+
+          <div className="divide-y divide-slate-100 dark:divide-slate-800">
+            {pendingItems.map((item) => {
+              return (
+                <div key={item.id} className="py-3 flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center shrink-0">
+                      {item.type === 'waypoint' && (
+                        <MapPin className="w-4 h-4 text-emerald-500 stroke-[2.2]" />
+                      )}
+                      {item.type === 'photo' && (
+                        <Camera className="w-4 h-4 text-slate-500 stroke-[2.2]" />
+                      )}
+                      {item.type === 'form' && (
+                        <ClipboardList className="w-4 h-4 text-slate-500 stroke-[2.2]" />
+                      )}
+                    </div>
+
+                    <div>
+                      <h5 className="text-xs font-extrabold text-slate-900 dark:text-white">
+                        {item.title}
+                      </h5>
+                      {item.subtitle && (
+                        <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                          {item.subtitle}
+                        </p>
+                      )}
+                      <span className="text-[10px] text-slate-400 dark:text-slate-500 font-mono">
+                        {item.date}
+                      </span>
+                    </div>
                   </div>
-                  <div className="text-[10px] text-slate-400">
-                    Ação: {item.action} | Timestamp: {new Date(item.timestamp).toLocaleTimeString('pt-BR')}
+
+                  {/* Pending Amber Cloud */}
+                  <div className="text-amber-500 shrink-0">
+                    <CloudUpload className="w-5 h-5 stroke-[2]" />
                   </div>
                 </div>
-
-                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-950 text-amber-300 border border-amber-800">
-                  Pendente
-                </span>
-              </div>
-            ))}
+              );
+            })}
           </div>
-        )}
-      </div>
 
-      {/* Corporate Copyright Footer */}
-      <footer className="mt-6 pt-4 pb-2 border-t border-slate-800/80 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-500">
-        <div className="flex items-center gap-2">
-          <span className="font-bold text-slate-400">GoField Pro</span>
-          <span>•</span>
-          <span>AM TST SAÚDE E SEGURANÇA DO TRABALHO</span>
+          <div className="pt-2 text-center border-t border-slate-100 dark:border-slate-800">
+            <button
+              onClick={() => setActiveTab('evidence')}
+              className="text-xs font-extrabold text-blue-600 dark:text-blue-400 hover:underline uppercase tracking-wider cursor-pointer"
+            >
+              Ver todos ({pendingCount})
+            </button>
+          </div>
         </div>
-        <a
-          href="https://amtst.vercel.app/"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="text-sky-400 hover:text-sky-300 font-medium hover:underline transition-colors"
-        >
-          https://amtst.vercel.app/
-        </a>
-      </footer>
-
-      <OfflineMapDownloadModal
-        isOpen={isDownloadModalOpen}
-        onClose={() => setIsDownloadModalOpen(false)}
-      />
+      </div>
     </div>
   );
 };

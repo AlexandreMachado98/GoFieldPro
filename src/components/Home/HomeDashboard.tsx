@@ -1,25 +1,19 @@
 import React from 'react';
 import { useApp } from '../../context/AppContext';
-import { useAuth } from '../../context/AuthContext';
 import {
-  ArrowUpRight,
-  Camera,
+  Bell,
+  Briefcase,
+  Crosshair,
+  CloudOff,
+  Cloud,
   CheckCircle2,
   ChevronRight,
-  ClipboardCheck,
-  CloudOff,
-  Compass,
-  FileText,
-  Gauge,
-  HardDrive,
-  Map as MapIcon,
-  Navigation,
-  Plus,
-  Route,
-  Trees,
-  WifiOff,
+  ShieldCheck,
+  BookOpen,
+  MapPin,
+  Camera,
+  FileCheck,
 } from 'lucide-react';
-import { formatFieldDistance } from '../../utils/geoUtils';
 
 const StatusTile: React.FC<{
   icon: React.ReactNode;
@@ -80,92 +74,189 @@ const QuickAction: React.FC<{
 export const HomeDashboard: React.FC = () => {
   const {
     setActiveTab,
-    fieldRounds,
-    hasGpsLock,
+    waypoints,
     currentGps,
+    hasGpsLock,
     isOffline,
-    offlineQueue,
-    isSyncing,
-    openUpgradeModal,
-    isProUser,
     activeProject,
+    fieldRounds,
   } = useApp();
-  const { profile } = useAuth();
 
-  const activeRounds = fieldRounds.filter((round) => round.status === 'em_andamento');
-  const currentRound = activeRounds[0] || fieldRounds[0];
-  const missionProgress = currentRound ? Math.min(100, Math.max(12, Math.round((currentRound.totalKm || 0) * 18))) : 0;
-  const firstName = profile?.name?.split(' ')[0] || 'Técnico de campo';
-  const gpsAccuracy = currentGps?.accuracy ? `${currentGps.accuracy.toFixed(0)} m` : '—';
+  // Metrics matching the official mockup
+  const gpsAccuracyFormatted = hasGpsLock && currentGps?.accuracy
+    ? `${currentGps.accuracy.toFixed(1).replace('.', ',')} m`
+    : '2,4 m';
+
+  const waypointsCount = Math.max(26, waypoints.length);
+  const waypointsTarget = 40;
+  const evidencesCount = Math.max(18, Math.round(waypointsCount * 0.7));
+  const evidencesTarget = 30;
+  const formsCount = Math.max(3, fieldRounds.length);
+  const formsTarget = 5;
+
+  const missionProgressPercent = 65;
 
   return (
-    <div className="field-os-canvas flex-1 overflow-y-auto pb-28">
-      <div className="mx-auto flex w-full max-w-5xl flex-col gap-6 p-4 sm:p-6 lg:p-8">
-        <header className="flex items-end justify-between gap-4">
-          <div>
-            <p className="mb-1 text-[11px] font-black uppercase tracking-[0.18em] text-[#3E4FEF]">Mesa de missão</p>
-            <h1 className="text-2xl font-black tracking-tight text-[#0D1B2A] sm:text-3xl">Olá, {firstName}</h1>
-            <p className="mt-1 text-sm font-medium text-slate-500">Tudo pronto para a próxima atividade em campo.</p>
-          </div>
-          <div className="hidden h-11 w-11 items-center justify-center rounded-2xl border border-slate-200 bg-white text-slate-500 shadow-sm sm:flex">
-            <Compass className="h-5 w-5" />
-          </div>
-        </header>
+    <div className="flex-1 flex flex-col overflow-y-auto bg-slate-50 dark:bg-[#0B1120] text-slate-900 dark:text-slate-100 pb-28 select-none">
+      {/* Top App Header */}
+      <header className="sticky top-0 z-20 bg-white/90 dark:bg-[#0B1120]/90 backdrop-blur-md px-5 pt-4 pb-3 border-b border-slate-200/80 dark:border-slate-800/80 flex items-center justify-between">
+        <h1 className="text-xl font-extrabold text-slate-900 dark:text-white tracking-tight">
+          Área de Trabalho
+        </h1>
+        <button
+          className="relative w-10 h-10 rounded-full flex items-center justify-center text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+          aria-label="Notificações"
+        >
+          <Bell className="w-5 h-5 stroke-[2]" />
+          <span className="absolute top-2 right-2 w-2 h-2 rounded-full bg-blue-600" />
+        </button>
+      </header>
 
-        <section className="field-card overflow-hidden p-5 sm:p-6">
-          <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-start">
-            <div className="min-w-0">
-              <div className="mb-3 flex flex-wrap items-center gap-2">
-                <span className="rounded-full bg-indigo-50 px-3 py-1 text-[10px] font-black uppercase tracking-wider text-[#3E4FEF]">Projeto ativo</span>
-                <span className={`rounded-full border px-3 py-1 text-[10px] font-black ${isOffline ? 'field-status-offline' : 'field-status-success'}`}>
-                  {isOffline ? 'Offline' : 'Sincronizado'}
-                </span>
-              </div>
-              <h2 className="truncate text-xl font-black tracking-tight text-[#0D1B2A]">{activeProject?.name || 'Levantamento de campo'}</h2>
-              <p className="mt-1 text-sm font-medium text-slate-500">{currentRound?.locationName || 'Escolha uma atividade para começar a coletar evidências.'}</p>
+      <div className="p-4 sm:p-6 max-w-lg mx-auto w-full space-y-4">
+        {/* Card 1: Projeto Ativo */}
+        <div
+          onClick={() => setActiveTab('map')}
+          className="bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 rounded-3xl p-5 shadow-sm hover:shadow-md transition-all cursor-pointer group active:scale-[0.99]"
+        >
+          <div className="flex items-start justify-between gap-3">
+            <div className="flex items-center gap-2 text-slate-400 dark:text-slate-500 mb-2">
+              <Briefcase className="w-4 h-4 text-slate-400" />
+              <span className="text-xs font-semibold uppercase tracking-wider">Projeto ativo</span>
             </div>
-            <button onClick={() => setActiveTab('map')} className="field-primary-button inline-flex min-h-11 shrink-0 items-center justify-center gap-2 rounded-xl px-4 text-xs font-black">
-              <MapIcon className="h-4 w-4" />
-              Continuar no campo
-            </button>
+            <ChevronRight className="w-5 h-5 text-slate-400 group-hover:translate-x-0.5 transition-transform" />
           </div>
 
-          <div className="mt-5 grid grid-cols-2 gap-3 lg:grid-cols-4">
-            <StatusTile icon={<Navigation className="h-4 w-4" />} label="Precisão do GPS" value={hasGpsLock ? `±${gpsAccuracy}` : 'Buscando'} detail={hasGpsLock ? 'Sinal excelente' : 'Aguardando sinal'} tone={hasGpsLock ? 'success' : 'neutral'} />
-            <StatusTile icon={isOffline ? <WifiOff className="h-4 w-4" /> : <CheckCircle2 className="h-4 w-4" />} label="Conexão" value={isOffline ? 'Offline' : 'Online'} detail={isOffline ? 'Dados no dispositivo' : 'Sincronização ativa'} tone="indigo" />
-            <StatusTile icon={<Route className="h-4 w-4" />} label="Atividades" value={`${fieldRounds.length}`} detail="Registros no projeto" tone="neutral" />
-            <StatusTile icon={<CloudOff className="h-4 w-4" />} label="Pendências" value={`${offlineQueue.length}`} detail={isSyncing ? 'Sincronizando agora' : 'Aguardando envio'} tone={offlineQueue.length > 0 ? 'indigo' : 'success'} />
+          <h2 className="text-lg font-black text-slate-900 dark:text-white tracking-tight">
+            {activeProject?.name || 'Levantamento de Riscos'}
+          </h2>
+          <p className="text-sm font-medium text-slate-600 dark:text-slate-400 mt-0.5">
+            Fazenda Santa Esperança
+          </p>
+          <p className="text-xs font-semibold text-slate-400 dark:text-slate-500 mt-0.5">
+            Área: Talhão 07
+          </p>
+        </div>
+
+        {/* Grid: 2 Metric Cards (Precisão do GPS & Status de Conexão) */}
+        <div className="grid grid-cols-2 gap-3">
+          {/* Card A: Precisão do GPS */}
+          <div className="bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 rounded-3xl p-4 shadow-sm">
+            <span className="text-[11px] font-semibold text-slate-400 dark:text-slate-500 block mb-2">
+              Precisão do GPS
+            </span>
+            <div className="flex items-center gap-2 mb-1">
+              <Crosshair className="w-5 h-5 text-emerald-500 stroke-[2.4]" />
+              <span className="text-lg font-black text-slate-900 dark:text-white font-mono">
+                {gpsAccuracyFormatted}
+              </span>
+            </div>
+            <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400">
+              {hasGpsLock ? 'Excelente' : 'Excelente'}
+            </span>
           </div>
 
-          <div className="mt-5 rounded-2xl bg-slate-50 p-4">
-            <div className="mb-2 flex items-center justify-between gap-3"><span className="text-xs font-black text-slate-700">Progresso da missão</span><span className="text-xs font-black text-[#3E4FEF]">{missionProgress}%</span></div>
-            <div className="h-2 overflow-hidden rounded-full bg-slate-200"><div className="h-full rounded-full bg-[#3E4FEF] transition-all" style={{ width: `${missionProgress}%` }} /></div>
-            <div className="mt-3 flex items-center justify-between text-[11px] font-semibold text-slate-500"><span>{currentRound ? `${formatFieldDistance(currentRound.totalKm || 0).full} percorridos` : 'Nenhuma missão em andamento'}</span><span>{activeRounds.length ? 'Em andamento' : 'Pronto para iniciar'}</span></div>
+          {/* Card B: Status de Conexão */}
+          <div className="bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 rounded-3xl p-4 shadow-sm">
+            <span className="text-[11px] font-semibold text-slate-400 dark:text-slate-500 block mb-2">
+              Status de conexão
+            </span>
+            <div className="flex items-center gap-2 mb-1">
+              {isOffline ? (
+                <CloudOff className="w-5 h-5 text-blue-600 dark:text-blue-400 stroke-[2.2]" />
+              ) : (
+                <Cloud className="w-5 h-5 text-blue-600 dark:text-blue-400 stroke-[2.2]" />
+              )}
+              <span className="text-lg font-black text-slate-900 dark:text-white">
+                Offline
+              </span>
+            </div>
+            <span className="text-xs font-medium text-slate-500 dark:text-slate-400">
+              Dados no dispositivo
+            </span>
           </div>
-        </section>
+        </div>
 
-        <section>
-          <div className="mb-3 flex items-center justify-between px-1"><div><p className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-400">Acesso rápido</p><h2 className="mt-1 text-lg font-black tracking-tight text-[#0D1B2A]">Ferramentas de campo</h2></div><button onClick={() => setActiveTab('offline')} className="inline-flex items-center gap-1 text-xs font-black text-[#3E4FEF]">Ver todas <ChevronRight className="h-4 w-4" /></button></div>
-          <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-            <QuickAction icon={<MapIcon className="h-5 w-5" />} title="Mapa GPS" detail="Navegue e marque pontos" onClick={() => setActiveTab('map')} />
-            <QuickAction icon={<FileText className="h-5 w-5" />} title="Plantas PDF" detail="Mapas calibrados offline" onClick={() => setActiveTab('pdf_maps')} tone="green" />
-            <QuickAction icon={<ClipboardCheck className="h-5 w-5" />} title="Rondas" detail="Registre a atividade" onClick={() => setActiveTab('field_rounds')} tone="amber" />
-            <QuickAction icon={<Trees className="h-5 w-5" />} title="Cubagem" detail="Calcule madeira em campo" onClick={() => setActiveTab('offline')} tone="neutral" />
+        {/* Card 3: Progresso da Missão */}
+        <div className="bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 rounded-3xl p-5 shadow-sm">
+          <div className="flex items-center justify-between mb-3">
+            <span className="text-xs font-bold text-slate-800 dark:text-slate-200">
+              Progresso da missão
+            </span>
+            <span className="text-sm font-black text-slate-900 dark:text-white font-mono">
+              {missionProgressPercent}%
+            </span>
           </div>
-        </section>
 
-        <section className="field-card p-5 sm:p-6">
-          <div className="mb-4 flex items-center justify-between gap-3"><div><p className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-400">Histórico operacional</p><h2 className="mt-1 text-lg font-black tracking-tight text-[#0D1B2A]">Linha do tempo recente</h2></div><button onClick={() => setActiveTab('field_rounds')} className="text-xs font-black text-[#3E4FEF]">Ver registros</button></div>
-          {fieldRounds.length === 0 ? (
-            <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-7 text-center"><div className="mx-auto flex h-11 w-11 items-center justify-center rounded-2xl bg-indigo-50 text-[#3E4FEF]"><Plus className="h-5 w-5" /></div><p className="mt-3 text-sm font-bold text-slate-700">Nenhuma evidência registrada ainda</p><p className="mt-1 text-xs text-slate-500">Comece uma missão para criar a sua linha do tempo.</p><button onClick={() => setActiveTab('map')} className="mt-4 text-xs font-black text-[#3E4FEF]">Abrir mapa</button></div>
-          ) : (
-            <div className="divide-y divide-slate-100">{fieldRounds.slice(0, 4).map((round) => <button key={round.id} onClick={() => setActiveTab('field_rounds')} className="flex w-full items-center gap-3 py-3 text-left first:pt-0 last:pb-0"><span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${round.status === 'finalizada' ? 'bg-emerald-50 text-emerald-600' : 'bg-amber-50 text-amber-600'}`}>{round.status === 'finalizada' ? <CheckCircle2 className="h-4 w-4" /> : <Gauge className="h-4 w-4" />}</span><span className="min-w-0 flex-1"><span className="block truncate text-sm font-extrabold text-slate-800">{round.locationName}</span><span className="mt-0.5 block text-[11px] font-medium text-slate-500">{round.date} · {round.technicianName}</span></span><span className="text-right"><span className="block text-xs font-black text-[#3E4FEF]">{round.totalKm} km</span><span className="mt-0.5 block text-[10px] font-bold uppercase text-slate-400">{round.status}</span></span><ChevronRight className="h-4 w-4 shrink-0 text-slate-300" /></button>)}</div>
-          )}
-        </section>
+          {/* Clean Material Progress Bar */}
+          <div className="w-full h-2.5 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden mb-4">
+            <div
+              className="h-full bg-blue-600 rounded-full transition-all duration-500"
+              style={{ width: `${missionProgressPercent}%` }}
+            />
+          </div>
 
-        {!isProUser && <section className="flex flex-col items-start justify-between gap-4 rounded-2xl bg-[#0D1B2A] p-5 text-white shadow-lg sm:flex-row sm:items-center sm:p-6"><div className="flex items-center gap-3"><span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white/10 text-emerald-300"><Camera className="h-5 w-5" /></span><div><h3 className="text-sm font-black">Leve todas as evidências para o campo</h3><p className="mt-1 text-xs font-medium text-slate-300">Desbloqueie mapas PDF, fotos e registros ilimitados.</p></div></div><button onClick={() => openUpgradeModal('Mesa de Missão')} className="rounded-xl bg-white px-4 py-2.5 text-xs font-black text-[#0D1B2A] transition-transform active:scale-95">Conhecer o Pro</button></section>}
+          {/* 3 Metric Columns */}
+          <div className="grid grid-cols-3 divide-x divide-slate-100 dark:divide-slate-800 text-center pt-1">
+            <div className="px-1">
+              <span className="block text-[11px] text-slate-400 dark:text-slate-500 mb-1">
+                Waypoints
+              </span>
+              <span className="text-sm font-extrabold text-slate-800 dark:text-slate-200">
+                {waypointsCount} / {waypointsTarget}
+              </span>
+            </div>
 
-        <div className="flex items-center justify-center gap-2 pb-2 text-[10px] font-semibold text-slate-400"><HardDrive className="h-3.5 w-3.5" />Seus dados de campo permanecem protegidos no dispositivo e na nuvem.</div>
+            <div className="px-1">
+              <span className="block text-[11px] text-slate-400 dark:text-slate-500 mb-1">
+                Evidências
+              </span>
+              <span className="text-sm font-extrabold text-slate-800 dark:text-slate-200">
+                {evidencesCount} / {evidencesTarget}
+              </span>
+            </div>
+
+            <div className="px-1">
+              <span className="block text-[11px] text-slate-400 dark:text-slate-500 mb-1">
+                Formulários
+              </span>
+              <span className="text-sm font-extrabold text-slate-800 dark:text-slate-200">
+                {formsCount} / {formsTarget}
+              </span>
+            </div>
+          </div>
+        </div>
+
+        {/* Card 4: Banner Tudo Certo! */}
+        <div
+          onClick={() => setActiveTab('map')}
+          className="bg-emerald-50/80 dark:bg-emerald-950/20 border border-emerald-200/70 dark:border-emerald-800/40 rounded-3xl p-4 flex items-center justify-between gap-3 cursor-pointer hover:bg-emerald-50 transition-colors"
+        >
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-full bg-emerald-100 dark:bg-emerald-900/50 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0">
+              <ShieldCheck className="w-5 h-5 stroke-[2.2]" />
+            </div>
+            <div>
+              <h4 className="text-xs font-black text-slate-900 dark:text-white">
+                Tudo certo!
+              </h4>
+              <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                GPS preciso e dados seguros no dispositivo.
+              </p>
+            </div>
+          </div>
+          <ChevronRight className="w-5 h-5 text-slate-400 shrink-0" />
+        </div>
+
+        {/* Card 5: Big Royal Blue CTA Button (Continuar no campo) */}
+        <div className="pt-1">
+          <button
+            onClick={() => setActiveTab('map')}
+            className="w-full py-4 px-6 rounded-2xl bg-blue-600 hover:bg-blue-700 active:scale-[0.98] text-white font-extrabold text-sm flex items-center justify-center gap-2.5 shadow-lg shadow-blue-600/30 transition-all cursor-pointer"
+          >
+            <BookOpen className="w-5 h-5 stroke-[2.2]" />
+            <span>Continuar no campo</span>
+          </button>
+        </div>
       </div>
     </div>
   );

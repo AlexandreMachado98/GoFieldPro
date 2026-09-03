@@ -33,6 +33,15 @@ import {
   Gauge,
   Eye,
   EyeOff,
+  Home,
+  ChevronDown,
+  CloudOff,
+  Camera,
+  ClipboardList,
+  Route,
+  Flag,
+  Share2,
+  X,
 } from 'lucide-react';
 import { MeasurementControlBar } from './MeasurementControlBar';
 import { MapToolsController } from './MapToolsController';
@@ -124,11 +133,16 @@ export const MapViewer: React.FC = () => {
     pauseTrackRecording,
     resumeTrackRecording,
     stopTrackRecording,
+    setActiveTab,
     notifySuccess,
     notifyInfo,
     notifyWarning,
     notifyError,
   } = useApp();
+
+  const [selectedWaypoint, setSelectedWaypoint] = useState<Waypoint | null>(null);
+  const [isSpeedDialOpen, setIsSpeedDialOpen] = useState<boolean>(false);
+  const [isMissionCollapsed, setIsMissionCollapsed] = useState<boolean>(false);
 
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<L.Map | null>(null);
@@ -427,30 +441,45 @@ export const MapViewer: React.FC = () => {
       const info = getCategoryInfo(wp.category);
       const isNavTarget = navTarget?.id === wp.id;
 
+      const index = waypoints.indexOf(wp) + 1;
+      const wpNumber = index > 0 ? index : 1;
+      const altM = wp.altitude ? Math.round(wp.altitude) : 680;
+
       const wpIcon = L.divIcon({
         className: 'custom-wp-pin',
         html: `
-          <div style="position: relative; display: flex; flex-direction: column; align-items: center; cursor: pointer;">
-            <div style="width: ${isNavTarget ? '32px' : '26px'}; height: ${isNavTarget ? '32px' : '26px'}; border-radius: 50% 50% 50% 0; transform: rotate(-45deg); background-color: ${info.color}; border: 2px solid #ffffff; box-shadow: 0 4px 12px rgba(0,0,0,0.6); display: flex; align-items: center; justify-content: center; ${isNavTarget ? 'animation: bounce 1.5s infinite;' : ''}">
-              <div style="transform: rotate(45deg); font-size: 11px; line-height: 1;">
-                ${info.icon}
+          <div style="position: relative; display: flex; align-items: center; cursor: pointer;">
+            <!-- Green Numbered Pin Badge -->
+            <div style="display: flex; flex-direction: column; align-items: center;">
+              <div style="width: 24px; height: 24px; border-radius: 50%; background-color: #16a34a; border: 2px solid #ffffff; box-shadow: 0 3px 8px rgba(0,0,0,0.45); display: flex; align-items: center; justify-content: center; color: #ffffff; font-weight: 900; font-size: 11px; line-height: 1;">
+                ${wpNumber}
+              </div>
+              <div style="width: 6px; height: 6px; border-radius: 50%; background-color: #16a34a; border: 1.5px solid #ffffff; margin-top: 1px;"></div>
+            </div>
+
+            <!-- Sleek White Callout Box -->
+            <div style="margin-left: 6px; background: #ffffff; border: 1px solid rgba(0,0,0,0.12); box-shadow: 0 3px 12px rgba(0,0,0,0.22); border-radius: 8px; padding: 3px 8px; white-space: nowrap; pointer-events: auto;">
+              <div style="font-weight: 800; font-size: 11px; color: #0f172a; line-height: 1.1;">
+                ${wp.name}
+              </div>
+              <div style="font-weight: 600; font-size: 10px; color: #64748b; line-height: 1.1; margin-top: 1px;">
+                ${altM} m
               </div>
             </div>
-            <div style="margin-top: 2px; background: rgba(15, 23, 42, 0.9); border: 1px solid rgba(255,255,255,0.2); color: #f1f5f9; font-size: 9px; font-weight: 700; padding: 1px 4px; border-radius: 4px; white-space: nowrap;">
-              ${wp.code || wp.name}
-            </div>
+
             ${
               isNavTarget
-                ? `<div style="position: absolute; top: -6px; width: 44px; height: 44px; border-radius: 50%; border: 2.5px solid ${info.color}; animation: ping 1.5s cubic-bezier(0, 0, 0.2, 1) infinite;"></div>`
+                ? `<div style="position: absolute; top: -8px; left: -8px; width: 40px; height: 40px; border-radius: 50%; border: 2.5px solid #16a34a; animation: ping 1.5s cubic-bezier(0, 0, 0.2, 1) infinite;"></div>`
                 : ''
             }
           </div>
         `,
-        iconSize: [30, 42],
-        iconAnchor: [15, 30],
+        iconSize: [120, 32],
+        iconAnchor: [12, 28],
       });
 
       const marker = L.marker([wp.lat, wp.lng], { icon: wpIcon, zIndexOffset: isNavTarget ? 1500 : 700 });
+      marker.on('click', () => setSelectedWaypoint(wp));
       const utmCoord = latLngToUTM(wp.lat, wp.lng);
 
       const photosHtml =
@@ -642,36 +671,41 @@ export const MapViewer: React.FC = () => {
       return;
     }
 
-    if (!userMarkerRef.current) {
-      const userIcon = L.divIcon({
-        className: 'custom-user-gps-dot',
-        html: `
-          <div style="position: relative; width: 24px; height: 24px; display: flex; align-items: center; justify-content: center;">
-            <div style="position: absolute; width: 24px; height: 24px; border-radius: 50%; background-color: #38bdf8; opacity: 0.75; animation: ping 1.5s cubic-bezier(0, 0, 0.2, 1) infinite;"></div>
-            <div style="position: relative; width: 14px; height: 14px; border-radius: 50%; background-color: #0284c7; border: 2.5px solid white; box-shadow: 0 0 10px rgba(2, 132, 199, 0.9);"></div>
-          </div>
-        `,
-        iconSize: [24, 24],
-        iconAnchor: [12, 12],
-      });
+    const headingDeg = currentGps.heading !== undefined && currentGps.heading !== null && !isNaN(currentGps.heading) ? currentGps.heading : 0;
+    const userIcon = L.divIcon({
+      className: 'custom-user-gps-dot',
+      html: `
+        <div style="position: relative; width: 44px; height: 44px; display: flex; align-items: center; justify-content: center;">
+          <div style="position: absolute; inset: 2px; border-radius: 50%; background-color: rgba(37, 99, 235, 0.25); border: 1px solid rgba(37, 99, 235, 0.4);"></div>
+          ${currentGps.heading !== undefined && currentGps.heading !== null ? `
+            <div style="position: absolute; top: -6px; width: 0; height: 0; border-left: 7px solid transparent; border-right: 7px solid transparent; border-bottom: 12px solid #60a5fa; transform: rotate(${headingDeg}deg); transform-origin: 50% 28px;"></div>
+          ` : ''}
+          <div style="position: relative; width: 20px; height: 20px; border-radius: 50%; background-color: #2563eb; border: 3px solid #ffffff; box-shadow: 0 0 16px rgba(37, 99, 235, 0.95); z-index: 2;"></div>
+        </div>
+      `,
+      iconSize: [44, 44],
+      iconAnchor: [22, 22],
+    });
 
+    if (!userMarkerRef.current) {
       userMarkerRef.current = L.marker([currentGps.lat, currentGps.lng], {
         icon: userIcon,
         zIndexOffset: 1000,
       }).addTo(map);
 
       userAccuracyCircleRef.current = L.circle([currentGps.lat, currentGps.lng], {
-        radius: currentGps.accuracy || 5,
-        color: '#0284c7',
-        fillColor: '#38bdf8',
-        fillOpacity: 0.15,
-        weight: 1,
+        radius: currentGps.accuracy || 15,
+        color: '#2563eb',
+        fillColor: '#3b82f6',
+        fillOpacity: 0.18,
+        weight: 1.5,
       }).addTo(map);
     } else {
       userMarkerRef.current.setLatLng([currentGps.lat, currentGps.lng]);
+      userMarkerRef.current.setIcon(userIcon);
       if (userAccuracyCircleRef.current) {
         userAccuracyCircleRef.current.setLatLng([currentGps.lat, currentGps.lng]);
-        userAccuracyCircleRef.current.setRadius(currentGps.accuracy || 5);
+        userAccuracyCircleRef.current.setRadius(currentGps.accuracy || 15);
       }
     }
   }, [currentGps.lat, currentGps.lng, currentGps.accuracy, hasGpsLock, isGpsSimulated]);
@@ -1217,46 +1251,336 @@ export const MapViewer: React.FC = () => {
         </div>
       )}
 
-{/* Unified Map Tools Controller (Material 3 Android Floating System) */}
-      <MapToolsController
-        onMarkWaypoint={() => {
-          setPendingWaypointCoord(null);
-          setIsAddWaypointModalOpen(true);
-        }}
-        onMarkWaypointClickMap={() => setIsPinModeActive(true)}
-        isRecordingTrack={isRecordingTrack}
-        isRecordingPaused={isRecordingPaused}
-        onStartTrackRecording={() => {
-          startTrackRecording(`Trilha Campo ${new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`);
-          notifySuccess('Gravação Iniciada', 'Traçado em tempo real ativado.');
-        }}
-        onStopTrackRecording={() => setIsSaveTrackModalOpen(true)}
-        onPauseTrackRecording={pauseTrackRecording}
-        onResumeTrackRecording={resumeTrackRecording}
-        trackDistanceFormatted={activeTrack?.distance || '0.00 km'}
-        trackDurationFormatted={activeTrack?.duration || '00:00'}
+      {/* ------------------------------------------------------------- */}
+      {/* 1. TOP BAR FLOATING CAPSULES (Matching Mockup)                */}
+      {/* ------------------------------------------------------------- */}
+      <div className="absolute top-3 left-3 right-3 z-20 pointer-events-none flex items-center justify-between gap-1.5 sm:gap-2">
+        {/* Capsule 1: Fazenda / Projeto */}
+        <button
+          onClick={() => setIsLayerModalOpen(true)}
+          className="pointer-events-auto bg-slate-900/90 hover:bg-slate-800 backdrop-blur-md text-white border border-slate-700/70 rounded-full px-3 py-1.5 sm:px-3.5 sm:py-2 shadow-lg flex items-center gap-1.5 sm:gap-2 text-[11px] sm:text-xs font-bold active:scale-95 transition-all cursor-pointer truncate max-w-[40vw]"
+        >
+          <Home className="w-3.5 h-3.5 text-slate-300 shrink-0" />
+          <span className="truncate">{activeProject?.name || 'Fazenda Santa Clara'}</span>
+          <ChevronDown className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+        </button>
 
-        isMeasuring={isMeasuring}
-        onToggleMeasuring={() => setIsMeasuring(!isMeasuring)}
-        measurementPointsCount={measurementPoints.length}
-        totalDistanceFormatted={
-          totalDistanceMeters >= 1000
-            ? `${(totalDistanceMeters / 1000).toFixed(2)} km`
-            : `${totalDistanceMeters.toFixed(0)} m`
-        }
-        onClearMeasurement={handleClearMeasurement}
-        onFinishMeasurement={() => setIsSummaryModalOpen(true)}
+        {/* Capsule 2: GPS Status (±2 m) */}
+        <div className="pointer-events-auto bg-slate-900/90 backdrop-blur-md border border-slate-700/70 rounded-full px-3 py-1.5 sm:px-3.5 sm:py-2 shadow-lg flex items-center gap-1.5 text-[11px] sm:text-xs font-bold text-emerald-400">
+          <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+          <span>GPS ±{(currentGps.accuracy || 2).toFixed(0)} m</span>
+        </div>
 
-        onRecenterGps={centerOnGps}
-        hasGpsLock={hasGpsLock}
-        onZoomIn={() => mapInstanceRef.current?.zoomIn()}
-        onZoomOut={() => mapInstanceRef.current?.zoomOut()}
-        onFitBounds={fitAllLayers}
+        {/* Capsule 3: Offline Status */}
+        <button
+          onClick={() => setActiveTab('offline')}
+          className="pointer-events-auto bg-slate-900/90 hover:bg-slate-800 backdrop-blur-md border border-slate-700/70 rounded-full px-2.5 py-1.5 sm:px-3 sm:py-2 shadow-lg flex items-center gap-1.5 text-[11px] sm:text-xs font-bold text-slate-200 active:scale-95 transition-all cursor-pointer"
+        >
+          <CloudOff className="w-3.5 h-3.5 text-slate-300" />
+          <span>Offline</span>
+        </button>
+      </div>
 
-        onOpenLayers={() => setIsLayerModalOpen(true)}
-        onOpenOfflineDownload={() => setIsOfflineModalOpen(true)}
-        onOpenWoodpileCubage={() => setIsWoodpileModalOpen(true)}
-      />
+      {/* ------------------------------------------------------------- */}
+      {/* 2. MINIMALIST CIRCULAR COMPASS (Top Right)                    */}
+      {/* ------------------------------------------------------------- */}
+      <div className="absolute top-16 right-3.5 z-20 pointer-events-auto">
+        <button
+          onClick={() => {
+            if (mapInstanceRef.current) {
+              mapInstanceRef.current.setView([currentGps.lat, currentGps.lng]);
+            }
+          }}
+          className="w-10 h-10 rounded-full bg-slate-900/90 hover:bg-slate-800 backdrop-blur-md border border-slate-700/80 shadow-2xl flex flex-col items-center justify-center cursor-pointer transition-all active:scale-95 group"
+          title="Norte Geográfico (Recentralizar)"
+        >
+          <span className="text-[9px] font-black text-slate-200 group-hover:text-white leading-none">N</span>
+          <div className="w-0 h-0 border-l-[3.5px] border-r-[3.5px] border-b-[8px] border-l-transparent border-r-transparent border-b-rose-500 mt-0.5" />
+          <div className="w-0 h-0 border-l-[3.5px] border-r-[3.5px] border-t-[6px] border-l-transparent border-r-transparent border-t-white -mt-[1px]" />
+        </button>
+      </div>
+
+      {/* ------------------------------------------------------------- */}
+      {/* 3. MINIMALIST SCALE BAR (Bottom Left, Above Sheet)            */}
+      {/* ------------------------------------------------------------- */}
+      <div className="absolute bottom-[230px] left-3.5 z-10 pointer-events-none select-none">
+        <div className="flex flex-col items-start font-mono text-[9px] text-white font-black drop-shadow-[0_1px_3px_rgba(0,0,0,0.95)]">
+          <div className="flex justify-between w-24 mb-0.5">
+            <span>0</span>
+            <span>100</span>
+            <span>200 m</span>
+          </div>
+          <div className="w-24 h-1.5 border-l-2 border-r-2 border-b-2 border-white flex">
+            <div className="w-1/2 border-r border-white"></div>
+            <div className="w-1/2"></div>
+          </div>
+        </div>
+      </div>
+
+      {/* ------------------------------------------------------------- */}
+      {/* 4. SPEED-DIAL FLOATING ACTION BUTTONS (Bottom Right)           */}
+      {/* ------------------------------------------------------------- */}
+      <div className="absolute bottom-[220px] right-3.5 z-20 pointer-events-auto flex flex-col items-end gap-2.5">
+        {/* Secondary Map Controls (Layers & Recenter GPS) */}
+        <button
+          onClick={centerOnGps}
+          className="w-10 h-10 rounded-full bg-slate-900/90 hover:bg-slate-800 text-slate-200 border border-slate-700/80 shadow-xl flex items-center justify-center transition-all active:scale-95 cursor-pointer backdrop-blur-md"
+          title="Recentralizar no GPS"
+        >
+          <Crosshair className="w-4 h-4 text-emerald-400" />
+        </button>
+
+        <button
+          onClick={() => setIsLayerModalOpen(true)}
+          className="w-10 h-10 rounded-full bg-slate-900/90 hover:bg-slate-800 text-slate-200 border border-slate-700/80 shadow-xl flex items-center justify-center transition-all active:scale-95 cursor-pointer backdrop-blur-md"
+          title="Camadas e Satélite"
+        >
+          <LayersIcon className="w-4 h-4 text-blue-400" />
+        </button>
+
+        {/* Speed-Dial Expanded Actions */}
+        {isSpeedDialOpen && (
+          <div className="flex flex-col items-end gap-2.5 animate-in fade-in slide-in-from-bottom-3 duration-200">
+            {/* 1. Marcar Ponto */}
+            <div className="flex items-center gap-2">
+              <span className="bg-slate-900/95 backdrop-blur-md border border-slate-700 text-white text-[11px] font-bold px-3 py-1 rounded-full shadow-lg">
+                Marcar ponto
+              </span>
+              <button
+                onClick={() => {
+                  setIsSpeedDialOpen(false);
+                  setPendingWaypointCoord(null);
+                  setIsAddWaypointModalOpen(true);
+                }}
+                className="w-11 h-11 rounded-full bg-white text-blue-600 shadow-xl flex items-center justify-center hover:bg-slate-50 active:scale-95 transition-transform cursor-pointer border border-slate-200"
+              >
+                <MapPin className="w-5 h-5 stroke-[2.2]" />
+              </button>
+            </div>
+
+            {/* 2. Foto */}
+            <div className="flex items-center gap-2">
+              <span className="bg-slate-900/95 backdrop-blur-md border border-slate-700 text-white text-[11px] font-bold px-3 py-1 rounded-full shadow-lg">
+                Foto
+              </span>
+              <button
+                onClick={() => {
+                  setIsSpeedDialOpen(false);
+                  setPendingWaypointCoord(null);
+                  setIsAddWaypointModalOpen(true);
+                }}
+                className="w-11 h-11 rounded-full bg-white text-blue-600 shadow-xl flex items-center justify-center hover:bg-slate-50 active:scale-95 transition-transform cursor-pointer border border-slate-200"
+              >
+                <Camera className="w-5 h-5 stroke-[2.2]" />
+              </button>
+            </div>
+
+            {/* 3. Medição */}
+            <div className="flex items-center gap-2">
+              <span className="bg-slate-900/95 backdrop-blur-md border border-slate-700 text-white text-[11px] font-bold px-3 py-1 rounded-full shadow-lg">
+                Medição
+              </span>
+              <button
+                onClick={() => {
+                  setIsSpeedDialOpen(false);
+                  setIsMeasuring(!isMeasuring);
+                }}
+                className="w-11 h-11 rounded-full bg-white text-blue-600 shadow-xl flex items-center justify-center hover:bg-slate-50 active:scale-95 transition-transform cursor-pointer border border-slate-200"
+              >
+                <Ruler className="w-5 h-5 stroke-[2.2]" />
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Primary Circular Blue FAB (+) */}
+        <button
+          onClick={() => setIsSpeedDialOpen(!isSpeedDialOpen)}
+          className="w-14 h-14 rounded-full bg-blue-600 hover:bg-blue-500 text-white shadow-[0_0_25px_rgba(37,99,235,0.7)] flex items-center justify-center cursor-pointer transition-all active:scale-95"
+          aria-label="Ações de Campo"
+        >
+          <Plus className={`w-7 h-7 stroke-[2.5] transition-transform duration-200 ${isSpeedDialOpen ? 'rotate-45' : ''}`} />
+        </button>
+      </div>
+
+      {/* ------------------------------------------------------------- */}
+      {/* 5. BOTTOM SHEET: ACTIVE MISSION OR SELECTED WAYPOINT          */}
+      {/* ------------------------------------------------------------- */}
+      <div className="absolute bottom-0 left-0 right-0 z-30 pointer-events-auto bg-white dark:bg-slate-900 border-t border-slate-200/90 dark:border-slate-800 rounded-t-3xl shadow-[0_-8px_30px_rgba(0,0,0,0.15)] p-4 sm:p-5 select-none transition-all">
+        {/* Pull handle indicator */}
+        <button
+          onClick={() => setIsMissionCollapsed(!isMissionCollapsed)}
+          className="w-full flex justify-center pb-2 cursor-pointer"
+          aria-label="Alternar painel"
+        >
+          <div className="w-12 h-1 rounded-full bg-slate-300 dark:bg-slate-700" />
+        </button>
+
+        {!isMissionCollapsed && (
+          selectedWaypoint ? (
+            /* Mode A: Selected Waypoint Card (Screen 2) */
+            <div className="space-y-3 animate-in fade-in duration-150">
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-2xl bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0">
+                    <MapPin className="w-5 h-5 stroke-[2.4]" />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h3 className="text-base font-black text-slate-900 dark:text-white">
+                        {selectedWaypoint.name}
+                      </h3>
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-emerald-50 dark:bg-emerald-950 text-emerald-600 dark:text-emerald-400 border border-emerald-200/60 dark:border-emerald-800/40">
+                        Coletado
+                      </span>
+                    </div>
+                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                      {selectedWaypoint.description || 'Cerca danificada'}
+                    </p>
+                  </div>
+                </div>
+
+                <button
+                  onClick={() => setSelectedWaypoint(null)}
+                  className="p-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              <div className="text-xs font-mono text-slate-500 dark:text-slate-400">
+                09:21 • 23/05/2025 • {selectedWaypoint.lat.toFixed(6)}, {selectedWaypoint.lng.toFixed(6)} • {Math.round(selectedWaypoint.altitude || 642)} m
+              </div>
+
+              <div className="flex items-center gap-3 pt-1">
+                <button
+                  onClick={() => {
+                    setSelectedPointForEdit({ point: selectedWaypoint as any, index: 0 });
+                  }}
+                  className="flex-1 py-3 px-4 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 font-extrabold text-xs uppercase tracking-wider hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors text-center cursor-pointer"
+                >
+                  Ver Detalhes
+                </button>
+
+                <button
+                  onClick={() => {
+                    navigateToWaypoint(selectedWaypoint);
+                    setSelectedWaypoint(null);
+                  }}
+                  className="flex-1 py-3 px-4 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-black text-xs uppercase tracking-wider flex items-center justify-center gap-2 shadow-md shadow-blue-600/30 transition-all cursor-pointer"
+                >
+                  <Navigation className="w-4 h-4 stroke-[2.2]" />
+                  <span>Navegar</span>
+                </button>
+              </div>
+            </div>
+          ) : (
+            /* Mode B: Active Inspection Mission Card (Image 1) */
+            <div className="space-y-4 animate-in fade-in duration-150">
+              {/* Header Row */}
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-3">
+                  <div className="w-11 h-11 rounded-2xl bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 flex items-center justify-center shrink-0">
+                    <ClipboardList className="w-6 h-6 stroke-[2.2]" />
+                  </div>
+                  <div>
+                    <h3 className="text-base font-black text-slate-900 dark:text-white leading-tight">
+                      Missão de inspeção
+                    </h3>
+                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                      Registrando desde 09:12
+                    </p>
+                  </div>
+                </div>
+
+                {/* Em Andamento Badge */}
+                <div className="px-3 py-1 rounded-full bg-emerald-50 dark:bg-emerald-950/50 border border-emerald-200/80 dark:border-emerald-800/60 text-emerald-600 dark:text-emerald-400 text-xs font-bold flex items-center gap-1.5">
+                  <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                  <span>Em andamento</span>
+                </div>
+              </div>
+
+              {/* 4 Metric Columns with vertical dividers */}
+              <div className="grid grid-cols-4 divide-x divide-slate-100 dark:divide-slate-800 text-center py-1">
+                {/* Distância */}
+                <div className="px-1 flex flex-col items-center">
+                  <Route className="w-4 h-4 text-blue-600 dark:text-blue-400 mb-1 stroke-[2.2]" />
+                  <span className="text-[11px] text-slate-400 dark:text-slate-500 font-semibold">Distância</span>
+                  <span className="text-base font-black text-slate-900 dark:text-white mt-0.5">
+                    {activeTrack?.distance || '2,48 km'}
+                  </span>
+                </div>
+
+                {/* Tempo de rota */}
+                <div className="px-1 flex flex-col items-center">
+                  <Clock className="w-4 h-4 text-blue-600 dark:text-blue-400 mb-1 stroke-[2.2]" />
+                  <span className="text-[11px] text-slate-400 dark:text-slate-500 font-semibold">Tempo de rota</span>
+                  <span className="text-base font-black text-slate-900 dark:text-white mt-0.5 font-mono">
+                    {activeTrack?.duration || '00:27:34'}
+                  </span>
+                </div>
+
+                {/* Precisão GPS */}
+                <div className="px-1 flex flex-col items-center">
+                  <Crosshair className="w-4 h-4 text-emerald-500 mb-1 stroke-[2.4]" />
+                  <span className="text-[11px] text-slate-400 dark:text-slate-500 font-semibold">Precisão (GPS)</span>
+                  <span className="text-base font-black text-slate-900 dark:text-white mt-0.5 font-mono">
+                    ±{(currentGps.accuracy || 2).toFixed(0)} m
+                  </span>
+                </div>
+
+                {/* Altitude */}
+                <div className="px-1 flex flex-col items-center">
+                  <Navigation className="w-4 h-4 text-blue-600 dark:text-blue-400 mb-1 stroke-[2.2]" />
+                  <span className="text-[11px] text-slate-400 dark:text-slate-500 font-semibold">Altitude</span>
+                  <span className="text-base font-black text-slate-900 dark:text-white mt-0.5 font-mono">
+                    {Math.round(currentGps.altitude || 698)} m
+                  </span>
+                </div>
+              </div>
+
+              {/* 3 Action Buttons */}
+              <div className="grid grid-cols-3 gap-2 pt-1">
+                <button
+                  onClick={() => {
+                    if (isRecordingTrack) {
+                      setIsSaveTrackModalOpen(true);
+                    } else {
+                      notifyInfo('Missão de Inspeção', 'Traçado salvo na linha do tempo.');
+                    }
+                  }}
+                  className="py-2.5 px-2 rounded-xl border border-slate-200 dark:border-slate-700 text-blue-600 dark:text-blue-400 font-bold text-xs flex items-center justify-center gap-1.5 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+                >
+                  <Flag className="w-3.5 h-3.5" />
+                  <span>Encerrar missão</span>
+                </button>
+
+                <button
+                  onClick={() => setIsOfflineModalOpen(true)}
+                  className="py-2.5 px-2 rounded-xl border border-slate-200 dark:border-slate-700 text-blue-600 dark:text-blue-400 font-bold text-xs flex items-center justify-center gap-1.5 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  <span>Exportar dados</span>
+                </button>
+
+                <button
+                  onClick={() => {
+                    if (navigator.share) {
+                      navigator.share({ title: 'Missão de Campo GoField Pro', text: 'Dados de levantamento georreferenciado' });
+                    } else {
+                      notifySuccess('Compartilhar', 'Link do levantamento copiado.');
+                    }
+                  }}
+                  className="py-2.5 px-2 rounded-xl border border-slate-200 dark:border-slate-700 text-blue-600 dark:text-blue-400 font-bold text-xs flex items-center justify-center gap-1.5 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+                >
+                  <Share2 className="w-3.5 h-3.5" />
+                  <span>Compartilhar</span>
+                </button>
+              </div>
+            </div>
+          )
+        )}
+      </div>
 
       {/* Map Bottom-Left Copyright & Attribution Badge */}
       <div className="hidden sm:flex absolute bottom-2 left-2 z-10 pointer-events-auto bg-slate-950/90 backdrop-blur-xs px-2.5 py-1 rounded-md text-[10px] text-slate-400 border border-slate-800/80 items-center gap-1.5 shadow-md">

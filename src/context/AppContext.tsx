@@ -60,8 +60,8 @@ interface AppContextType {
   setCurrentRole: (role: UserRole) => void;
 
   // Active View Tab
-  activeTab: 'home' | 'map' | 'pdf_maps' | 'layers' | 'tracks' | 'field_rounds' | 'fire_incidents' | 'team' | 'reports' | 'analytics' | 'offline' | 'admin';
-  setActiveTab: (tab: 'home' | 'map' | 'pdf_maps' | 'layers' | 'tracks' | 'field_rounds' | 'fire_incidents' | 'team' | 'reports' | 'analytics' | 'offline' | 'admin') => void;
+  activeTab: 'home' | 'map' | 'evidence' | 'pdf_maps' | 'layers' | 'tracks' | 'field_rounds' | 'fire_incidents' | 'team' | 'reports' | 'analytics' | 'offline' | 'admin' | 'more';
+  setActiveTab: (tab: 'home' | 'map' | 'evidence' | 'pdf_maps' | 'layers' | 'tracks' | 'field_rounds' | 'fire_incidents' | 'team' | 'reports' | 'analytics' | 'offline' | 'admin' | 'more') => void;
   isMobileMenuOpen: boolean;
   setIsMobileMenuOpen: (isOpen: boolean) => void;
   isSidebarCollapsed: boolean;
@@ -236,7 +236,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     }
   }, [profile?.role]);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState<'home' | 'map' | 'pdf_maps' | 'layers' | 'tracks' | 'field_rounds' | 'fire_incidents' | 'team' | 'reports' | 'analytics' | 'offline' | 'admin'>('home');
+  const [activeTab, setActiveTab] = useState<'home' | 'map' | 'evidence' | 'pdf_maps' | 'layers' | 'tracks' | 'field_rounds' | 'fire_incidents' | 'team' | 'reports' | 'analytics' | 'offline' | 'admin' | 'more'>('home');
 
   // Collapsible Sidebar State with user-scoped LocalStorage memory
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState<boolean>(() => {
