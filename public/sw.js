@@ -1,6 +1,6 @@
 // Service Worker for GoField Pro PWA
 // Build-Timestamp: 1787920722959
-const CACHE_NAME = 'gofield-pro-build-1788478384870';
+const CACHE_NAME = 'gofield-pro-build-1788474590796';
 const OFFLINE_URLS = [
   '/',
   '/index.html',
