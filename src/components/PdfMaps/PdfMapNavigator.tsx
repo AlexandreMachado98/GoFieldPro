@@ -1498,7 +1498,7 @@ export const PdfMapNavigator: React.FC = () => {
           startPoint = [pos.lat, pos.lng];
         } else if (userGps && typeof userGps.lat === 'number' && typeof userGps.lng === 'number' && !isNaN(userGps.lat) && !isNaN(userGps.lng)) {
           const userPdf = gpsToPdf(userGps.lat, userGps.lng, activeDoc);
-          if (!isNaN(userPdf.x) && !isNaN(userPdf.y)) {
+          if (userPdf.isCalibrated && !isNaN(userPdf.x) && !isNaN(userPdf.y)) {
             startPoint = [userPdf.x, userPdf.y];
           }
         }
@@ -1692,7 +1692,7 @@ export const PdfMapNavigator: React.FC = () => {
     }
 
     // Dynamic real-time update for Target Navigation Guide Line
-    if (activeNavPoint && typeof activeNavPoint.x === 'number' && typeof activeNavPoint.y === 'number' && !isNaN(activeNavPoint.x) && !isNaN(activeNavPoint.y)) {
+    if (pdfCoords.isCalibrated && activeNavPoint && typeof activeNavPoint.x === 'number' && typeof activeNavPoint.y === 'number' && !isNaN(activeNavPoint.x) && !isNaN(activeNavPoint.y)) {
       if (targetGuideLineRef.current) {
         targetGuideLineRef.current.setLatLngs([
           [pdfCoords.x, pdfCoords.y],
@@ -2859,7 +2859,7 @@ export const PdfMapNavigator: React.FC = () => {
       {/* Target Navigation Live HUD (Bottom Centered - Compact & Proportional) */}
       {activeNavPoint && navMetrics && !isMapsListOpen && (
         <div
-          className={`absolute bottom-20 sm:bottom-6 left-1/2 -translate-x-1/2 z-[1000] w-auto max-w-[92vw] pointer-events-auto transition-opacity duration-300 ${
+          className={`absolute top-4 sm:top-6 left-1/2 -translate-x-1/2 z-[1000] w-auto max-w-[92vw] pointer-events-auto transition-opacity duration-300 ${
             isMapInteracting ? 'opacity-20 pointer-events-none' : 'opacity-100 pointer-events-auto'
           }`}
         >
