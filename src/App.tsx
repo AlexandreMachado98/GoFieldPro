@@ -25,6 +25,8 @@ import { FeatureLockModal } from './components/Common/FeatureLockModal';
 import { AddWaypointModal } from './components/Waypoints/AddWaypointModal';
 import { LayerManagerModal } from './components/Layers/LayerManagerModal';
 import { MobileBottomNav } from './components/Navigation/MobileBottomNav';
+import { EvidenceTimeline } from './components/Evidence/EvidenceTimeline';
+import { MoreHubModal } from './components/Navigation/MoreHubModal';
 import { AppUpdateBanner } from './components/Common/AppUpdateBanner';
 import { SpecialAccessModal } from './components/Modals/SpecialAccessModal';
 import { Sparkles, Clock, AlertTriangle, ArrowRight, Lock, ExternalLink } from 'lucide-react';
@@ -70,6 +72,7 @@ const MainAppContent: React.FC = () => {
     hasFeatureAccess,
   } = useApp();
   const { profile } = useAuth();
+  const [isMoreHubOpen, setIsMoreHubOpen] = React.useState<boolean>(false);
 
   // Show Welcome / Plan Choice modal on first login if not yet dismissed
   React.useEffect(() => {
@@ -164,6 +167,7 @@ const MainAppContent: React.FC = () => {
             )
           )}
           {activeTab === 'home' && <HomeDashboard />}
+          {activeTab === 'evidence' && <EvidenceTimeline />}
           {activeTab === 'pdf_maps' && (
             <ErrorBoundary fallbackTitle="Visualizador de Mapas e Plantas PDF">
               <PdfMapNavigator />
@@ -185,7 +189,8 @@ const MainAppContent: React.FC = () => {
       <ConfirmModal />
       <FeatureLockModal />
       <ToastContainer />
-      <MobileBottomNav />
+      <MobileBottomNav onOpenMoreHub={() => setIsMoreHubOpen(true)} />
+      <MoreHubModal isOpen={isMoreHubOpen} onClose={() => setIsMoreHubOpen(false)} />
     </div>
   );
 };
