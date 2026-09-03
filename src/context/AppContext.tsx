@@ -689,7 +689,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   // App Settings with LocalStorage persistence
   const [settings, setSettings] = useState<AppSettings>(() => {
     const defaultSettings: AppSettings = {
-      theme: 'dark',
+      theme: 'light',
       coordinateFormat: 'DD',
       gpsAccuracyMode: 'high',
       gpsUpdateIntervalMs: 1000,

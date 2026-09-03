@@ -15,6 +15,62 @@ import {
   FileCheck,
 } from 'lucide-react';
 
+const StatusTile: React.FC<{
+  icon: React.ReactNode;
+  label: string;
+  value: string;
+  detail: string;
+  tone?: 'success' | 'indigo' | 'neutral';
+}> = ({ icon, label, value, detail, tone = 'neutral' }) => {
+  const toneClass = {
+    success: 'field-status-success',
+    indigo: 'field-status-offline',
+    neutral: 'bg-slate-50 text-slate-700 border-slate-200',
+  }[tone];
+
+  return (
+    <div className={`rounded-2xl border p-4 ${toneClass}`}>
+      <div className="flex items-center gap-2 text-[11px] font-bold opacity-80">
+        {icon}
+        <span>{label}</span>
+      </div>
+      <div className="mt-2 text-xl font-black tracking-tight">{value}</div>
+      <div className="mt-0.5 text-[11px] font-medium opacity-75">{detail}</div>
+    </div>
+  );
+};
+
+const QuickAction: React.FC<{
+  icon: React.ReactNode;
+  title: string;
+  detail: string;
+  onClick: () => void;
+  tone?: 'indigo' | 'green' | 'amber' | 'neutral';
+}> = ({ icon, title, detail, onClick, tone = 'indigo' }) => {
+  const iconTone = {
+    indigo: 'bg-indigo-50 text-[#3E4FEF] border-indigo-100',
+    green: 'bg-emerald-50 text-emerald-600 border-emerald-100',
+    amber: 'bg-amber-50 text-amber-600 border-amber-100',
+    neutral: 'bg-slate-100 text-slate-600 border-slate-200',
+  }[tone];
+
+  return (
+    <button
+      onClick={onClick}
+      className="field-card group flex min-h-[112px] items-start gap-3 p-4 text-left transition-transform hover:-translate-y-0.5 active:scale-[0.98]"
+    >
+      <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border ${iconTone}`}>
+        {icon}
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="block truncate text-sm font-extrabold text-slate-900">{title}</span>
+        <span className="mt-1 block text-[11px] font-medium leading-4 text-slate-500">{detail}</span>
+      </span>
+      <ArrowUpRight className="mt-0.5 h-4 w-4 shrink-0 text-slate-300 transition-colors group-hover:text-[#3E4FEF]" />
+    </button>
+  );
+};
+
 export const HomeDashboard: React.FC = () => {
   const {
     setActiveTab,

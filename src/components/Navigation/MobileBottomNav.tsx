@@ -57,6 +57,9 @@ export const MobileBottomNav: React.FC<{ onOpenMoreHub?: () => void }> = ({ onOp
                   : 'font-medium text-slate-500 dark:text-slate-400'
               }`}
             >
+              <Icon className={`h-5 w-5 transition-transform ${isActive ? 'scale-105 stroke-[2.2]' : 'stroke-[1.8]'}`} />
+            </span>
+            <span className={`mt-0.5 text-[10px] tracking-tight transition-colors ${isActive ? 'font-bold text-[#3E4FEF] dark:text-indigo-300' : 'font-medium text-slate-500 dark:text-slate-400'}`}>
               {item.label}
             </span>
           </button>
