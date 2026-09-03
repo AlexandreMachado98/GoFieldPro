@@ -202,6 +202,7 @@ export const PdfMapNavigator: React.FC = () => {
 
   // Retractable Tools Panel (Starts CLOSED to avoid screen clutter, like GPS map)
   const [isToolsPanelOpen, setIsToolsPanelOpen] = useState<boolean>(false);
+  const [isNavSheetOpen, setIsNavSheetOpen] = useState<boolean>(false);
   const [isMapInteracting, setIsMapInteracting] = useState<boolean>(false);
 
   // Woodpile Specific Submode & Form State
@@ -2856,39 +2857,16 @@ export const PdfMapNavigator: React.FC = () => {
       </div>
     )}
 
-      {/* Target Navigation Live HUD (Bottom Centered - Compact & Proportional) */}
+      {/* Avenza-style Minimal Orange Navigation Bar */}
       {activeNavPoint && navMetrics && !isMapsListOpen && (
         <div
-          className={`absolute top-4 sm:top-6 left-1/2 -translate-x-1/2 z-[1000] w-auto max-w-[92vw] pointer-events-auto transition-opacity duration-300 ${
+          onClick={() => setIsNavSheetOpen(true)}
+          className={`absolute bottom-0 left-0 right-0 w-full z-[1000] pointer-events-auto transition-all duration-300 cursor-pointer active:scale-[0.99] ${
             isMapInteracting ? 'opacity-20 pointer-events-none' : 'opacity-100 pointer-events-auto'
           }`}
         >
-          <div className="bg-slate-950/95 backdrop-blur-md border border-sky-500/80 rounded-2xl px-3.5 py-2 shadow-2xl flex items-center gap-3 text-xs text-white">
-            <div className="flex items-center gap-2">
-              <div className="w-7 h-7 rounded-xl bg-sky-500/20 border border-sky-500/40 flex items-center justify-center text-sky-400 shrink-0">
-                <Navigation className="w-3.5 h-3.5 transform rotate-45" />
-              </div>
-              <div className="min-w-0 max-w-[120px] sm:max-w-[160px]">
-                <span className="text-[10px] text-sky-300 font-medium block leading-tight">Navegando até</span>
-                <span className="font-extrabold text-white text-xs truncate block leading-tight">{activeNavPoint.title}</span>
-              </div>
-            </div>
-
-            <div className="border-l border-slate-700 pl-2.5 flex items-center gap-1.5 shrink-0">
-              <span className="text-emerald-400 font-black text-xs">{navMetrics.formattedDistance}</span>
-              <span className="text-[10px] text-slate-400 font-mono">
-                {navMetrics.cardinal} ({navMetrics.bearingDegrees.toFixed(0)}°)
-              </span>
-            </div>
-
-            <button
-              type="button"
-              onClick={() => setActiveNavPoint(null)}
-              className="p-1.5 bg-rose-500/20 hover:bg-rose-500 text-rose-400 hover:text-white rounded-xl active:scale-95 transition cursor-pointer shrink-0"
-              title="Encerrar Navegação"
-            >
-              <X className="w-3.5 h-3.5" />
-            </button>
+          <div className="bg-orange-600 hover:bg-orange-500 text-white shadow-[0_-4px_20px_rgba(234,88,12,0.3)] px-4 py-3 pb-[calc(0.75rem+env(safe-area-inset-bottom,0px))] flex items-center justify-center">
+            <span className="font-extrabold text-sm tracking-wide">Navegando: {activeNavPoint.title}</span>
           </div>
         </div>
       )}
@@ -3600,6 +3578,133 @@ export const PdfMapNavigator: React.FC = () => {
                     <strong className="block text-xs text-white font-extrabold">Modo Navegar</strong>
                     <span className="text-[10px] text-slate-400">Apenas mover e dar zoom</span>
                   </div>
+                </button>
+              </div>
+            </div>
+          </BottomSheet>
+        )}
+
+        {/* Avenza-style Navigation Dashboard Bottom Sheet */}
+        {activeNavPoint && navMetrics && (
+          <BottomSheet
+            isOpen={isNavSheetOpen}
+            onClose={() => setIsNavSheetOpen(false)}
+            maxHeight="max-h-[85dvh]"
+          >
+            <div className="flex flex-col h-full bg-[#111] text-white -mx-5 -mt-5 -mb-5 relative">
+              {/* Tabs / Header Area */}
+              <div className="flex items-center justify-between border-b border-[#333] pt-4 px-2">
+                <div className="flex gap-1 w-full bg-[#222] rounded-full p-1 mx-2">
+                  <div className="flex-1 text-center py-2 text-xs font-bold text-slate-400">Localização</div>
+                  <div className="flex-1 text-center py-2 text-xs font-bold text-slate-400">Rastreamento</div>
+                  <div className="flex-1 text-center py-2 text-xs font-bold text-white bg-emerald-600 rounded-full shadow">Navegação</div>
+                </div>
+              </div>
+
+              <div className="flex-1 flex flex-col p-6 space-y-8 overflow-y-auto">
+                <div className="text-center">
+                  <h2 className="text-2xl font-bold tracking-tight">{activeNavPoint.title}</h2>
+                  <p className="text-sm text-slate-400 mt-1">Destino</p>
+                </div>
+
+                {/* Compass & Main Readouts */}
+                <div className="flex items-center justify-between gap-2">
+                  {/* Left: Heading */}
+                  <div className="flex-1 text-center">
+                    <div className="text-3xl font-black text-emerald-400">
+                      {currentGps?.heading ? currentGps.heading.toFixed(0) : '---'}
+                    </div>
+                    <div className="text-[10px] text-slate-400 uppercase mt-1">Orientação<br/>(DEG)</div>
+                  </div>
+
+                  {/* Center: Compass Widget */}
+                  <div className="w-40 h-40 shrink-0 relative flex items-center justify-center">
+                    <div className="absolute inset-0 rounded-full border-[8px] border-[#333] bg-[#222]" />
+                    {/* Tick marks and N/S/E/W rotating by heading */}
+                    <div 
+                      className="absolute inset-2 rounded-full transition-transform duration-200 ease-linear"
+                      style={{ transform: `rotate(${-(currentGps?.heading || 0)}deg)` }}
+                    >
+                      <div className="absolute top-1 left-1/2 -translate-x-1/2 text-rose-500 font-bold text-sm">N</div>
+                      <div className="absolute bottom-1 left-1/2 -translate-x-1/2 text-white font-bold text-sm">S</div>
+                      <div className="absolute right-1 top-1/2 -translate-y-1/2 text-white font-bold text-sm">E</div>
+                      <div className="absolute left-1 top-1/2 -translate-y-1/2 text-white font-bold text-sm">W</div>
+                      <div className="absolute -top-1 left-1/2 -translate-x-1/2 -translate-y-full w-0 h-0 border-l-[6px] border-l-transparent border-r-[6px] border-r-transparent border-b-[8px] border-b-rose-500" />
+                    </div>
+
+                    {/* Target Bearing Needle rotating relative to heading */}
+                    <div 
+                      className="absolute inset-4 rounded-full transition-transform duration-200 ease-linear pointer-events-none"
+                      style={{ transform: `rotate(${(navMetrics.bearingDegrees) - (currentGps?.heading || 0)}deg)` }}
+                    >
+                      <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 w-0 h-0 border-l-[8px] border-l-transparent border-r-[8px] border-r-transparent border-b-[24px] border-b-emerald-500" />
+                    </div>
+
+                    {/* Bearing Text */}
+                    <div className="relative z-10 flex flex-col items-center justify-center bg-[#111] w-14 h-14 rounded-full border-2 border-[#333]">
+                      <span className="text-sm font-bold text-emerald-400">{navMetrics.bearingDegrees.toFixed(0)}°</span>
+                    </div>
+                  </div>
+
+                  {/* Right: Bearing */}
+                  <div className="flex-1 text-center">
+                    <div className="text-3xl font-black text-orange-500">
+                      {navMetrics.bearingDegrees.toFixed(0)}
+                    </div>
+                    <div className="text-[10px] text-slate-400 uppercase mt-1">Rota<br/>(DEG)</div>
+                  </div>
+                </div>
+
+                {/* Lower Grid Metrics */}
+                <div className="grid grid-cols-2 gap-y-8 gap-x-4">
+                  <div className="text-center">
+                    <div className="text-2xl font-bold text-white">
+                      {currentGps?.speed ? (currentGps.speed * 3.6).toFixed(2) : '0,00'}
+                    </div>
+                    <div className="text-[11px] text-slate-400 mt-1">Velocidade (Km/h)</div>
+                  </div>
+                  <div className="text-center">
+                    <div className="text-2xl font-bold text-white">
+                      {(navMetrics.distanceMeters / 1000).toFixed(2).replace('.', ',')}
+                    </div>
+                    <div className="text-[11px] text-slate-400 mt-1">Distância (Km)</div>
+                  </div>
+                  <div className="text-center">
+                    <div className="text-xl font-bold text-white">
+                      {(() => {
+                        if (!currentGps || currentGps.speed < 0.2) return '--:--';
+                        const sec = navMetrics.distanceMeters / currentGps.speed;
+                        return new Date(Date.now() + sec * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                      })()}
+                    </div>
+                    <div className="text-[11px] text-slate-400 mt-1">ETA</div>
+                  </div>
+                  <div className="text-center">
+                    <div className="text-xl font-bold text-white">
+                      {(() => {
+                        if (!currentGps || currentGps.speed < 0.2) return '--:--:--';
+                        const sec = navMetrics.distanceMeters / currentGps.speed;
+                        const h = Math.floor(sec / 3600);
+                        const m = Math.floor((sec % 3600) / 60);
+                        const s = Math.floor(sec % 60);
+                        return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+                      })()}
+                    </div>
+                    <div className="text-[11px] text-slate-400 mt-1">Tempo até o próximo</div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Stop Button */}
+              <div className="p-4 bg-[#111] border-t border-[#333]">
+                <button
+                  onClick={() => {
+                    setActiveNavPoint(null);
+                    setIsNavSheetOpen(false);
+                  }}
+                  className="w-full bg-red-600 hover:bg-red-500 text-white font-bold text-lg py-4 rounded-2xl active:scale-[0.98] transition-transform"
+                >
+                  Parar
                 </button>
               </div>
             </div>
