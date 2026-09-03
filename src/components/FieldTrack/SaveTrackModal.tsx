@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { createPortal } from 'react-dom';
 import { Track } from '../../types';
 import {
   X,
@@ -97,7 +98,7 @@ export const SaveTrackModal: React.FC<SaveTrackModalProps> = ({
       ? `${activeTrack.distanceKm.toFixed(2)} km`
       : `${Math.round(activeTrack.distanceKm * 1000)} m`;
 
-  return (
+  return createPortal(
     <div className="fixed inset-0 z-[200] flex items-center justify-center p-3 sm:p-4 bg-slate-950/80 backdrop-blur-sm animate-in fade-in duration-200">
       <div className="bg-slate-900 border border-slate-800 w-full max-w-xl rounded-2xl shadow-2xl flex flex-col max-h-[min(90dvh,calc(100vh-32px))] overflow-hidden">
         {/* Header */}
@@ -271,6 +272,7 @@ export const SaveTrackModal: React.FC<SaveTrackModalProps> = ({
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };

@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { useApp } from '../../context/AppContext';
 import { useAuth } from '../../context/AuthContext';
 import { WoodpileItem, generateWoodpilePdfReport } from '../../utils/woodpilePdfReport';
@@ -178,7 +179,7 @@ export const WoodpileCubageModal: React.FC<WoodpileCubageModalProps> = ({ isOpen
 
   if (!isOpen) return null;
 
-  return (
+  return createPortal(
     <div className="fixed inset-0 z-[200] flex items-center justify-center p-2.5 sm:p-4 bg-slate-950/80 backdrop-blur-sm animate-in fade-in duration-200">
       <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-2xl max-h-[min(90dvh,calc(100vh-32px))] flex flex-col shadow-2xl overflow-hidden text-slate-100">
         {/* Header */}
@@ -657,6 +658,7 @@ export const WoodpileCubageModal: React.FC<WoodpileCubageModalProps> = ({ isOpen
           )}
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };

@@ -1,4 +1,5 @@
 import React from 'react';
+import { createPortal } from 'react-dom';
 import { useApp } from '../../context/AppContext';
 import { AlertTriangle, AlertCircle, HelpCircle, X } from 'lucide-react';
 
@@ -48,7 +49,7 @@ export const ConfirmModal: React.FC = () => {
 
   const style = getTypeStyle();
 
-  return (
+  return createPortal(
     <div
       id="modal-confirm-dialog"
       className="fixed inset-0 z-[300] flex items-center justify-center p-3 sm:p-4 bg-slate-950/85 backdrop-blur-sm animate-in fade-in duration-150"
@@ -98,6 +99,7 @@ export const ConfirmModal: React.FC = () => {
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };

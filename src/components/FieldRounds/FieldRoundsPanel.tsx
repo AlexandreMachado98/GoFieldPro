@@ -1,5 +1,6 @@
 import { formatFieldDistance, parseOdometerKm } from '../../utils/geoUtils';
 import React, { useState, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { useApp } from '../../context/AppContext';
 import { useAuth } from '../../context/AuthContext';
 import { FieldRound } from '../../types';

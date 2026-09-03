@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import {
   X,
   FileText,
@@ -152,7 +153,7 @@ export const MeasurementSummaryModal: React.FC<MeasurementSummaryModalProps> = (
 
   const areaResult = isClosed ? calculatePolygonArea(points) : { m2: 0, hectares: 0 };
 
-  return (
+  return createPortal(
     <div className="fixed inset-0 z-[200] flex items-center justify-center p-3 sm:p-4 bg-slate-950/80 backdrop-blur-sm animate-in fade-in duration-200">
       <div className="bg-slate-900 border border-slate-800 w-full max-w-4xl rounded-2xl shadow-2xl flex flex-col max-h-[min(90dvh,calc(100vh-32px))] overflow-hidden text-slate-100">
         {/* Modal Header */}
@@ -474,6 +475,7 @@ export const MeasurementSummaryModal: React.FC<MeasurementSummaryModalProps> = (
           </div>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };

@@ -1,4 +1,5 @@
 import React, { useState, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import {
   X,
   MapPin,
@@ -71,7 +72,7 @@ export const PointDetailModal: React.FC<PointDetailModalProps> = ({
   const safeLng = typeof point.lng === 'number' && !isNaN(point.lng) ? point.lng : 0;
   const utm = latLngToUTM(safeLat, safeLng);
 
-  return (
+  return createPortal(
     <div className="fixed inset-0 z-[200] flex items-center justify-center p-3 sm:p-4 bg-slate-950/80 backdrop-blur-sm animate-in fade-in duration-200">
       <div className="bg-slate-900 border border-slate-800 w-full max-w-lg rounded-2xl shadow-2xl flex flex-col max-h-[min(90dvh,calc(100vh-32px))] overflow-hidden">
         {/* Header */}
@@ -295,6 +296,7 @@ export const PointDetailModal: React.FC<PointDetailModalProps> = ({
           </div>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };

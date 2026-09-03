@@ -1,4 +1,5 @@
 import React from 'react';
+import { createPortal } from 'react-dom';
 import { X, Lock, Sparkles, ExternalLink, ArrowRight, Check, Shield } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 
@@ -12,7 +13,7 @@ export const FeatureLockModal: React.FC = () => {
     setIsUpgradeModalOpen(false);
   };
 
-  return (
+  return createPortal(
     <div className="fixed inset-0 z-[200] flex items-center justify-center p-3 sm:p-4 bg-slate-950/85 backdrop-blur-sm animate-in fade-in duration-200">
       <div className="relative w-full max-w-lg bg-[#070A10] border border-slate-800 rounded-2xl shadow-2xl overflow-y-auto max-h-[min(90dvh,calc(100vh-32px))] text-slate-100 p-5 sm:p-7 space-y-5">
         
@@ -100,6 +101,7 @@ export const FeatureLockModal: React.FC = () => {
         </div>
 
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };

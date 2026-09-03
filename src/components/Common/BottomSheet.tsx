@@ -1,4 +1,5 @@
 import React, { useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { X } from 'lucide-react';
 
 interface BottomSheetProps {
@@ -32,8 +33,8 @@ export const BottomSheet: React.FC<BottomSheetProps> = ({
 
   if (!isOpen) return null;
 
-  return (
-    <div className="fixed inset-0 z-[999] flex flex-col justify-end transition-opacity duration-200">
+  return createPortal(
+    <div className="fixed inset-0 z-[99999] flex flex-col justify-end transition-opacity duration-200">
       {/* Backdrop without canvas-breaking blur */}
       <div
         className="fixed inset-0 bg-black/40 animate-in fade-in duration-200"
@@ -76,6 +77,7 @@ export const BottomSheet: React.FC<BottomSheetProps> = ({
         {/* Content */}
         <div className="flex-1 overflow-y-auto p-5 text-slate-200">{children}</div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };

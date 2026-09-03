@@ -1,4 +1,5 @@
 import React, { useState, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { useApp } from '../../context/AppContext';
 import { LayerItem, BasemapType, PDFMapOverlay } from '../../types';
 import { parseKMLString, parseKMZFile } from '../../utils/kmlParser';
@@ -180,7 +181,7 @@ export const LayerManagerModal: React.FC = () => {
 
   const activeLayerWithFeatures = layers.find((l) => l.id === selectedLayerForFeatures);
 
-  return (
+  return createPortal(
     <div className="fixed inset-0 z-[200] flex items-center justify-center p-3 sm:p-4 bg-slate-950/80 backdrop-blur-sm animate-in fade-in duration-200">
       <div className="bg-slate-900 border border-slate-800 w-full max-w-3xl rounded-2xl shadow-2xl flex flex-col max-h-[min(90dvh,calc(100vh-32px))] overflow-hidden">
         {/* Header */}
@@ -551,6 +552,7 @@ export const LayerManagerModal: React.FC = () => {
           )}
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };

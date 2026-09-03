@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { createPortal } from 'react-dom';
 import {
   ShieldCheck,
   FileText,
@@ -24,7 +25,7 @@ export const LegalPoliciesModal: React.FC<LegalPoliciesModalProps> = ({ isOpen, 
 
   if (!isOpen) return null;
 
-  return (
+  return createPortal(
     <div className="fixed inset-0 z-[200] flex items-center justify-center p-2.5 sm:p-4 bg-slate-950/80 backdrop-blur-sm animate-in fade-in select-none">
       <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-3xl max-h-[min(90dvh,calc(100vh-32px))] flex flex-col shadow-2xl overflow-hidden text-slate-100">
         {/* Header */}
@@ -345,6 +346,7 @@ export const LegalPoliciesModal: React.FC<LegalPoliciesModalProps> = ({ isOpen, 
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };

@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { useApp } from '../../context/AppContext';
 import { Waypoint } from '../../types';
 import { latLngToUTM, formatToDMS } from '../../utils/geoUtils';
@@ -163,7 +164,7 @@ export const AddWaypointModal: React.FC<AddWaypointModalProps> = ({
   const utm = latLngToUTM(Number(lat), Number(lng));
   const selectedCat = CATEGORY_CONFIG.find((c) => c.id === category) || CATEGORY_CONFIG[0];
 
-  return (
+  return createPortal(
     <div className="fixed inset-0 z-[200] flex items-center justify-center p-3 sm:p-4 bg-slate-950/80 backdrop-blur-sm animate-in fade-in duration-200">
       <div className="bg-slate-900 border border-slate-800 w-full max-w-xl rounded-2xl shadow-2xl flex flex-col max-h-[min(90dvh,calc(100vh-32px))] overflow-hidden">
         {/* Header */}
@@ -401,6 +402,7 @@ export const AddWaypointModal: React.FC<AddWaypointModalProps> = ({
         </div>
       </form>
     </div>
-  </div>
-);
+  </div>,
+    document.body
+  );
 };

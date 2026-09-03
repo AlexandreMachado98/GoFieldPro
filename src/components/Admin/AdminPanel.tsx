@@ -1,6 +1,7 @@
 import { sanitizeFirestorePayload } from '../../utils/firestoreSanitizer';
 import { formatCurrencyBRL } from '../../utils/commercialVisibility';
 import React, { useEffect, useState, useCallback, useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import {
   collection,
   onSnapshot,

@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import { useApp } from '../../context/AppContext';
 import { 
   UploadCloud, DownloadCloud, 
@@ -2693,11 +2694,13 @@ export const PdfMapNavigator: React.FC = () => {
 
             {/* Processing message */}
             {isProcessing && (
+        createPortal(
               <div className="p-4 rounded-2xl bg-emerald-950/60 border border-emerald-800 text-emerald-200 text-xs flex items-center gap-3 animate-pulse">
                 <div className="w-4 h-4 border-2 border-emerald-400 border-t-transparent rounded-full animate-spin shrink-0" />
                 <span>{processingProgress || 'Renderizando páginas em alta resolução para navegação offline...'}</span>
               </div>
-            )}
+            , document.body)
+      )}
 
             {/* List of Maps Cards */}
             {documents.length > 0 ? (
@@ -2937,7 +2940,7 @@ export const PdfMapNavigator: React.FC = () => {
       {/* Woodpile Active Floating HUD */}
       {activeTool === 'woodpile' && !isMapsListOpen && (
         <div
-          className={`absolute bottom-20 sm:bottom-6 left-1/2 -translate-x-1/2 z-[1000] w-[95%] max-w-lg bg-slate-950/95 backdrop-blur-md border border-amber-500/80 rounded-2xl p-2.5 shadow-2xl flex flex-col sm:flex-row items-center justify-between gap-2.5 pointer-events-auto transition-opacity duration-300 ${
+          className={`absolute bottom-0 left-0 right-0 z-40 w-full bg-slate-950/95 backdrop-blur-md border-t border-slate-800 px-4 py-3 pb-[calc(1rem+env(safe-area-inset-bottom,4rem))] sm:pb-3 shadow-2xl flex flex-col sm:flex-row items-center justify-between gap-3 pointer-events-auto transition-opacity duration-300 animate-in slide-in-from-bottom ${
             isMapInteracting ? 'opacity-20 pointer-events-none' : 'opacity-100 pointer-events-auto'
           }`}
         >
@@ -3220,61 +3223,34 @@ export const PdfMapNavigator: React.FC = () => {
         )}
 
         {/* ------------------------------------------------------------- */}
-        {/* TOP-RIGHT CORNER: DISCRETE TOOLS BUTTON STACK (GPS MAP STYLE) */}
+        {/* BOTTOM RIGHT FAB GROUP (GPS MAP STYLE) */}
         {/* ------------------------------------------------------------- */}
         {activeDoc && !isMapsListOpen && (
           <div
-            className={`absolute top-3 right-3 z-20 pointer-events-auto flex flex-col gap-2 transition-opacity duration-300 ${
+            className={`absolute bottom-[5.5rem] sm:bottom-6 right-3 z-20 pointer-events-auto flex flex-col gap-3 transition-opacity duration-300 ${
               isMapInteracting ? 'opacity-20 pointer-events-none' : 'opacity-100 pointer-events-auto'
             }`}
           >
-            {/* 1. Ferramentas (SlidersHorizontal - Opens Discrete Menu) */}
-            <button
-              onClick={() => setIsToolsPanelOpen(true)}
-              className="w-10 h-10 rounded-2xl bg-slate-900/95 hover:bg-slate-900 text-emerald-400 border border-slate-700/80 shadow-xl flex items-center justify-center transition-all active:scale-95 cursor-pointer backdrop-blur-md"
-              title="Ferramentas do Mapa PDF"
-            >
-              <SlidersHorizontal className="w-4 h-4 text-emerald-400" />
-            </button>
-
-            {/* 2. Centralizar GPS */}
+            {/* Recenter GPS FAB */}
             <button
               onClick={centerOnUserGps}
-              className={`w-10 h-10 rounded-2xl border shadow-xl flex items-center justify-center transition-all active:scale-95 cursor-pointer backdrop-blur-md ${
+              className={`w-12 h-12 rounded-full border shadow-2xl flex items-center justify-center transition-all active:scale-95 cursor-pointer backdrop-blur-md ${
                 isGpsActive && userGps
-                  ? 'bg-slate-900/95 text-emerald-400 border-slate-700/80 hover:bg-slate-900'
-                  : 'bg-slate-900/95 text-slate-400 border-slate-700/80 hover:bg-slate-900'
+                  ? 'bg-slate-900/90 text-emerald-400 border-slate-700/80 hover:bg-slate-800'
+                  : 'bg-amber-900/90 text-amber-400 border-amber-500/50 animate-pulse'
               }`}
               title="Centralizar Minha Posição"
             >
-              <Crosshair className="w-4 h-4" />
+              <Crosshair className="w-5 h-5" />
             </button>
 
-            {/* 3. Zoom In */}
+            {/* Tools Drawer FAB */}
             <button
-              onClick={() => mapInstanceRef.current?.zoomIn()}
-              className="w-10 h-10 rounded-2xl bg-slate-900/95 hover:bg-slate-900 text-slate-300 border border-slate-700/80 shadow-xl flex items-center justify-center transition-all active:scale-95 cursor-pointer backdrop-blur-md"
-              title="Aproximar Zoom (+)"
+              onClick={() => setIsToolsPanelOpen(true)}
+              className="w-12 h-12 rounded-full bg-emerald-600 hover:bg-emerald-500 text-white border-none shadow-[0_4px_16px_rgba(5,150,105,0.4)] flex items-center justify-center transition-all active:scale-95 cursor-pointer"
+              title="Ferramentas do Mapa PDF"
             >
-              <ZoomIn className="w-4 h-4" />
-            </button>
-
-            {/* 4. Zoom Out */}
-            <button
-              onClick={() => mapInstanceRef.current?.zoomOut()}
-              className="w-10 h-10 rounded-2xl bg-slate-900/95 hover:bg-slate-900 text-slate-300 border border-slate-700/80 shadow-xl flex items-center justify-center transition-all active:scale-95 cursor-pointer backdrop-blur-md"
-              title="Afastar Zoom (-)"
-            >
-              <ZoomOut className="w-4 h-4" />
-            </button>
-
-            {/* 5. Ajustar Folha à Tela */}
-            <button
-              onClick={handleFitBounds}
-              className="w-10 h-10 rounded-2xl bg-slate-900/95 hover:bg-slate-900 text-slate-300 border border-slate-700/80 shadow-xl flex items-center justify-center transition-all active:scale-95 cursor-pointer backdrop-blur-md"
-              title="Enquadrar Folha"
-            >
-              <Maximize2 className="w-4 h-4" />
+              <Layers className="w-5 h-5" />
             </button>
           </div>
         )}
@@ -3284,13 +3260,13 @@ export const PdfMapNavigator: React.FC = () => {
         {/* ------------------------------------------------------------- */}
         {isRecordingLive && !isMapsListOpen && (
           <div
-            className={`absolute bottom-20 sm:bottom-6 left-1/2 -translate-x-1/2 z-[1000] transition-opacity duration-300 pointer-events-auto ${
-              isMapInteracting ? 'opacity-20 pointer-events-none' : 'opacity-100 pointer-events-auto'
+            className={`absolute bottom-0 left-0 right-0 z-40 w-full pointer-events-none animate-in slide-in-from-bottom duration-300 transition-opacity ${
+              isMapInteracting ? 'opacity-20' : 'opacity-100'
             }`}
           >
-            <div className="bg-slate-950/95 backdrop-blur-md border border-slate-700/90 rounded-full px-3 py-1.5 shadow-2xl flex items-center gap-2 text-white">
+            <div className="pointer-events-auto bg-slate-950/95 backdrop-blur-md border-t border-slate-800 px-4 py-3 pb-[calc(1rem+env(safe-area-inset-bottom,4rem))] sm:pb-3 shadow-2xl flex items-center justify-between gap-3 text-white w-full">
               {/* Status Pulse */}
-              <div className="flex items-center gap-1.5 pl-1.5 pr-0.5">
+              <div className="flex items-center gap-2 pl-1.5 pr-0.5">
                 <span className={`w-2.5 h-2.5 rounded-full ${isRecordingPaused ? 'bg-amber-400' : 'bg-rose-500 animate-ping'}`} />
                 <span className="text-[10px] font-black uppercase tracking-wider text-slate-300">
                   {isRecordingPaused ? 'Pausado' : 'Gravando'}
@@ -3368,37 +3344,45 @@ export const PdfMapNavigator: React.FC = () => {
         {/* ------------------------------------------------------------- */}
         {activeTool === 'draw_track' && currentTrackPoints.length > 0 && (
           <div
-            className={`absolute bottom-20 sm:bottom-6 left-1/2 -translate-x-1/2 z-[1000] transition-opacity duration-300 pointer-events-auto ${
-              isMapInteracting ? 'opacity-20 pointer-events-none' : 'opacity-100 pointer-events-auto'
+            className={`absolute bottom-0 left-0 right-0 z-40 w-full pointer-events-none animate-in slide-in-from-bottom duration-300 transition-opacity ${
+              isMapInteracting ? 'opacity-20' : 'opacity-100'
             }`}
           >
-            <div className="bg-slate-950/95 backdrop-blur-md border border-amber-500/80 rounded-full px-3.5 py-1.5 shadow-2xl flex items-center gap-2 text-white">
-              <span className="text-xs font-bold text-amber-400 px-1">
-                {currentTrackPoints.length} pts
-              </span>
-              <button
-                onClick={() => setCurrentTrackPoints((prev) => prev.slice(0, -1))}
-                className="p-1.5 bg-slate-800 text-slate-200 rounded-full hover:bg-slate-700 active:scale-95 cursor-pointer"
-                title="Desfazer último vértice"
-              >
-                <Undo2 className="w-3.5 h-3.5" />
-              </button>
-              <button
-                onClick={() => setIsTrackModalOpen(true)}
-                className="flex items-center gap-1 px-3 py-1 bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs rounded-full shadow active:scale-95 cursor-pointer"
-              >
-                <Check className="w-3.5 h-3.5" />
-                <span>Salvar</span>
-              </button>
-              <button
-                onClick={() => {
-                  setCurrentTrackPoints([]);
-                  setActiveTool('pan');
-                }}
-                className="px-2.5 py-1 text-slate-400 hover:text-white text-xs font-bold rounded-full cursor-pointer"
-              >
-                Cancelar
-              </button>
+            <div className="pointer-events-auto bg-slate-950/95 backdrop-blur-md border-t border-slate-800 px-4 py-3 pb-[calc(1rem+env(safe-area-inset-bottom,4rem))] sm:pb-3 shadow-2xl flex items-center justify-between gap-3 text-white w-full">
+              {/* Left Side */}
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-bold text-amber-400 px-1">
+                  {currentTrackPoints.length} vértices
+                </span>
+              </div>
+              
+              {/* Right Side */}
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setCurrentTrackPoints((prev) => prev.slice(0, -1))}
+                  className="w-10 h-10 flex items-center justify-center bg-slate-800 text-slate-200 rounded-full hover:bg-slate-700 active:scale-95 cursor-pointer"
+                  title="Desfazer último vértice"
+                >
+                  <Undo2 className="w-4 h-4" />
+                </button>
+                <button
+                  onClick={() => setIsTrackModalOpen(true)}
+                  className="flex items-center gap-1.5 px-4 h-10 bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs uppercase tracking-wider rounded-full shadow active:scale-95 cursor-pointer"
+                >
+                  <Check className="w-4 h-4" />
+                  <span>Salvar</span>
+                </button>
+                <button
+                  onClick={() => {
+                    setCurrentTrackPoints([]);
+                    setActiveTool('pan');
+                  }}
+                  className="w-10 h-10 flex items-center justify-center text-slate-400 hover:text-white hover:bg-slate-800 rounded-full cursor-pointer ml-1"
+                  title="Cancelar"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
             </div>
           </div>
         )}
@@ -3677,6 +3661,7 @@ export const PdfMapNavigator: React.FC = () => {
 
       {/* MODAL: Adicionar Novo Ponto com Foto (z-[200]) */}
       {pendingMarkerPos && (
+        createPortal(
         <div className="fixed inset-0 z-[200] bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 animate-in fade-in">
           <div className="bg-slate-900 border border-slate-800 w-full max-w-md rounded-2xl shadow-2xl flex flex-col max-h-[min(90dvh,calc(100vh-32px))] overflow-hidden">
             
@@ -3918,10 +3903,12 @@ export const PdfMapNavigator: React.FC = () => {
 
           </div>
         </div>
+      , document.body)
       )}
 
       {/* MODAL: Salvar Rota Traçada (z-[200]) */}
       {isTrackModalOpen && (
+        createPortal(
         <div className="fixed inset-0 z-[200] bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 animate-in fade-in">
           <div className="bg-slate-900 border border-slate-800 w-full max-w-sm rounded-2xl shadow-2xl p-4 space-y-4 max-h-[min(90dvh,calc(100vh-32px))] overflow-y-auto">
             <h3 className="text-sm font-extrabold text-white flex items-center gap-2">
@@ -3974,6 +3961,7 @@ export const PdfMapNavigator: React.FC = () => {
             </div>
           </div>
         </div>
+      , document.body)
       )}
 
       {/* MODAL: Salvar Trilha Gravada em Tempo Real (z-[200]) */}

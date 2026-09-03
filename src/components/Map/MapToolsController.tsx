@@ -188,62 +188,30 @@ export const MapToolsController: React.FC<MapToolsControllerProps> = ({
 
       {/* ------------------------------------------------------------- */}
       {/* TOP-RIGHT CORNER: MAP CONTROLS & TOOLS BUTTON STACK          */}
+      {/* BOTTOM-RIGHT CORNER: MODERN FLOATING ACTION BUTTONS           */}
       {/* ------------------------------------------------------------- */}
-      <div className="absolute top-3 right-3 z-20 pointer-events-auto flex flex-col gap-2">
-        {/* Tools Drawer Button */}
-        <button
-          onClick={() => setIsToolsBottomSheetOpen(true)}
-          className="w-10 h-10 rounded-xl bg-slate-950/90 hover:bg-slate-900 text-slate-200 hover:text-emerald-400 border border-slate-800 shadow-lg flex items-center justify-center transition-all active:scale-95 cursor-pointer backdrop-blur-md"
-          title="Ferramentas do Mapa"
-        >
-          <SlidersHorizontal className="w-4 h-4" />
-        </button>
-
-        {/* Recenter GPS */}
+      <div className="absolute bottom-[5.5rem] sm:bottom-6 right-3 z-20 pointer-events-auto flex flex-col gap-3">
+        {/* Recenter GPS FAB */}
         <button
           onClick={onRecenterGps}
-          className={`w-10 h-10 rounded-xl border shadow-lg flex items-center justify-center transition-all active:scale-95 cursor-pointer ${
+          className={`w-12 h-12 rounded-full border shadow-2xl flex items-center justify-center transition-all active:scale-95 cursor-pointer backdrop-blur-md ${
             hasGpsLock
-              ? 'bg-slate-950/90 text-emerald-400 border-slate-800 hover:bg-slate-900'
-              : 'bg-amber-950/90 text-amber-400 border-amber-500/50 animate-pulse'
+              ? 'bg-slate-900/90 text-emerald-400 border-slate-700/80 hover:bg-slate-800'
+              : 'bg-amber-900/90 text-amber-400 border-amber-500/50 animate-pulse'
           }`}
           title="Recentralizar no GPS"
         >
-          <Crosshair className="w-4.5 h-4.5" />
+          <Crosshair className="w-5 h-5" />
         </button>
 
-        {/* Zoom In */}
-        {onZoomIn && (
-          <button
-            onClick={onZoomIn}
-            className="w-10 h-10 rounded-xl bg-slate-950/90 hover:bg-slate-900 text-slate-300 border border-slate-800 shadow-lg flex items-center justify-center transition-all active:scale-95 cursor-pointer"
-            title="Aproximar Zoom (+)"
-          >
-            <ZoomIn className="w-4.5 h-4.5" />
-          </button>
-        )}
-
-        {/* Zoom Out */}
-        {onZoomOut && (
-          <button
-            onClick={onZoomOut}
-            className="w-10 h-10 rounded-xl bg-slate-950/90 hover:bg-slate-900 text-slate-300 border border-slate-800 shadow-lg flex items-center justify-center transition-all active:scale-95 cursor-pointer"
-            title="Afastar Zoom (-)"
-          >
-            <ZoomOut className="w-4.5 h-4.5" />
-          </button>
-        )}
-
-        {/* Fit Bounds */}
-        {onFitBounds && (
-          <button
-            onClick={onFitBounds}
-            className="w-10 h-10 rounded-xl bg-slate-950/90 hover:bg-slate-900 text-slate-300 border border-slate-800 shadow-lg flex items-center justify-center transition-all active:scale-95 cursor-pointer"
-            title="Enquadrar Todas as Camadas"
-          >
-            <Maximize2 className="w-4.5 h-4.5" />
-          </button>
-        )}
+        {/* Tools Drawer FAB */}
+        <button
+          onClick={() => setIsToolsBottomSheetOpen(true)}
+          className="w-12 h-12 rounded-full bg-emerald-600 hover:bg-emerald-500 text-white border-none shadow-[0_4px_16px_rgba(5,150,105,0.4)] flex items-center justify-center transition-all active:scale-95 cursor-pointer"
+          title="Ferramentas do Mapa"
+        >
+          <Layers className="w-5 h-5" />
+        </button>
       </div>
 
       {/* ------------------------------------------------------------- */}
