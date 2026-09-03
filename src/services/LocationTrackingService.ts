@@ -178,33 +178,25 @@ class LocationTrackingService {
       console.warn('[LocationTrackingService] Erro ao checar permissões nativas (possivelmente rodando em desktop):', permError);
     }
 
-    if (typeof navigator === 'undefined' || !navigator.geolocation) {
-      console.warn('[LocationTrackingService] Geolocation API unavailable on this browser.');
-      return;
-    }
-
     try {
-      this.watchId = navigator.geolocation.watchPosition(
-        (pos) => this.handleRawPosition(pos),
-        (err) => {
-          console.warn('[LocationTrackingService] High-accuracy geolocation error:', err.message);
-          if (this.watchId !== null) {
-            navigator.geolocation.clearWatch(this.watchId);
-            this.watchId = navigator.geolocation.watchPosition(
-              (p) => this.handleRawPosition(p),
-              (e) => console.warn('[LocationTrackingService] Low-accuracy geolocation fallback error:', e.message),
-              GPS_CONFIG.FALLBACK_OPTIONS
-            );
+      this.watchId = await Geolocation.watchPosition(
+        GPS_CONFIG.WATCH_OPTIONS,
+        (pos, err) => {
+          if (err) {
+            console.warn('[LocationTrackingService] Native geolocation error:', err);
+            return;
           }
-        },
-        GPS_CONFIG.WATCH_OPTIONS
-      );
+          if (pos) {
+            this.handleRawPosition(pos as GeolocationPosition);
+          }
+        }
+      ) as unknown as number;
 
       if (this.currentStatus === 'idle') {
         this.notifyStatus('tracking');
       }
     } catch (e) {
-      console.error('[LocationTrackingService] Failed to start watchPosition:', e);
+      console.error('[LocationTrackingService] Failed to start native watchPosition:', e);
     }
   }
 
@@ -462,8 +454,8 @@ class LocationTrackingService {
   }
 
   private stopHardwareWatch() {
-    if (this.watchId !== null && typeof navigator !== 'undefined' && navigator.geolocation) {
-      navigator.geolocation.clearWatch(this.watchId);
+    if (this.watchId !== null) {
+      Geolocation.clearWatch({ id: this.watchId as unknown as string }).catch(console.error);
       this.watchId = null;
     }
   }
