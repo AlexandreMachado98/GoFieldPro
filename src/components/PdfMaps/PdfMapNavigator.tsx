@@ -36,8 +36,10 @@ import {
   Ruler,
   Lock,
   ArrowLeft,
-  EyeOff
+  EyeOff,
+  SlidersHorizontal
 } from 'lucide-react';
+import { BottomSheet } from '../Common/BottomSheet';
 import L from 'leaflet';
 import * as pdfjsLib from 'pdfjs-dist';
 import pdfWorker from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
@@ -59,13 +61,18 @@ import {
   gpsToPdf, 
   pdfToGps, 
   createCenteredCalibration, 
+  create2PointCalibration,
+  createBoundingBoxCalibration,
+  isDocumentCalibrated,
   calculateNavigationToMarker
 } from '../../utils/geoTransform';
+import { parseGeoPdfMetadata } from '../../utils/geoPdfParser';
 import { calculateDistanceMeters, calculatePolygonArea } from '../../utils/geoUtils';
 import { parseKMLString, parseKMZFile } from '../../utils/kmlParser';
 import { KMLFeature, GeoCoordinate } from '../../types';
 import { MeasurementPoint, MeasurementPointType } from '../../types';
 import { MeasurementControlBar } from '../Map/MeasurementControlBar';
+import { MapToolsController } from '../Map/MapToolsController';
 import { PointDetailModal } from '../Map/PointDetailModal';
 import { MeasurementSummaryModal } from '../Map/MeasurementSummaryModal';
 import { PdfExportModal } from './PdfExportModal';
@@ -168,6 +175,7 @@ export const PdfMapNavigator: React.FC = () => {
   const {
     addPdfFile,
     currentGps,
+    requestCurrentLocation,
     notifySuccess,
     notifyError,
     isProUser,
@@ -177,6 +185,7 @@ export const PdfMapNavigator: React.FC = () => {
     notifyInfo,
     showConfirm,
     setActiveTab,
+    setNavTarget,
   } = useApp();
   
   // Storage state
@@ -188,8 +197,9 @@ export const PdfMapNavigator: React.FC = () => {
   // Tools mode: 'pan', 'add_point', 'draw_track', 'record_track', 'measure', 'woodpile'
   const [activeTool, setActiveTool] = useState<'pan' | 'add_point' | 'draw_track' | 'record_track' | 'measure' | 'woodpile'>('pan');
 
-  // Retractable Tools Panel
-  const [isToolsPanelOpen, setIsToolsPanelOpen] = useState<boolean>(true);
+  // Retractable Tools Panel (Starts CLOSED to avoid screen clutter, like GPS map)
+  const [isToolsPanelOpen, setIsToolsPanelOpen] = useState<boolean>(false);
+  const [isMapInteracting, setIsMapInteracting] = useState<boolean>(false);
 
   // Woodpile Specific Submode & Form State
   const [woodpileSubMode, setWoodpileSubMode] = useState<'point' | 'measure'>('point');
@@ -263,9 +273,25 @@ export const PdfMapNavigator: React.FC = () => {
   // Export Modal state
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
 
-  // Calibration Modal state
+  // Calibration Modal state (Multi-method: GPS anchor, 2-point GCP, neatline bounds)
   const [isCalibrationModalOpen, setIsCalibrationModalOpen] = useState(false);
+  const [calibTab, setCalibTab] = useState<'gps_anchor' | 'gcp_2pt' | 'bounds'>('gps_anchor');
   const [calibScale, setCalibScale] = useState(0.85);
+  const [calibRotation, setCalibRotation] = useState<number>(0);
+  const [calibNominalScale, setCalibNominalScale] = useState<string>('1:10.000');
+  const [calibCenterLat, setCalibCenterLat] = useState<string>('');
+  const [calibCenterLng, setCalibCenterLng] = useState<string>('');
+  const [gcpPt1, setGcpPt1] = useState<{ x: number; y: number; lat: string; lng: string }>({ x: 0, y: 0, lat: '', lng: '' });
+  const [gcpPt2, setGcpPt2] = useState<{ x: number; y: number; lat: string; lng: string }>({ x: 0, y: 0, lat: '', lng: '' });
+  const [boundsNorth, setBoundsNorth] = useState<string>('');
+  const [boundsSouth, setBoundsSouth] = useState<string>('');
+  const [boundsWest, setBoundsWest] = useState<string>('');
+  const [boundsEast, setBoundsEast] = useState<string>('');
+  const [isSelectingGcpOnMap, setIsSelectingGcpOnMap] = useState<1 | 2 | null>(null);
+  const isSelectingGcpOnMapRef = useRef<1 | 2 | null>(null);
+  isSelectingGcpOnMapRef.current = isSelectingGcpOnMap;
+  const [distanceToMapKm, setDistanceToMapKm] = useState<number | null>(null);
+  const [isUserInsideMap, setIsUserInsideMap] = useState<boolean>(true);
 
   // Save Live Recorded Route Modal state
   const [isSaveRecordedModalOpen, setIsSaveRecordedModalOpen] = useState(false);
@@ -498,6 +524,7 @@ export const PdfMapNavigator: React.FC = () => {
   const activeDrawPolylineRef = useRef<L.Polyline | null>(null);
   const liveRecordPolylineRef = useRef<L.Polyline | null>(null);
   const targetGuideLineRef = useRef<L.Polyline | null>(null);
+  const approachLineRef = useRef<L.Polyline | null>(null);
   const gpsUserMarkerRef = useRef<L.Marker | null>(null);
   const gpsAccuracyCircleRef = useRef<L.CircleMarker | null>(null);
   const gpsWatchIdRef = useRef<number | null>(null);
@@ -582,6 +609,14 @@ export const PdfMapNavigator: React.FC = () => {
       const measureGroup = L.layerGroup().addTo(map);
       measureLayerRef.current = measureGroup;
 
+      // Listen to user map interaction (drag, zoom, pan) to reduce opacity of overlay controls
+      map.on('movestart zoomstart dragstart', () => {
+        setIsMapInteracting(true);
+      });
+      map.on('moveend zoomend dragend', () => {
+        setIsMapInteracting(false);
+      });
+
       // Click listener uses activeToolRef and state refs to prevent crashes & stale closures
       map.on('click', (e: L.LeafletMouseEvent) => {
         try {
@@ -594,6 +629,21 @@ export const PdfMapNavigator: React.FC = () => {
           const currentDocs = documentsRef.current;
           const currentDocId = activeDocIdRef.current;
           const currentDoc = currentDocs.find((d) => d.id === currentDocId);
+
+          if (isSelectingGcpOnMapRef.current === 1) {
+            setGcpPt1((prev) => ({ ...prev, x: +lat.toFixed(1), y: +lng.toFixed(1) }));
+            setIsSelectingGcpOnMap(null);
+            setIsCalibrationModalOpen(true);
+            notifySuccess('Ponto 1 Marcado na Folha', `Posição do Ponto 1 definida: [${lat.toFixed(0)}, ${lng.toFixed(0)}]`);
+            return;
+          }
+          if (isSelectingGcpOnMapRef.current === 2) {
+            setGcpPt2((prev) => ({ ...prev, x: +lat.toFixed(1), y: +lng.toFixed(1) }));
+            setIsSelectingGcpOnMap(null);
+            setIsCalibrationModalOpen(true);
+            notifySuccess('Ponto 2 Marcado na Folha', `Posição do Ponto 2 definida: [${lat.toFixed(0)}, ${lng.toFixed(0)}]`);
+            return;
+          }
 
           if (currentTool === 'add_point') {
             setPendingMarkerPos({ x: lat, y: lng });
@@ -734,7 +784,33 @@ export const PdfMapNavigator: React.FC = () => {
     let mounted = true;
     (async () => {
       try {
-        const docs = await getAllPdfDocuments(currentUserId);
+        const rawDocs = await getAllPdfDocuments(currentUserId);
+        // Automatically sanitize and cleanse any legacy auto-anchored fake calibrations from previous versions
+        const docs = await Promise.all(
+          rawDocs.map(async (doc) => {
+            if (doc.calibration && doc.calibration.isCalibrated) {
+              if (doc.calibration.method === 'centered' || !doc.calibration.method) {
+                const cleanedDoc: PdfDocument = {
+                  ...doc,
+                  calibration: {
+                    isCalibrated: false,
+                    ref1: { x: doc.height * 0.9, y: doc.width * 0.1, lat: NaN, lng: NaN },
+                    ref2: { x: doc.height * 0.1, y: doc.width * 0.9, lat: NaN, lng: NaN },
+                    scaleMetersPerPixel: 0.75,
+                  },
+                };
+                try {
+                  await savePdfDocument(cleanedDoc, currentUserId);
+                } catch (err) {
+                  console.warn('Failed to persist cleaned calibration:', err);
+                }
+                return cleanedDoc;
+              }
+            }
+            return doc;
+          })
+        );
+
         if (mounted) {
           if (docs.length > 0) {
             setDocuments(docs);
@@ -841,16 +917,23 @@ export const PdfMapNavigator: React.FC = () => {
         try {
           imageOverlayRef.current = L.imageOverlay(currentDataUrl, bounds).addTo(map);
           map.fitBounds(bounds, { padding: [15, 15] });
-          map.setMaxBounds(bounds.pad(1.5));
-          
+          // Allow zooming out freely so user can view their GPS position approaching the sheet from afar
           const baseZoom = map.getBoundsZoom(bounds);
-          if (isFinite(baseZoom)) {
-            map.setMinZoom(baseZoom - 1.2);
-          } else {
-            map.setMinZoom(-3);
-          }
+          map.setMinZoom(isFinite(baseZoom) ? Math.min(-5, baseZoom - 5) : -6);
         } catch (err) {
           console.warn('Error loading image overlay:', err);
+        }
+      }
+
+      // If document is not calibrated, strictly ensure no GPS markers exist on sheet
+      if (!isDocumentCalibrated(activeDoc)) {
+        if (gpsUserMarkerRef.current) {
+          try { map.removeLayer(gpsUserMarkerRef.current); } catch {}
+          gpsUserMarkerRef.current = null;
+        }
+        if (gpsAccuracyCircleRef.current) {
+          try { map.removeLayer(gpsAccuracyCircleRef.current); } catch {}
+          gpsAccuracyCircleRef.current = null;
         }
       }
 
@@ -1392,16 +1475,18 @@ export const PdfMapNavigator: React.FC = () => {
       }
 
       if (activeNavPoint && typeof activeNavPoint.x === 'number' && typeof activeNavPoint.y === 'number' && !isNaN(activeNavPoint.x) && !isNaN(activeNavPoint.y)) {
-        let startPoint: [number, number];
-        if (userGps && typeof userGps.lat === 'number' && typeof userGps.lng === 'number' && !isNaN(userGps.lat) && !isNaN(userGps.lng)) {
+        let startPoint: [number, number] | null = null;
+        if (gpsUserMarkerRef.current) {
+          const pos = gpsUserMarkerRef.current.getLatLng();
+          startPoint = [pos.lat, pos.lng];
+        } else if (userGps && typeof userGps.lat === 'number' && typeof userGps.lng === 'number' && !isNaN(userGps.lat) && !isNaN(userGps.lng)) {
           const userPdf = gpsToPdf(userGps.lat, userGps.lng, activeDoc);
-          startPoint = [userPdf.x, userPdf.y];
-        } else {
-          const center = map.getCenter();
-          startPoint = [center.lat, center.lng];
+          if (!isNaN(userPdf.x) && !isNaN(userPdf.y)) {
+            startPoint = [userPdf.x, userPdf.y];
+          }
         }
 
-        if (!isNaN(startPoint[0]) && !isNaN(startPoint[1])) {
+        if (startPoint && !isNaN(startPoint[0]) && !isNaN(startPoint[1])) {
           targetGuideLineRef.current = L.polyline([startPoint, [activeNavPoint.x, activeNavPoint.y]], {
             color: '#38bdf8',
             weight: 3,
@@ -1415,159 +1500,11 @@ export const PdfMapNavigator: React.FC = () => {
     }
   }, [activeNavPoint, userGps, activeDoc]);
 
-  // Real-time GPS Location Tracker & PDF Coordinate Projection Engine
-  const updateUserGpsPosition = useCallback((pos: GeolocationPosition) => {
-    try {
-      if (!pos || !pos.coords) return;
-      const { latitude, longitude, accuracy, speed, altitude, heading } = pos.coords;
-      if (typeof latitude !== 'number' || typeof longitude !== 'number' || isNaN(latitude) || isNaN(longitude)) return;
-
-      setUserGps({
-        lat: latitude,
-        lng: longitude,
-        accuracy: typeof accuracy === 'number' && !isNaN(accuracy) ? accuracy : 5,
-        speed: typeof speed === 'number' && !isNaN(speed) ? speed : null,
-        altitude: typeof altitude === 'number' && !isNaN(altitude) ? altitude : null,
-        heading: typeof heading === 'number' && !isNaN(heading) ? heading : null,
-        timestamp: pos.timestamp || Date.now(),
-      });
-      setErrorMsg(null);
-
-      if (!mapInstanceRef.current || !activeDoc) return;
-      const map = mapInstanceRef.current;
-
-      const pdfCoords = gpsToPdf(latitude, longitude, activeDoc);
-      if (isNaN(pdfCoords.x) || isNaN(pdfCoords.y)) return;
-
-      const headingDeg = heading !== null && !isNaN(heading) ? heading : 0;
-      const userMarkerHtml = `
-        <div class="user-gps-pulse-wrapper" style="position: relative; width: 36px; height: 36px; display: flex; align-items: center; justify-content: center;">
-          <div style="position: absolute; inset: 0; border-radius: 50%; background: rgba(14, 165, 233, 0.35); animation: ping 2s cubic-bezier(0, 0, 0.2, 1) infinite;"></div>
-          <div style="width: 20px; height: 20px; border-radius: 50%; background: #0284c7; border: 3px solid #ffffff; box-shadow: 0 0 14px rgba(2, 132, 199, 0.9); display: flex; align-items: center; justify-content: center;">
-            <div style="width: 6px; height: 6px; border-radius: 50%; background: #ffffff;"></div>
-          </div>
-          ${heading !== null ? `
-            <div style="position: absolute; top: -8px; width: 0; height: 0; border-left: 5px solid transparent; border-right: 5px solid transparent; border-bottom: 8px solid #38bdf8; transform: rotate(${headingDeg}deg); transform-origin: 50% 26px;"></div>
-          ` : ''}
-        </div>
-      `;
-
-      const userIcon = L.divIcon({
-        className: 'custom-user-gps-marker',
-        html: userMarkerHtml,
-        iconSize: [36, 36],
-        iconAnchor: [18, 18],
-      });
-
-      if (gpsUserMarkerRef.current) {
-        gpsUserMarkerRef.current.setLatLng([pdfCoords.x, pdfCoords.y]);
-        gpsUserMarkerRef.current.setIcon(userIcon);
-      } else {
-        gpsUserMarkerRef.current = L.marker([pdfCoords.x, pdfCoords.y], {
-          icon: userIcon,
-          zIndexOffset: 10000,
-        }).addTo(map);
-      }
-
-      const safeAccuracy = typeof accuracy === 'number' && !isNaN(accuracy) ? accuracy : 5;
-      const accuracyRadiusPx = Math.max(15, Math.min(120, safeAccuracy * 0.8));
-      if (gpsAccuracyCircleRef.current) {
-        gpsAccuracyCircleRef.current.setLatLng([pdfCoords.x, pdfCoords.y]);
-        gpsAccuracyCircleRef.current.setRadius(accuracyRadiusPx);
-      } else {
-        gpsAccuracyCircleRef.current = L.circle([pdfCoords.x, pdfCoords.y], {
-          radius: accuracyRadiusPx,
-          color: '#0284c7',
-          fillColor: '#38bdf8',
-          fillOpacity: 0.12,
-          weight: 1,
-          dashArray: '4, 4',
-        }).addTo(map);
-      }
-
-      if (activeToolRef.current === 'record_track' && !isRecordingPaused) {
-        setRecordedPoints((prev) => {
-          const lastPt = prev[prev.length - 1];
-          if (!lastPt) {
-            return [{
-              x: pdfCoords.x,
-              y: pdfCoords.y,
-              lat: latitude,
-              lng: longitude,
-              speed: speed !== null ? speed : undefined,
-              altitude: altitude !== null ? altitude : undefined,
-              time: new Date().toLocaleTimeString('pt-BR'),
-            }];
-          }
-
-          const distPx = Math.hypot(pdfCoords.x - lastPt.x, pdfCoords.y - lastPt.y);
-          if (distPx >= 3) {
-            return [
-              ...prev,
-              {
-                x: pdfCoords.x,
-                y: pdfCoords.y,
-                lat: latitude,
-                lng: longitude,
-                speed: speed !== null ? speed : undefined,
-                altitude: altitude !== null ? altitude : undefined,
-                time: new Date().toLocaleTimeString('pt-BR'),
-              },
-            ];
-          }
-          return prev;
-        });
-      }
-    } catch (err) {
-      console.warn('Error in GPS update:', err);
-    }
-  }, [activeDoc, isRecordingPaused]);
-
-  // Handle GPS start / stop watcher
-  const toggleGps = useCallback((forceState?: boolean) => {
-    const nextState = forceState !== undefined ? forceState : !isGpsActive;
-
-    if (nextState) {
-      if (!('geolocation' in navigator)) {
-        notifyError('GPS Não Suportado', 'Seu navegador ou dispositivo não possui suporte a geolocalização.');
-        return;
-      }
-
-      setIsGpsActive(true);
-      notifyInfo('GPS Ativado', 'Obtendo localização de satélite em tempo real...');
-
-      try {
-        gpsWatchIdRef.current = navigator.geolocation.watchPosition(
-          (pos) => {
-            updateUserGpsPosition(pos);
-          },
-          (err) => {
-            console.warn('Geolocation watch error:', err);
-            let errText = 'Não foi possível obter a localização do dispositivo.';
-            if (err.code === err.PERMISSION_DENIED) {
-              errText = 'Permissão de localização negada pelo usuário.';
-            } else if (err.code === err.POSITION_UNAVAILABLE) {
-              errText = 'Sinal de GPS indisponível no momento.';
-            } else if (err.code === err.TIMEOUT) {
-              errText = 'Tempo limite esgotado ao buscar satélites.';
-            }
-            setErrorMsg(errText);
-          },
-          {
-            enableHighAccuracy: true,
-            timeout: 12000,
-            maximumAge: 1000,
-          }
-        );
-      } catch (err) {
-        console.warn('Failed to start GPS watch:', err);
-      }
-    } else {
+  // Unified GPS Pipeline: Synchronizes with AppContext/LocationTrackingService
+  useEffect(() => {
+    if (!currentGps) {
+      setUserGps(null);
       setIsGpsActive(false);
-      if (gpsWatchIdRef.current !== null) {
-        navigator.geolocation.clearWatch(gpsWatchIdRef.current);
-        gpsWatchIdRef.current = null;
-      }
       if (gpsUserMarkerRef.current && mapInstanceRef.current) {
         try {
           mapInstanceRef.current.removeLayer(gpsUserMarkerRef.current);
@@ -1580,77 +1517,329 @@ export const PdfMapNavigator: React.FC = () => {
         } catch {}
         gpsAccuracyCircleRef.current = null;
       }
-      setUserGps(null);
-      notifyInfo('GPS Desativado', 'Rastreio de posição pausado.');
-    }
-  }, [isGpsActive, notifyError, notifyInfo, updateUserGpsPosition]);
-
-  // Clean up GPS watcher on unmount & suspend on background for battery/thermal savings
-  useEffect(() => {
-    const handleVisibility = () => {
-      if (document.visibilityState === 'hidden') {
-        if (!isRecordingLive && gpsWatchIdRef.current !== null && navigator.geolocation) {
-          try {
-            navigator.geolocation.clearWatch(gpsWatchIdRef.current);
-            gpsWatchIdRef.current = null;
-          } catch {}
-        }
-      } else if (document.visibilityState === 'visible') {
-        if (isGpsActive && gpsWatchIdRef.current === null && navigator.geolocation) {
-          try {
-            gpsWatchIdRef.current = navigator.geolocation.watchPosition(
-              (pos) => updateUserGpsPosition(pos),
-              (err) => console.warn('GPS resume error:', err),
-              { enableHighAccuracy: true, timeout: 15000, maximumAge: 4000 }
-            );
-          } catch {}
-        }
-      }
-    };
-
-    document.addEventListener('visibilitychange', handleVisibility);
-
-    return () => {
-      document.removeEventListener('visibilitychange', handleVisibility);
-      if (gpsWatchIdRef.current !== null) {
-        try {
-          navigator.geolocation.clearWatch(gpsWatchIdRef.current);
-          gpsWatchIdRef.current = null;
-        } catch {}
-      }
-    };
-  }, [isRecordingLive, isGpsActive, updateUserGpsPosition]);
-
-  // Center map on user's current GPS position on PDF
-  const centerOnUserGps = useCallback(() => {
-    if (!userGps) {
-      toggleGps(true);
       return;
     }
 
+    setIsGpsActive(true);
+    setUserGps({
+      lat: currentGps.lat,
+      lng: currentGps.lng,
+      accuracy: currentGps.accuracy || 5,
+      speed: currentGps.speed !== undefined ? currentGps.speed : null,
+      altitude: currentGps.altitude !== undefined ? currentGps.altitude : null,
+      heading: currentGps.heading !== undefined ? currentGps.heading : null,
+      timestamp: currentGps.timestamp || Date.now(),
+    });
+    setErrorMsg(null);
+
     if (!mapInstanceRef.current || !activeDoc) return;
+    const map = mapInstanceRef.current;
+
+    // Strict validation: if document is not calibrated:
+    if (!isDocumentCalibrated(activeDoc)) {
+      if (gpsUserMarkerRef.current) {
+        map.removeLayer(gpsUserMarkerRef.current);
+        gpsUserMarkerRef.current = null;
+      }
+      if (gpsAccuracyCircleRef.current) {
+        map.removeLayer(gpsAccuracyCircleRef.current);
+        gpsAccuracyCircleRef.current = null;
+      }
+      if (approachLineRef.current) {
+        map.removeLayer(approachLineRef.current);
+        approachLineRef.current = null;
+      }
+      setIsUserInsideMap(false);
+      setDistanceToMapKm(null);
+      return;
+    }
+
+    const pdfCoords = gpsToPdf(currentGps.lat, currentGps.lng, activeDoc);
+
+    // Calculate distance between user GPS and the calibrated document center
+    let distKm = 0;
+    if (activeDoc.calibration?.ref1 && activeDoc.calibration?.ref2) {
+      let centerLat = (activeDoc.calibration.ref1.lat + activeDoc.calibration.ref2.lat) / 2;
+      let centerLng = (activeDoc.calibration.ref1.lng + activeDoc.calibration.ref2.lng) / 2;
+
+      // Auto-heal calibrations where latitude/longitude were saved positive in South America
+      if (currentGps.lat < 0 && centerLat > 0 && centerLat < 35 && currentGps.lng < 0 && (centerLng < -30 || centerLng > 30)) {
+        centerLat = -centerLat;
+      }
+      if (currentGps.lng < 0 && centerLng > 30 && centerLng < 75) {
+        centerLng = -centerLng;
+      }
+
+      if (!isNaN(centerLat) && !isNaN(centerLng)) {
+        distKm = +(calculateDistanceMeters(currentGps.lat, currentGps.lng, centerLat, centerLng) / 1000).toFixed(1);
+      }
+    }
+
+    // Check for valid projective coordinates
+    if (isNaN(pdfCoords.x) || isNaN(pdfCoords.y)) {
+      if (gpsUserMarkerRef.current) {
+        map.removeLayer(gpsUserMarkerRef.current);
+        gpsUserMarkerRef.current = null;
+      }
+      if (gpsAccuracyCircleRef.current) {
+        map.removeLayer(gpsAccuracyCircleRef.current);
+        gpsAccuracyCircleRef.current = null;
+      }
+      if (approachLineRef.current) {
+        map.removeLayer(approachLineRef.current);
+        approachLineRef.current = null;
+      }
+      return;
+    }
+
+    setIsUserInsideMap(pdfCoords.isInside);
+    setDistanceToMapKm(distKm);
+
+    // If user is physically outside the sheet, do NOT render the blue dot on the sheet!
+    if (!pdfCoords.isInside) {
+      if (gpsUserMarkerRef.current) {
+        map.removeLayer(gpsUserMarkerRef.current);
+        gpsUserMarkerRef.current = null;
+      }
+      if (gpsAccuracyCircleRef.current) {
+        map.removeLayer(gpsAccuracyCircleRef.current);
+        gpsAccuracyCircleRef.current = null;
+      }
+
+      const centerSheet: [number, number] = [activeDoc.height / 2, activeDoc.width / 2];
+      if (approachLineRef.current) {
+        approachLineRef.current.setLatLngs([[pdfCoords.x, pdfCoords.y], centerSheet]);
+      } else {
+        approachLineRef.current = L.polyline([[pdfCoords.x, pdfCoords.y], centerSheet], {
+          color: '#10b981',
+          weight: 2,
+          dashArray: '6, 8',
+          opacity: 0.8,
+        }).addTo(map);
+      }
+    } else {
+      // User is physically INSIDE the sheet! Remove approach line and show blue GPS marker!
+      if (approachLineRef.current) {
+        try { map.removeLayer(approachLineRef.current); } catch {}
+        approachLineRef.current = null;
+      }
+
+      // PONTINHO AZUL (Iconic Pulsing Blue GPS Marker - ONLY when user is physically inside the plant area!)
+      const headingDeg = currentGps.heading !== undefined && currentGps.heading !== null && !isNaN(currentGps.heading) ? currentGps.heading : 0;
+      const userMarkerHtml = `
+        <div class="user-gps-pulse-wrapper" style="position: relative; width: 40px; height: 40px; display: flex; align-items: center; justify-content: center;">
+          <div style="position: absolute; inset: 0; border-radius: 50%; background: rgba(59, 130, 246, 0.4); animation: ping 2s cubic-bezier(0, 0, 0.2, 1) infinite;"></div>
+          <div style="width: 22px; height: 22px; border-radius: 50%; background: #2563eb; border: 3.5px solid #ffffff; box-shadow: 0 0 16px rgba(37, 99, 235, 0.95); display: flex; align-items: center; justify-content: center;">
+            <div style="width: 6px; height: 6px; border-radius: 50%; background: #ffffff;"></div>
+          </div>
+          ${currentGps.heading !== undefined && currentGps.heading !== null ? `
+            <div style="position: absolute; top: -8px; width: 0; height: 0; border-left: 6px solid transparent; border-right: 6px solid transparent; border-bottom: 9px solid #60a5fa; transform: rotate(${headingDeg}deg); transform-origin: 50% 28px;"></div>
+          ` : ''}
+        </div>
+      `;
+
+      const userIcon = L.divIcon({
+        className: 'custom-user-gps-marker',
+        html: userMarkerHtml,
+        iconSize: [40, 40],
+        iconAnchor: [20, 20],
+      });
+
+      if (gpsUserMarkerRef.current) {
+        gpsUserMarkerRef.current.setLatLng([pdfCoords.x, pdfCoords.y]);
+        gpsUserMarkerRef.current.setIcon(userIcon);
+      } else {
+        gpsUserMarkerRef.current = L.marker([pdfCoords.x, pdfCoords.y], {
+          icon: userIcon,
+          zIndexOffset: 10000,
+        }).addTo(map);
+      }
+
+      const safeAccuracy = currentGps.accuracy || 5;
+      const scale = activeDoc.calibration?.scaleMetersPerPixel || 0.75;
+      const accuracyRadiusPx = Math.max(12, Math.min(150, safeAccuracy / (scale > 0 ? scale : 0.75)));
+
+      if (gpsAccuracyCircleRef.current) {
+        gpsAccuracyCircleRef.current.setLatLng([pdfCoords.x, pdfCoords.y]);
+        gpsAccuracyCircleRef.current.setRadius(accuracyRadiusPx);
+      } else {
+        gpsAccuracyCircleRef.current = L.circle([pdfCoords.x, pdfCoords.y], {
+          radius: accuracyRadiusPx,
+          color: '#2563eb',
+          fillColor: '#38bdf8',
+          fillOpacity: 0.15,
+          weight: 1,
+          dashArray: '4, 4',
+        }).addTo(map);
+      }
+    }
+
+    // Dynamic real-time update for Target Navigation Guide Line
+    if (activeNavPoint && typeof activeNavPoint.x === 'number' && typeof activeNavPoint.y === 'number' && !isNaN(activeNavPoint.x) && !isNaN(activeNavPoint.y)) {
+      if (targetGuideLineRef.current) {
+        targetGuideLineRef.current.setLatLngs([
+          [pdfCoords.x, pdfCoords.y],
+          [activeNavPoint.x, activeNavPoint.y],
+        ]);
+      } else {
+        targetGuideLineRef.current = L.polyline(
+          [
+            [pdfCoords.x, pdfCoords.y],
+            [activeNavPoint.x, activeNavPoint.y],
+          ],
+          {
+            color: '#38bdf8',
+            weight: 3,
+            dashArray: '6, 6',
+            opacity: 0.9,
+          }
+        ).addTo(map);
+      }
+    }
+
+    if (activeToolRef.current === 'record_track' && !isRecordingPaused) {
+      setRecordedPoints((prev) => {
+        const lastPt = prev[prev.length - 1];
+        if (!lastPt) {
+          return [{
+            x: pdfCoords.x,
+            y: pdfCoords.y,
+            lat: currentGps.lat,
+            lng: currentGps.lng,
+            speed: currentGps.speed !== undefined ? currentGps.speed : undefined,
+            altitude: currentGps.altitude !== undefined ? currentGps.altitude : undefined,
+            time: new Date().toLocaleTimeString('pt-BR'),
+          }];
+        }
+
+        const distPx = Math.hypot(pdfCoords.x - lastPt.x, pdfCoords.y - lastPt.y);
+        if (distPx >= 3) {
+          return [
+            ...prev,
+            {
+              x: pdfCoords.x,
+              y: pdfCoords.y,
+              lat: currentGps.lat,
+              lng: currentGps.lng,
+              speed: currentGps.speed !== undefined ? currentGps.speed : undefined,
+              altitude: currentGps.altitude !== undefined ? currentGps.altitude : undefined,
+              time: new Date().toLocaleTimeString('pt-BR'),
+            },
+          ];
+        }
+        return prev;
+      });
+    }
+  }, [currentGps, activeDoc, isRecordingPaused]);
+
+  // Handle GPS start / wakeup
+  const toggleGps = useCallback(() => {
+    if (!currentGps) {
+      notifyInfo('Ativando GPS', 'Obtendo sinal dos satélites GNSS...');
+      requestCurrentLocation();
+    } else {
+      centerOnUserGps();
+    }
+  }, [currentGps, requestCurrentLocation, notifyInfo]);
+
+  // Center map on user's current GPS position on PDF
+  const centerOnUserGps = useCallback(() => {
+    if (!currentGps) {
+      notifyInfo('Buscando GPS', 'Aguardando fixação dos satélites...');
+      requestCurrentLocation();
+      return;
+    }
+
+    if (!activeDoc) return;
+    if (!isDocumentCalibrated(activeDoc)) {
+      notifyWarning('Planta Não Georreferenciada', 'Calibre a planta primeiro para que sua posição apareça sobre a folha.');
+      setIsCalibrationModalOpen(true);
+      return;
+    }
+
+    if (!mapInstanceRef.current) return;
     try {
-      const pdfCoords = gpsToPdf(userGps.lat, userGps.lng, activeDoc);
+      const pdfCoords = gpsToPdf(currentGps.lat, currentGps.lng, activeDoc);
       if (!isNaN(pdfCoords.x) && !isNaN(pdfCoords.y)) {
         mapInstanceRef.current.panTo([pdfCoords.x, pdfCoords.y], { animate: true, duration: 0.6 });
-        notifySuccess('Localização Centralizada', `Lat: ${userGps.lat.toFixed(5)} | Lng: ${userGps.lng.toFixed(5)}`);
+        if (pdfCoords.isInside) {
+          notifySuccess('Posição Centralizada', `Lat: ${currentGps.lat.toFixed(5)} | Lng: ${currentGps.lng.toFixed(5)} (±${currentGps.accuracy?.toFixed(0)}m)`);
+        } else {
+          let distMsg = '';
+          if (activeDoc.calibration?.ref1 && activeDoc.calibration?.ref2) {
+            const centerLat = (activeDoc.calibration.ref1.lat + activeDoc.calibration.ref2.lat) / 2;
+            const centerLng = (activeDoc.calibration.ref1.lng + activeDoc.calibration.ref2.lng) / 2;
+            if (!isNaN(centerLat) && !isNaN(centerLng)) {
+              const km = (calculateDistanceMeters(currentGps.lat, currentGps.lng, centerLat, centerLng) / 1000).toFixed(1);
+              distMsg = ` (a ${km} km da planta)`;
+            }
+          }
+          notifyInfo('Centralizado no Seu GPS', `Você está fora da folha${distMsg}. O GPS está acompanhando seu trajeto até o local.`);
+        }
       }
     } catch (err) {
       console.warn('Error centering on GPS:', err);
     }
-  }, [userGps, activeDoc, toggleGps, notifySuccess]);
+  }, [currentGps, activeDoc, requestCurrentLocation, notifySuccess, notifyWarning]);
 
-  // Calibrate map with user's current GPS position
+  // Clear calibration and return document to raw uncalibrated state
+  const handleClearCalibration = useCallback(() => {
+    if (!activeDoc) return;
+    try {
+      const resetDoc: PdfDocument = {
+        ...activeDoc,
+        calibration: {
+          isCalibrated: false,
+          ref1: { x: activeDoc.height * 0.9, y: activeDoc.width * 0.1, lat: NaN, lng: NaN },
+          ref2: { x: activeDoc.height * 0.1, y: activeDoc.width * 0.9, lat: NaN, lng: NaN },
+          scaleMetersPerPixel: 0.75,
+        },
+      };
+
+      if (gpsUserMarkerRef.current && mapInstanceRef.current) {
+        mapInstanceRef.current.removeLayer(gpsUserMarkerRef.current);
+        gpsUserMarkerRef.current = null;
+      }
+      if (gpsAccuracyCircleRef.current && mapInstanceRef.current) {
+        mapInstanceRef.current.removeLayer(gpsAccuracyCircleRef.current);
+        gpsAccuracyCircleRef.current = null;
+      }
+      if (approachLineRef.current && mapInstanceRef.current) {
+        mapInstanceRef.current.removeLayer(approachLineRef.current);
+        approachLineRef.current = null;
+      }
+
+      updateDocumentInStore(resetDoc);
+      setIsCalibrationModalOpen(false);
+      setIsUserInsideMap(false);
+      setDistanceToMapKm(null);
+      notifySuccess('Calibração Removida', 'A planta voltou ao estado original não-georreferenciado.');
+    } catch (err) {
+      console.error('Error clearing calibration:', err);
+      notifyError('Erro ao Limpar', 'Não foi possível redefinir a calibração.');
+    }
+  }, [activeDoc, updateDocumentInStore, notifySuccess, notifyError]);
+
+  // Calibrate map with user's current GPS position & nominal scale/rotation
   const handleCalibrateCurrentGps = useCallback(() => {
     if (!activeDoc) return;
-    if (!userGps) {
-      notifyWarning('GPS Necessário', 'Ative o GPS primeiro para calibrar a folha com a sua posição.');
-      toggleGps(true);
+    if (!currentGps) {
+      notifyWarning('GPS Necessário', 'Aguarde o sinal de satélite para calibrar a folha com a sua posição.');
+      requestCurrentLocation();
       return;
     }
 
     try {
-      const newCalibration = createCenteredCalibration(activeDoc, userGps.lat, userGps.lng, calibScale);
+      const newCalibration = createCenteredCalibration(
+        activeDoc,
+        currentGps.lat,
+        currentGps.lng,
+        calibScale,
+        calibRotation
+      );
+      newCalibration.nominalScale = calibNominalScale;
+      newCalibration.method = 'user_anchor';
+
       const updatedDoc: PdfDocument = {
         ...activeDoc,
         calibration: newCalibration,
@@ -1658,12 +1847,117 @@ export const PdfMapNavigator: React.FC = () => {
 
       updateDocumentInStore(updatedDoc);
       setIsCalibrationModalOpen(false);
-      notifySuccess('Planta Calibrada', 'A folha do PDF foi ancorada na sua posição geográfica atual.');
+      notifySuccess('Planta Calibrada', `Ancorada na posição atual (±${currentGps.accuracy?.toFixed(0)}m) com escala ${calibScale.toFixed(2)} m/px.`);
     } catch (err) {
       console.error('Error calibrating doc:', err);
       notifyError('Erro de Calibração', 'Não foi possível salvar os parâmetros de escala.');
     }
-  }, [activeDoc, userGps, calibScale, updateDocumentInStore, toggleGps, notifySuccess, notifyWarning, notifyError]);
+  }, [activeDoc, currentGps, calibScale, calibRotation, calibNominalScale, updateDocumentInStore, requestCurrentLocation, notifySuccess, notifyWarning, notifyError]);
+
+  // Calibrate map with custom Lat/Lng coordinates for farm/property center
+  const handleCalibrateCustomCenter = useCallback(() => {
+    if (!activeDoc) return;
+    const lat = parseFloat(calibCenterLat);
+    const lng = parseFloat(calibCenterLng);
+
+    if (isNaN(lat) || isNaN(lng) || lat < -90 || lat > 90 || lng < -180 || lng > 180) {
+      notifyWarning('Coordenadas Inválidas', 'Informe Latitude (-90 a 90) e Longitude (-180 a 180) válidas do centro da fazenda/local.');
+      return;
+    }
+
+    try {
+      const newCalibration = createCenteredCalibration(
+        activeDoc,
+        lat,
+        lng,
+        calibScale,
+        calibRotation
+      );
+      newCalibration.nominalScale = calibNominalScale;
+      newCalibration.method = 'user_anchor';
+
+      const updatedDoc: PdfDocument = {
+        ...activeDoc,
+        calibration: newCalibration,
+      };
+
+      updateDocumentInStore(updatedDoc);
+      setIsCalibrationModalOpen(false);
+      notifySuccess('Planta Georreferenciada!', `Vinculada ao local [${lat.toFixed(5)}, ${lng.toFixed(5)}]. O GPS acompanhará seu trajeto até o destino.`);
+    } catch (err) {
+      console.error('Error calibrating custom center:', err);
+      notifyError('Erro de Calibração', 'Não foi possível salvar as coordenadas informadas.');
+    }
+  }, [activeDoc, calibCenterLat, calibCenterLng, calibScale, calibRotation, calibNominalScale, updateDocumentInStore, notifySuccess, notifyWarning, notifyError]);
+
+  // Calibrate map with 2 Ground Control Points (GCP)
+  const handleCalibrate2Points = useCallback(() => {
+    if (!activeDoc) return;
+    const lat1 = parseFloat(gcpPt1.lat);
+    const lng1 = parseFloat(gcpPt1.lng);
+    const lat2 = parseFloat(gcpPt2.lat);
+    const lng2 = parseFloat(gcpPt2.lng);
+
+    if (isNaN(lat1) || isNaN(lng1) || isNaN(lat2) || isNaN(lng2)) {
+      notifyWarning('Coordenadas Inválidas', 'Preencha a Latitude e Longitude dos 2 pontos de controle.');
+      return;
+    }
+
+    try {
+      const newCalibration = create2PointCalibration(
+        { x: gcpPt1.x, y: gcpPt1.y, lat: lat1, lng: lng1 },
+        { x: gcpPt2.x, y: gcpPt2.y, lat: lat2, lng: lng2 },
+        calibNominalScale
+      );
+
+      const updatedDoc: PdfDocument = {
+        ...activeDoc,
+        calibration: newCalibration,
+      };
+
+      updateDocumentInStore(updatedDoc);
+      setIsCalibrationModalOpen(false);
+      notifySuccess('Calibração de Alta Precisão', 'Matriz afim de 2 pontos aplicada com sucesso à folha.');
+    } catch (err: any) {
+      console.error('Error in 2pt calibration:', err);
+      notifyError('Erro de Calibração', err?.message || 'Falha ao calcular transformação afim.');
+    }
+  }, [activeDoc, gcpPt1, gcpPt2, calibNominalScale, updateDocumentInStore, notifySuccess, notifyWarning, notifyError]);
+
+  // Calibrate map with Bounding Box Neatline
+  const handleCalibrateBounds = useCallback(() => {
+    if (!activeDoc) return;
+    const north = parseFloat(boundsNorth);
+    const south = parseFloat(boundsSouth);
+    const west = parseFloat(boundsWest);
+    const east = parseFloat(boundsEast);
+
+    if (isNaN(north) || isNaN(south) || isNaN(west) || isNaN(east)) {
+      notifyWarning('Limites Inválidos', 'Informe os 4 valores de coordenadas da moldura da carta.');
+      return;
+    }
+
+    try {
+      const newCalibration = createBoundingBoxCalibration(activeDoc, {
+        northLat: north,
+        southLat: south,
+        westLng: west,
+        eastLng: east,
+      });
+
+      const updatedDoc: PdfDocument = {
+        ...activeDoc,
+        calibration: newCalibration,
+      };
+
+      updateDocumentInStore(updatedDoc);
+      setIsCalibrationModalOpen(false);
+      notifySuccess('Moldura Calibrada', 'Limites geodésicos aplicados com sucesso à carta.');
+    } catch (err: any) {
+      console.error('Error in bounds calibration:', err);
+      notifyError('Erro de Calibração', err?.message || 'Falha ao aplicar limites da carta.');
+    }
+  }, [activeDoc, boundsNorth, boundsSouth, boundsWest, boundsEast, updateDocumentInStore, notifySuccess, notifyWarning, notifyError]);
 
   // Calculate live navigation metrics to active target marker
   const navMetrics = useMemo(() => {
@@ -1793,6 +2087,25 @@ export const PdfMapNavigator: React.FC = () => {
           canvas.height = 0;
         }
 
+        setProcessingProgress('Verificando metadados georreferenciados (GeoPDF)...');
+        const geoMetadata = await parseGeoPdfMetadata(arrayBuffer, baseWidth, baseHeight);
+
+        let initialCalibration: GeoCalibration;
+        let isGeoPdfDetected = false;
+
+        if (geoMetadata && geoMetadata.calibration && geoMetadata.calibration.isCalibrated) {
+          initialCalibration = geoMetadata.calibration;
+          isGeoPdfDetected = true;
+        } else {
+          // Standard PDF without embedded GeoPDF tags: starts uncalibrated until user enters coordinates or GCP points
+          initialCalibration = {
+            isCalibrated: false,
+            ref1: { x: baseHeight * 0.9, y: baseWidth * 0.1, lat: NaN, lng: NaN },
+            ref2: { x: baseHeight * 0.1, y: baseWidth * 0.9, lat: NaN, lng: NaN },
+            scaleMetersPerPixel: 0.75,
+          };
+        }
+
         const newDoc: PdfDocument = {
           id: `pdf-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
           name: file.name.replace(/\.[^/.]+$/, '').replace(/[_]/g, ' '),
@@ -1804,12 +2117,7 @@ export const PdfMapNavigator: React.FC = () => {
           width: baseWidth,
           height: baseHeight,
           userId: currentUserId,
-          calibration: createCenteredCalibration(
-            { width: baseWidth, height: baseHeight },
-            currentGps?.lat || -23.542,
-            currentGps?.lng || -46.638,
-            0.75
-          ),
+          calibration: initialCalibration,
           markers: [],
           tracks: [],
           uploadedAt: new Date().toLocaleDateString('pt-BR'),
@@ -1828,7 +2136,13 @@ export const PdfMapNavigator: React.FC = () => {
           height: newDoc.height,
         });
 
-        notifySuccess('Mapa em PDF Importado', `"${newDoc.name}" pronto para navegação e marcações.`);
+        if (isGeoPdfDetected) {
+          notifySuccess('GeoPDF Reconhecido!', `Metadados (${geoMetadata?.datum || 'SIRGAS 2000'}) aplicados automaticamente.`);
+        } else if (initialCalibration.isCalibrated) {
+          notifySuccess('Mapa Importado e Ancorado', `"${newDoc.name}" pronto para navegação.`);
+        } else {
+          notifyInfo('Mapa Importado', `"${newDoc.name}" carregado. Calibre a folha para ativar a navegação GPS.`);
+        }
       } else {
         // Image format handling
         setProcessingProgress('Carregando imagem do mapa...');
@@ -1839,6 +2153,14 @@ export const PdfMapNavigator: React.FC = () => {
           img.onload = async () => {
             const imgWidth = img.naturalWidth || 1600;
             const imgHeight = img.naturalHeight || 1200;
+
+            const initialImgCalibration: GeoCalibration = {
+              isCalibrated: false,
+              ref1: { x: imgHeight * 0.9, y: imgWidth * 0.1, lat: NaN, lng: NaN },
+              ref2: { x: imgHeight * 0.1, y: imgWidth * 0.9, lat: NaN, lng: NaN },
+              scaleMetersPerPixel: 0.75,
+            };
+
             const newDoc: PdfDocument = {
               id: `img-${Date.now()}`,
               userId: currentUserId,
@@ -1850,12 +2172,7 @@ export const PdfMapNavigator: React.FC = () => {
               currentPage: 0,
               width: imgWidth,
               height: imgHeight,
-              calibration: createCenteredCalibration(
-                { width: imgWidth, height: imgHeight },
-                currentGps?.lat || -23.542,
-                currentGps?.lng || -46.638,
-                0.75
-              ),
+              calibration: initialImgCalibration,
               markers: [],
               tracks: [],
               uploadedAt: new Date().toLocaleDateString('pt-BR'),
@@ -1872,6 +2189,12 @@ export const PdfMapNavigator: React.FC = () => {
               width: newDoc.width,
               height: newDoc.height,
             });
+
+            if (initialImgCalibration.isCalibrated) {
+              notifySuccess('Imagem Importada e Ancorada', `"${newDoc.name}" pronta.`);
+            } else {
+              notifyInfo('Imagem Importada', `"${newDoc.name}" carregada. Calibre para ativar o GPS.`);
+            }
             notifySuccess('Imagem do Mapa Carregada', `"${newDoc.name}" importada com sucesso.`);
             setIsProcessing(false);
           };
@@ -2300,7 +2623,7 @@ export const PdfMapNavigator: React.FC = () => {
       
       {/* Fullscreen Overlay: Meus Mapas PDF (Safe Overlay - Map stays mounted underneath) */}
       {(!activeDoc || isMapsListOpen) && (
-        <div className="absolute inset-0 z-[1500] bg-slate-950 flex flex-col p-4 sm:p-8 overflow-y-auto pb-32 text-slate-100 animate-in fade-in duration-150">
+        <div className="absolute inset-0 z-40 bg-slate-950 flex flex-col p-4 sm:p-8 overflow-y-auto pb-32 text-slate-100 animate-in fade-in duration-150">
           <div className="max-w-5xl mx-auto w-full space-y-6">
             {/* Header */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-800/80">
@@ -2464,7 +2787,7 @@ export const PdfMapNavigator: React.FC = () => {
 
       {/* Top Floating App Bar (Clean & Focused) */}
       {activeDoc && !isMapsListOpen && (
-        <div className="absolute top-2.5 left-2.5 right-2.5 z-[1000] flex items-center justify-between pointer-events-none gap-2">
+        <div className="absolute top-2.5 left-2.5 right-2.5 z-10 flex items-center justify-between pointer-events-none gap-2">
           
           {/* Left: Voltar para Meus Mapas PDF & Info */}
           <div className="flex items-center gap-1.5 pointer-events-auto flex-wrap">
@@ -2517,60 +2840,67 @@ export const PdfMapNavigator: React.FC = () => {
       </div>
     )}
 
-      {/* Target Navigation Live HUD */}
-      {activeNavPoint && navMetrics && (
-        <div className="absolute top-14 left-1/2 -translate-x-1/2 z-[1000] bg-slate-900/95 backdrop-blur-md border border-sky-500 rounded-2xl px-4 py-2 shadow-2xl flex items-center gap-3 text-xs font-bold text-white pointer-events-auto animate-in fade-in">
-          <div className="flex items-center gap-2">
-            <div className="w-6 h-6 rounded-lg bg-sky-500/20 border border-sky-500 flex items-center justify-center text-sky-400">
-              <Navigation className="w-3.5 h-3.5 transform rotate-45" />
+      {/* Target Navigation Live HUD (Bottom Centered - Compact & Proportional) */}
+      {activeNavPoint && navMetrics && !isMapsListOpen && (
+        <div
+          className={`absolute bottom-20 sm:bottom-6 left-1/2 -translate-x-1/2 z-[1000] w-auto max-w-[92vw] pointer-events-auto transition-opacity duration-300 ${
+            isMapInteracting ? 'opacity-20 pointer-events-none' : 'opacity-100 pointer-events-auto'
+          }`}
+        >
+          <div className="bg-slate-950/95 backdrop-blur-md border border-sky-500/80 rounded-2xl px-3.5 py-2 shadow-2xl flex items-center gap-3 text-xs text-white">
+            <div className="flex items-center gap-2">
+              <div className="w-7 h-7 rounded-xl bg-sky-500/20 border border-sky-500/40 flex items-center justify-center text-sky-400 shrink-0">
+                <Navigation className="w-3.5 h-3.5 transform rotate-45" />
+              </div>
+              <div className="min-w-0 max-w-[120px] sm:max-w-[160px]">
+                <span className="text-[10px] text-sky-300 font-medium block leading-tight">Navegando até</span>
+                <span className="font-extrabold text-white text-xs truncate block leading-tight">{activeNavPoint.title}</span>
+              </div>
             </div>
-            <div>
-              <div className="text-[10px] text-sky-300 font-normal">Navegando até</div>
-              <div className="font-extrabold text-white truncate max-w-[130px]">{activeNavPoint.title}</div>
+
+            <div className="border-l border-slate-700 pl-2.5 flex items-center gap-1.5 shrink-0">
+              <span className="text-emerald-400 font-black text-xs">{navMetrics.formattedDistance}</span>
+              <span className="text-[10px] text-slate-400 font-mono">
+                {navMetrics.cardinal} ({navMetrics.bearingDegrees.toFixed(0)}°)
+              </span>
             </div>
-          </div>
 
-          <div className="border-l border-slate-700 pl-3 flex items-center gap-2">
-            <span className="text-emerald-400 font-black text-sm">{navMetrics.formattedDistance}</span>
-            <span className="text-[11px] text-slate-400 font-mono">
-              {navMetrics.cardinal} ({navMetrics.bearingDegrees.toFixed(0)}°)
-            </span>
+            <button
+              type="button"
+              onClick={() => setActiveNavPoint(null)}
+              className="p-1.5 bg-rose-500/20 hover:bg-rose-500 text-rose-400 hover:text-white rounded-xl active:scale-95 transition cursor-pointer shrink-0"
+              title="Encerrar Navegação"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
           </div>
-
-          <button
-            onClick={() => setActiveNavPoint(null)}
-            className="ml-2 px-3 py-1.5 rounded-lg bg-rose-500 hover:bg-rose-600 text-white flex items-center gap-1.5 shadow-md active:scale-95 transition-all"
-            title="Encerrar Navegação"
-          >
-            <X className="w-3.5 h-3.5" />
-            <span className="uppercase tracking-wider font-extrabold text-[10px]">Parar</span>
-          </button>
         </div>
       )}
 
-      {/* Helper Banner for Active Tool */}
-      {activeTool === 'add_point' && (
-        <div className="absolute top-14 left-1/2 -translate-x-1/2 z-[1000] bg-emerald-600 text-white px-4 py-2 rounded-full shadow-2xl flex items-center gap-2 text-xs font-black animate-bounce pointer-events-auto">
-          <Camera className="w-4 h-4" />
-          <span>Toque na folha do PDF onde deseja marcar o ponto</span>
-          <button
-            onClick={() => setActiveTool('pan')}
-            className="ml-2 bg-emerald-800/80 hover:bg-emerald-900 rounded-full px-2 py-0.5 text-[10px]"
-          >
-            Cancelar
-          </button>
-        </div>
-      )}
-
-      {activeTool === 'draw_track' && (
-        <div className="absolute top-14 left-1/2 -translate-x-1/2 z-[1000] bg-amber-600 text-slate-950 px-4 py-2 rounded-full shadow-2xl flex items-center gap-2 text-xs font-black pointer-events-auto">
-          <Activity className="w-4 h-4" />
-          <span>Toque na folha para adicionar os vértices da rota ({currentTrackPoints.length} marcados)</span>
+      {/* Helper Banner for Active Tool (Add Point) */}
+      {activeTool === 'add_point' && !isMapsListOpen && (
+        <div
+          className={`absolute bottom-20 sm:bottom-6 left-1/2 -translate-x-1/2 z-[1000] w-auto max-w-[92vw] pointer-events-auto transition-opacity duration-300 ${
+            isMapInteracting ? 'opacity-20 pointer-events-none' : 'opacity-100 pointer-events-auto'
+          }`}
+        >
+          <div className="bg-slate-950/95 backdrop-blur-md border border-emerald-500/80 rounded-full px-4 py-2 shadow-2xl flex items-center gap-2.5 text-xs text-white">
+            <div className="w-6 h-6 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center shrink-0">
+              <Camera className="w-3.5 h-3.5" />
+            </div>
+            <span className="font-semibold text-slate-200">Toque na folha para marcar o ponto com foto</span>
+            <button
+              onClick={() => setActiveTool('pan')}
+              className="ml-1 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-full px-2.5 py-1 text-[11px] font-bold active:scale-95 cursor-pointer"
+            >
+              Cancelar
+            </button>
+          </div>
         </div>
       )}
 
       {/* Measurement Active Floating HUD */}
-      {activeTool === 'measure' && (
+      {activeTool === 'measure' && !isMapsListOpen && (
         <MeasurementControlBar
           points={measurementPoints}
           currentType={currentMeasureType}
@@ -2585,12 +2915,19 @@ export const PdfMapNavigator: React.FC = () => {
           onCloseLoop={handleCloseLoopPdf}
           onFinishMeasurement={() => setIsMeasureSummaryOpen(true)}
           onClose={() => setActiveTool('pan')}
+          positionClassName={`absolute bottom-20 sm:bottom-6 left-1/2 -translate-x-1/2 z-[1000] w-auto max-w-[92vw] pointer-events-none transition-opacity duration-300 ${
+            isMapInteracting ? 'opacity-20 pointer-events-none' : 'opacity-100 pointer-events-auto'
+          }`}
         />
       )}
 
       {/* Woodpile Active Floating HUD */}
-      {activeTool === 'woodpile' && (
-        <div className="absolute top-2 left-1/2 -translate-x-1/2 z-[1000] w-[95%] max-w-xl bg-slate-900/95 backdrop-blur-md border border-amber-500/80 rounded-2xl p-2.5 shadow-2xl flex flex-col sm:flex-row items-center justify-between gap-2.5 animate-in slide-in-from-top duration-200 pointer-events-auto">
+      {activeTool === 'woodpile' && !isMapsListOpen && (
+        <div
+          className={`absolute bottom-20 sm:bottom-6 left-1/2 -translate-x-1/2 z-[1000] w-[95%] max-w-lg bg-slate-950/95 backdrop-blur-md border border-amber-500/80 rounded-2xl p-2.5 shadow-2xl flex flex-col sm:flex-row items-center justify-between gap-2.5 pointer-events-auto transition-opacity duration-300 ${
+            isMapInteracting ? 'opacity-20 pointer-events-none' : 'opacity-100 pointer-events-auto'
+          }`}
+        >
           {/* Title & Info */}
           <div className="flex items-center gap-2">
             <div className="w-8 h-8 rounded-xl bg-amber-500/20 border border-amber-500/40 flex items-center justify-center text-amber-400 shrink-0">
@@ -2605,15 +2942,15 @@ export const PdfMapNavigator: React.FC = () => {
               </div>
               <p className="text-[10px] text-slate-400">
                 {woodpileSubMode === 'point'
-                  ? 'Toque na folha para apontar local da pilha com foto e volume'
-                  : 'Toque para marcar os vértices e calcular o comprimento da pilha'}
+                  ? 'Toque na folha para apontar local da pilha'
+                  : 'Toque para marcar os vértices e calcular'}
               </p>
             </div>
           </div>
 
           {/* Submode Switcher & Actions */}
           <div className="flex items-center gap-1.5 w-full sm:w-auto justify-end">
-            <div className="flex bg-slate-950 p-1 rounded-xl border border-slate-800">
+            <div className="flex bg-slate-900 p-1 rounded-xl border border-slate-800">
               <button
                 type="button"
                 onClick={() => {
@@ -2643,7 +2980,7 @@ export const PdfMapNavigator: React.FC = () => {
               >
                 <span>📏 Medir</span>
                 {measurementPoints.length > 0 && (
-                  <span className="w-4 h-4 rounded-full bg-slate-900 text-amber-400 text-[9px] flex items-center justify-center font-bold">
+                  <span className="w-4 h-4 rounded-full bg-slate-950 text-amber-400 text-[9px] flex items-center justify-center font-bold">
                     {measurementPoints.length}
                   </span>
                 )}
@@ -2741,313 +3078,535 @@ export const PdfMapNavigator: React.FC = () => {
           </div>
         )}
 
-        {/* Live Track Recording Indicator Banner & Telemetry */}
-        {isRecordingLive && (
-          <div className="absolute top-14 left-1/2 -translate-x-1/2 z-[1000] bg-rose-950/95 backdrop-blur-md border border-rose-500 rounded-2xl px-4 py-2 shadow-2xl flex items-center gap-3 animate-in fade-in pointer-events-auto">
-            <div className="flex items-center gap-2">
-              <span className="w-3 h-3 rounded-full bg-rose-500 animate-ping" />
-              <span className="text-xs font-black text-rose-200">
-                {isRecordingPaused ? 'PAUSADO' : 'GRAVANDO TRILHA'}
-              </span>
+        {/* GCP Point Selection Banner (Bottom Centered) */}
+        {isSelectingGcpOnMap && !isMapsListOpen && (
+          <div
+            className={`absolute bottom-20 sm:bottom-6 left-1/2 -translate-x-1/2 z-[1100] max-w-md w-[calc(100%-2rem)] transition-opacity duration-300 pointer-events-auto ${
+              isMapInteracting ? 'opacity-20 pointer-events-none' : 'opacity-100 pointer-events-auto'
+            }`}
+          >
+            <div className="bg-emerald-500 text-slate-950 px-4 py-2 rounded-2xl shadow-2xl border-2 border-emerald-300 flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2">
+                <span className="text-base font-black">🎯</span>
+                <span className="text-xs font-black">Toque na folha para posicionar o Ponto {isSelectingGcpOnMap}</span>
+              </div>
+              <button
+                onClick={() => {
+                  setIsSelectingGcpOnMap(null);
+                  setIsCalibrationModalOpen(true);
+                }}
+                className="px-2.5 py-1 bg-slate-950 text-white font-bold text-[10px] rounded-lg shadow active:scale-95 cursor-pointer"
+              >
+                Cancelar
+              </button>
             </div>
-            <div className="font-mono text-xs font-bold text-white bg-slate-950/90 px-2 py-0.5 rounded-lg border border-slate-800">
-              ⏱️ {formatTimer(recordDuration)}
-            </div>
-            <div className="text-xs font-bold text-amber-300 bg-slate-950/90 px-2 py-0.5 rounded-lg border border-slate-800">
-              📏 {totalRecordedDistanceMeters >= 1000 ? `${(totalRecordedDistanceMeters / 1000).toFixed(2)} km` : `${Math.round(totalRecordedDistanceMeters)} m`}
-            </div>
-            <span className="text-[11px] text-rose-300 font-semibold hidden sm:inline">
-              📍 {recordedPoints.length} pts
-            </span>
           </div>
         )}
 
-        {/* Live GPS Telemetry Overlay Badge (Bottom Left - Safe Area above Mobile Nav) */}
-        {isGpsActive && userGps && (
-          <div className="absolute bottom-16 sm:bottom-3 left-2.5 z-20 pointer-events-auto bg-slate-900/95 backdrop-blur-md border border-sky-500/80 rounded-2xl px-3 py-2 shadow-2xl flex items-center gap-3 text-xs text-slate-200">
-            <div className="flex items-center gap-1.5">
-              <span className="w-2.5 h-2.5 rounded-full bg-sky-400 animate-ping" />
-              <span className="font-mono font-black text-sky-300">
-                {userGps.lat.toFixed(5)}, {userGps.lng.toFixed(5)}
-              </span>
+        {/* Helper Banner for Active Tool (Draw Track Initial State) */}
+        {activeTool === 'draw_track' && !isMapsListOpen && currentTrackPoints.length === 0 && (
+          <div
+            className={`absolute bottom-20 sm:bottom-6 left-1/2 -translate-x-1/2 z-[1000] w-auto max-w-[92vw] pointer-events-auto transition-opacity duration-300 ${
+              isMapInteracting ? 'opacity-20 pointer-events-none' : 'opacity-100 pointer-events-auto'
+            }`}
+          >
+            <div className="bg-slate-950/95 backdrop-blur-md border border-amber-500/80 rounded-full px-4 py-2 shadow-2xl flex items-center gap-2.5 text-xs text-white">
+              <div className="w-6 h-6 rounded-full bg-amber-500/20 text-amber-400 flex items-center justify-center shrink-0">
+                <Activity className="w-3.5 h-3.5" />
+              </div>
+              <span className="font-semibold text-slate-200">Toque na folha para adicionar os vértices</span>
+              <button
+                onClick={() => setActiveTool('pan')}
+                className="ml-1 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-full px-2.5 py-1 text-[11px] font-bold active:scale-95 cursor-pointer"
+              >
+                Cancelar
+              </button>
             </div>
-            <div className="border-l border-slate-700 pl-2 text-[11px] text-slate-400 flex items-center gap-2">
-              <span>±{userGps.accuracy.toFixed(1)}m</span>
-              {userGps.speed !== null && userGps.speed !== undefined && (
-                <span className="text-emerald-400 font-bold">{(userGps.speed * 3.6).toFixed(1)} km/h</span>
-              )}
+          </div>
+        )}
+
+
+        {/* User Outside Calibrated Map Indicator (Bottom Centered - Real-time tracking to destination) */}
+        {activeDoc && !isMapsListOpen && isDocumentCalibrated(activeDoc) && !isUserInsideMap && distanceToMapKm !== null && !isSelectingGcpOnMap && !isRecordingLive && activeTool === 'pan' && (
+          <div
+            className={`absolute bottom-20 sm:bottom-6 left-1/2 -translate-x-1/2 z-[1000] max-w-md w-[calc(100%-2rem)] transition-opacity duration-300 pointer-events-auto ${
+              isMapInteracting ? 'opacity-20 pointer-events-none' : 'opacity-100 pointer-events-auto'
+            }`}
+          >
+            <div className="bg-slate-950/95 border border-emerald-500/40 text-slate-200 px-4 py-2.5 rounded-2xl shadow-2xl backdrop-blur-md flex items-center justify-between gap-2.5">
+              <div className="flex items-center gap-2.5 text-xs">
+                <span className="w-3 h-3 rounded-full bg-emerald-400 animate-ping shrink-0 shadow-[0_0_10px_#10b981]" />
+                <div>
+                  <span className="font-extrabold block text-white text-[12px] leading-tight">
+                    A {distanceToMapKm >= 10 ? distanceToMapKm.toFixed(0) : distanceToMapKm.toFixed(1)} km da planta
+                  </span>
+                  <span className="text-[10px] text-emerald-400 font-medium leading-tight">
+                    GPS acompanhando seu trajeto até a chegada
+                  </span>
+                </div>
+              </div>
+              <div className="flex items-center gap-1.5 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (activeDoc?.calibration?.ref1 && activeDoc?.calibration?.ref2 && currentGps) {
+                      let cLat = (activeDoc.calibration.ref1.lat + activeDoc.calibration.ref2.lat) / 2;
+                      let cLng = (activeDoc.calibration.ref1.lng + activeDoc.calibration.ref2.lng) / 2;
+                      if (currentGps.lat < 0 && cLat > 0 && cLat < 35) cLat = -cLat;
+                      if (currentGps.lng < 0 && cLng > 30 && cLng < 75) cLng = -cLng;
+
+                      setNavTarget({
+                        id: activeDoc.id,
+                        name: `Planta: ${activeDoc.name}`,
+                        lat: cLat,
+                        lng: cLng,
+                        distanceMeters: Math.round((distanceToMapKm || 0) * 1000),
+                        bearingDegrees: 0,
+                        azimuthString: '',
+                        estimatedTimeArrivalMin: Math.max(1, Math.round(((distanceToMapKm || 0) * 1000) / (4000 / 60))),
+                        crossTrackErrorMeters: 0,
+                      });
+                      setActiveTab('map');
+                    }
+                  }}
+                  className="px-2.5 py-1.5 bg-slate-900 border border-slate-700 hover:border-emerald-500 text-emerald-400 hover:text-white font-bold text-xs rounded-xl shadow active:scale-95 transition cursor-pointer flex items-center gap-1"
+                  title="Traçar Rota até a Planta no Mapa Satélite"
+                >
+                  <Navigation className="w-3.5 h-3.5" />
+                  <span>Navegar</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (mapInstanceRef.current && activeDoc && currentGps) {
+                      const p = gpsToPdf(currentGps.lat, currentGps.lng, activeDoc);
+                      const b = L.latLngBounds([[0, 0], [activeDoc.height, activeDoc.width]]);
+                      if (!isNaN(p.x) && !isNaN(p.y)) {
+                        b.extend([p.x, p.y]);
+                      }
+                      mapInstanceRef.current.fitBounds(b, { padding: [50, 50] });
+                    }
+                  }}
+                  className="px-2.5 py-1.5 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs rounded-xl shadow active:scale-95 transition cursor-pointer flex items-center gap-1"
+                  title="Enquadrar Minha Posição e a Folha"
+                >
+                  <Maximize2 className="w-3.5 h-3.5" />
+                  <span>Ver Tudo</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsCalibrationModalOpen(true)}
+                  className="px-2.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-xs rounded-xl border border-slate-700 cursor-pointer"
+                  title="Ajustar Coordenadas da Planta"
+                >
+                  Ajustar
+                </button>
+              </div>
             </div>
+          </div>
+        )}
+
+        {/* ------------------------------------------------------------- */}
+        {/* TOP-RIGHT CORNER: DISCRETE TOOLS BUTTON STACK (GPS MAP STYLE) */}
+        {/* ------------------------------------------------------------- */}
+        {activeDoc && !isMapsListOpen && (
+          <div
+            className={`absolute top-3 right-3 z-20 pointer-events-auto flex flex-col gap-2 transition-opacity duration-300 ${
+              isMapInteracting ? 'opacity-20 pointer-events-none' : 'opacity-100 pointer-events-auto'
+            }`}
+          >
+            {/* 1. Ferramentas (SlidersHorizontal - Opens Discrete Menu) */}
+            <button
+              onClick={() => setIsToolsPanelOpen(true)}
+              className="w-10 h-10 rounded-2xl bg-slate-900/95 hover:bg-slate-900 text-emerald-400 border border-slate-700/80 shadow-xl flex items-center justify-center transition-all active:scale-95 cursor-pointer backdrop-blur-md"
+              title="Ferramentas do Mapa PDF"
+            >
+              <SlidersHorizontal className="w-4 h-4 text-emerald-400" />
+            </button>
+
+            {/* 2. Centralizar GPS */}
             <button
               onClick={centerOnUserGps}
-              className="p-1 text-sky-400 hover:text-white rounded-lg hover:bg-slate-800"
-              title="Centralizar na Posição"
+              className={`w-10 h-10 rounded-2xl border shadow-xl flex items-center justify-center transition-all active:scale-95 cursor-pointer backdrop-blur-md ${
+                isGpsActive && userGps
+                  ? 'bg-slate-900/95 text-emerald-400 border-slate-700/80 hover:bg-slate-900'
+                  : 'bg-slate-900/95 text-slate-400 border-slate-700/80 hover:bg-slate-900'
+              }`}
+              title="Centralizar Minha Posição"
             >
-              <Crosshair className="w-3.5 h-3.5" />
+              <Crosshair className="w-4 h-4" />
+            </button>
+
+            {/* 3. Zoom In */}
+            <button
+              onClick={() => mapInstanceRef.current?.zoomIn()}
+              className="w-10 h-10 rounded-2xl bg-slate-900/95 hover:bg-slate-900 text-slate-300 border border-slate-700/80 shadow-xl flex items-center justify-center transition-all active:scale-95 cursor-pointer backdrop-blur-md"
+              title="Aproximar Zoom (+)"
+            >
+              <ZoomIn className="w-4 h-4" />
+            </button>
+
+            {/* 4. Zoom Out */}
+            <button
+              onClick={() => mapInstanceRef.current?.zoomOut()}
+              className="w-10 h-10 rounded-2xl bg-slate-900/95 hover:bg-slate-900 text-slate-300 border border-slate-700/80 shadow-xl flex items-center justify-center transition-all active:scale-95 cursor-pointer backdrop-blur-md"
+              title="Afastar Zoom (-)"
+            >
+              <ZoomOut className="w-4 h-4" />
+            </button>
+
+            {/* 5. Ajustar Folha à Tela */}
+            <button
+              onClick={handleFitBounds}
+              className="w-10 h-10 rounded-2xl bg-slate-900/95 hover:bg-slate-900 text-slate-300 border border-slate-700/80 shadow-xl flex items-center justify-center transition-all active:scale-95 cursor-pointer backdrop-blur-md"
+              title="Enquadrar Folha"
+            >
+              <Maximize2 className="w-4 h-4" />
             </button>
           </div>
         )}
 
-        {/* Floating Open Tools Button (When Tools are hidden) */}
-        {activeDoc && !isToolsPanelOpen && (
-          <button
-            onClick={() => setIsToolsPanelOpen(true)}
-            className="absolute right-3 top-3 z-[1000] px-3 py-2 rounded-xl bg-slate-900/95 backdrop-blur-md border border-slate-700/80 hover:border-emerald-500/80 text-slate-200 hover:text-white font-extrabold text-xs flex items-center gap-1.5 shadow-2xl transition-all active:scale-95 pointer-events-auto cursor-pointer"
-            title="Abrir Barra de Ferramentas"
+        {/* ------------------------------------------------------------- */}
+        {/* BOTTOM FLOATING BAR: DISCRETE LIVE TRACK RECORDING CONTROLLER */}
+        {/* ------------------------------------------------------------- */}
+        {isRecordingLive && !isMapsListOpen && (
+          <div
+            className={`absolute bottom-20 sm:bottom-6 left-1/2 -translate-x-1/2 z-[1000] transition-opacity duration-300 pointer-events-auto ${
+              isMapInteracting ? 'opacity-20 pointer-events-none' : 'opacity-100 pointer-events-auto'
+            }`}
           >
-            <Layers className="w-4 h-4 text-emerald-400" />
-            <span>Ferramentas</span>
-          </button>
-        )}
-
-        {/* Lateral Tactical Action Dock (Right Side - Sleek & Ultra-Compact) */}
-        {activeDoc && isToolsPanelOpen && (
-          <div className="absolute right-3 top-3 z-[1000] flex flex-col items-end gap-2 pointer-events-none max-h-[calc(100dvh-4.5rem)] animate-in slide-in-from-right duration-200">
-            
-            {/* Context Sub-Tool Bar (Drawing Actions - positioned to the left of the dock) */}
-            {activeTool === 'draw_track' && currentTrackPoints.length > 0 && (
-              <div className="bg-slate-900/95 backdrop-blur-md border border-amber-500/80 rounded-2xl p-2 shadow-2xl flex flex-col sm:flex-row items-center gap-1.5 pointer-events-auto animate-in slide-in-from-right duration-200">
-                <div className="flex items-center gap-1">
-                  <span className="text-xs font-bold text-amber-400 px-2">
-                    {currentTrackPoints.length} pts
-                  </span>
-                  <button
-                    onClick={() => setCurrentTrackPoints((prev) => prev.slice(0, -1))}
-                    className="p-2 bg-slate-800 text-slate-200 rounded-xl hover:bg-slate-700 active:scale-95 cursor-pointer"
-                    title="Desfazer último vértice"
-                  >
-                    <Undo2 className="w-4 h-4" />
-                  </button>
-                </div>
-                <div className="flex items-center gap-1">
-                  <button
-                    onClick={() => setIsTrackModalOpen(true)}
-                    className="px-3 py-2 bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs rounded-xl shadow flex items-center gap-1 active:scale-95 cursor-pointer"
-                  >
-                    <Check className="w-4 h-4" />
-                    Salvar
-                  </button>
-                  <button
-                    onClick={() => {
-                      setCurrentTrackPoints([]);
-                      setActiveTool('pan');
-                    }}
-                    className="px-2.5 py-2 bg-slate-800 text-slate-300 font-bold text-xs rounded-xl hover:bg-slate-700 active:scale-95 cursor-pointer"
-                  >
-                    Cancelar
-                  </button>
-                </div>
+            <div className="bg-slate-950/95 backdrop-blur-md border border-slate-700/90 rounded-full px-3 py-1.5 shadow-2xl flex items-center gap-2 text-white">
+              {/* Status Pulse */}
+              <div className="flex items-center gap-1.5 pl-1.5 pr-0.5">
+                <span className={`w-2.5 h-2.5 rounded-full ${isRecordingPaused ? 'bg-amber-400' : 'bg-rose-500 animate-ping'}`} />
+                <span className="text-[10px] font-black uppercase tracking-wider text-slate-300">
+                  {isRecordingPaused ? 'Pausado' : 'Gravando'}
+                </span>
               </div>
-            )}
 
-            {/* Context Sub-Tool Bar (Live Recording Actions - positioned to the left of the dock) */}
-            {activeTool === 'record_track' && isRecordingLive && (
-              <div className="bg-slate-900/95 backdrop-blur-md border border-rose-500/80 rounded-2xl p-2 shadow-2xl flex flex-col sm:flex-row items-center gap-1.5 pointer-events-auto animate-in slide-in-from-right duration-200">
-                <button
-                  onClick={() => {
-                    try {
-                      if (userGps && activeDoc) {
-                        const p = gpsToPdf(userGps.lat, userGps.lng, activeDoc);
-                        if (!isNaN(p.x) && !isNaN(p.y)) {
-                          setRecordedPoints((prev) => [
-                            ...prev,
-                            { 
-                              x: p.x, 
-                              y: p.y, 
-                              lat: userGps.lat, 
-                              lng: userGps.lng, 
-                              time: new Date().toLocaleTimeString('pt-BR'),
-                              speed: userGps.speed !== null ? userGps.speed : undefined,
-                              altitude: userGps.altitude !== null ? userGps.altitude : undefined
-                            }
-                          ]);
-                        }
-                      } else if (mapInstanceRef.current) {
-                        const center = mapInstanceRef.current.getCenter();
-                        if (!isNaN(center.lat) && !isNaN(center.lng)) {
-                          setRecordedPoints((prev) => [
-                            ...prev,
-                            { x: center.lat, y: center.lng, time: new Date().toLocaleTimeString('pt-BR') }
-                          ]);
-                        }
+              {/* + Ponto */}
+              <button
+                onClick={() => {
+                  try {
+                    if (currentGps && activeDoc) {
+                      const p = gpsToPdf(currentGps.lat, currentGps.lng, activeDoc);
+                      if (!isNaN(p.x) && !isNaN(p.y)) {
+                        setRecordedPoints((prev) => [
+                          ...prev,
+                          {
+                            x: p.x,
+                            y: p.y,
+                            lat: currentGps.lat,
+                            lng: currentGps.lng,
+                            time: new Date().toLocaleTimeString('pt-BR'),
+                            speed: currentGps.speed !== undefined ? currentGps.speed : undefined,
+                            altitude: currentGps.altitude !== undefined ? currentGps.altitude : undefined,
+                          },
+                        ]);
+                        notifySuccess('Ponto Gravado', `Vértice #${recordedPoints.length + 1} registrado na trilha.`);
                       }
-                    } catch (err) {
-                      console.warn('Error recording point:', err);
+                    } else if (mapInstanceRef.current) {
+                      const center = mapInstanceRef.current.getCenter();
+                      if (!isNaN(center.lat) && !isNaN(center.lng)) {
+                        setRecordedPoints((prev) => [
+                          ...prev,
+                          { x: center.lat, y: center.lng, time: new Date().toLocaleTimeString('pt-BR') },
+                        ]);
+                        notifySuccess('Ponto Gravado', `Vértice #${recordedPoints.length + 1} registrado na tela.`);
+                      }
                     }
-                  }}
-                  className="w-full sm:w-auto px-3 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-xl flex items-center justify-center gap-1 active:scale-95 cursor-pointer"
-                >
-                  <Plus className="w-4 h-4" />
-                  + Ponto
-                </button>
-
-                <div className="flex items-center gap-1 w-full sm:w-auto justify-between">
-                  <button
-                    onClick={() => setIsRecordingPaused(!isRecordingPaused)}
-                    className="p-2 bg-slate-800 text-slate-200 rounded-xl active:scale-95 cursor-pointer"
-                    title={isRecordingPaused ? 'Retomar' : 'Pausar'}
-                  >
-                    {isRecordingPaused ? <Play className="w-4 h-4 text-emerald-400" /> : <Pause className="w-4 h-4 text-amber-400" />}
-                  </button>
-
-                  <button
-                    onClick={handleStopAndSaveLiveRecording}
-                    className="px-3 py-2 bg-rose-600 hover:bg-rose-500 text-white font-black text-xs rounded-xl shadow flex items-center gap-1 active:scale-95 cursor-pointer"
-                  >
-                    <Square className="w-4 h-4" />
-                    Finalizar
-                  </button>
-                </div>
-              </div>
-            )}
-
-            {/* Sleek Compact Tactical GIS Tool Rail */}
-            <div className="bg-slate-900/95 backdrop-blur-md border border-slate-700/80 rounded-2xl p-1.5 shadow-2xl flex flex-col gap-1.5 pointer-events-auto items-center">
-              {/* Ocultar / Fechar */}
-              <button
-                onClick={() => setIsToolsPanelOpen(false)}
-                title="Ocultar Barra de Ferramentas"
-                className="w-11 h-11 rounded-xl flex items-center justify-center text-slate-400 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer"
-              >
-                <X className="w-5 h-5" />
-              </button>
-
-              <div className="w-full h-px bg-slate-800" />
-
-              {/* 1. Navegar */}
-              <button
-                onClick={() => { setActiveTool('pan'); setCurrentTrackPoints([]); }}
-                title="Navegar no Mapa"
-                className={`w-11 h-11 rounded-xl flex items-center justify-center transition-all cursor-pointer ${
-                  activeTool === 'pan' ? 'bg-sky-600 text-white shadow-md' : 'text-slate-400 hover:text-white hover:bg-slate-800/70'
-                }`}
-              >
-                <MousePointer className="w-5 h-5 text-sky-400" />
-              </button>
-
-              {/* 2. Marcar Ponto com Foto */}
-              <button
-                onClick={() => { setActiveTool('add_point'); setCurrentTrackPoints([]); }}
-                title="Adicionar Ponto de Campo com Foto"
-                className={`w-11 h-11 rounded-xl flex items-center justify-center transition-all cursor-pointer ${
-                  activeTool === 'add_point' ? 'bg-emerald-600 text-white shadow-md' : 'text-slate-400 hover:text-emerald-400 hover:bg-slate-800/70'
-                }`}
-              >
-                <Camera className="w-5 h-5 text-emerald-400" />
-              </button>
-
-              {/* 3. Régua / Medir Área & Distância */}
-              <button
-                onClick={() => {
-                  if (activeTool === 'measure' && measurementPoints.length > 0) {
-                    setIsMeasureSummaryOpen(true);
-                  } else {
-                    setActiveTool('measure');
-                    setCurrentTrackPoints([]);
+                  } catch (err) {
+                    console.warn('Error recording point:', err);
                   }
                 }}
-                title="Régua de Medição e Área"
-                className={`w-11 h-11 rounded-xl flex items-center justify-center transition-all relative cursor-pointer ${
-                  activeTool === 'measure' ? 'bg-rose-600 text-white shadow-md' : 'text-slate-400 hover:text-rose-400 hover:bg-slate-800/70'
-                }`}
+                className="flex items-center gap-1 px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-emerald-400 font-black text-xs rounded-full transition active:scale-95 cursor-pointer"
+                title="Adicionar Ponto na Trilha"
               >
-                <Ruler className="w-5 h-5 text-rose-400" />
-                {measurementPoints.length > 0 && activeTool === 'measure' && (
-                  <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-amber-500 text-slate-950 text-[9px] font-black flex items-center justify-center">
-                    {measurementPoints.length}
-                  </span>
-                )}
+                <Plus className="w-3.5 h-3.5" />
+                <span>Ponto</span>
               </button>
 
-              {/* 4. Gravar Rota em Tempo Real */}
+              {/* Pausar / Retomar */}
               <button
-                onClick={handleStartLiveRecording}
-                title="Gravar Rota GPS em Tempo Real"
-                className={`w-11 h-11 rounded-xl flex items-center justify-center transition-all cursor-pointer ${
-                  activeTool === 'record_track' ? 'bg-rose-600 text-white shadow-md' : 'text-slate-400 hover:text-rose-400 hover:bg-slate-800/70'
-                }`}
+                onClick={() => setIsRecordingPaused(!isRecordingPaused)}
+                className="p-1.5 text-amber-400 hover:text-amber-300 rounded-full hover:bg-slate-800 transition active:scale-95 cursor-pointer"
+                title={isRecordingPaused ? 'Retomar Gravação' : 'Pausar Gravação'}
               >
-                <Footprints className="w-5 h-5 text-rose-400" />
+                {isRecordingPaused ? <Play className="w-4 h-4 fill-amber-400" /> : <Pause className="w-4 h-4 fill-amber-400" />}
               </button>
 
-              {/* 5. Traçar Rota Manualmente */}
-              <button
-                onClick={() => { setActiveTool('draw_track'); setCurrentTrackPoints([]); }}
-                title="Traçar Rota Manualmente"
-                className={`w-11 h-11 rounded-xl flex items-center justify-center transition-all cursor-pointer ${
-                  activeTool === 'draw_track' ? 'bg-amber-600 text-white shadow-md' : 'text-slate-400 hover:text-amber-400 hover:bg-slate-800/70'
-                }`}
-              >
-                <Activity className="w-5 h-5 text-amber-400" />
-              </button>
+              <div className="h-4 w-px bg-slate-800 shrink-0" />
 
-              {/* 6. Cubagem de Pilha de Madeira */}
+              {/* Finalizar / Desativar */}
               <button
-                onClick={() => {
-                  if (activeTool === 'woodpile' && measurementPoints.length > 0 && woodpileSubMode === 'measure') {
-                    setIsMeasureSummaryOpen(true);
-                  } else {
-                    setActiveTool('woodpile');
-                    setCurrentTrackPoints([]);
-                  }
-                }}
-                title="Cubagem de Madeira"
-                className={`w-11 h-11 rounded-xl flex items-center justify-center transition-all cursor-pointer ${
-                  activeTool === 'woodpile' ? 'bg-amber-600 text-white shadow-md' : 'text-slate-400 hover:text-amber-400 hover:bg-slate-800/70'
-                }`}
+                onClick={handleStopAndSaveLiveRecording}
+                className="flex items-center gap-1 px-3 py-1.5 bg-rose-600 hover:bg-rose-500 text-white rounded-full text-xs font-black shadow transition active:scale-95 cursor-pointer"
+                title="Finalizar e Salvar Trilha"
               >
-                <WoodpileIcon className="w-5 h-5 text-amber-400" />
-              </button>
-
-              <div className="w-full h-px bg-slate-800" />
-
-              {/* 7. GPS Live Toggle */}
-              <button
-                onClick={() => toggleGps()}
-                title={isGpsActive ? 'Desativar GPS' : 'Ativar Meu GPS'}
-                className={`w-11 h-11 rounded-xl flex items-center justify-center transition-all cursor-pointer ${
-                  isGpsActive ? 'bg-sky-600 text-white shadow-md' : 'text-slate-400 hover:text-sky-400 hover:bg-slate-800/70'
-                }`}
-              >
-                <LocateFixed className={`w-5 h-5 ${isGpsActive ? 'animate-spin text-white' : 'text-sky-400'}`} style={{ animationDuration: '4s' }} />
-              </button>
-
-              {/* 8. Calibrar Georreferenciamento */}
-              <button
-                onClick={() => setIsCalibrationModalOpen(true)}
-                title="Calibrar Georreferenciamento da Folha"
-                className="w-11 h-11 rounded-xl flex items-center justify-center text-slate-400 hover:text-amber-400 hover:bg-slate-800/70 transition-colors cursor-pointer"
-              >
-                <Sliders className="w-5 h-5 text-amber-400" />
-              </button>
-
-              {/* 9. Exportar & Compartilhar */}
-              <button
-                onClick={() => setIsExportModalOpen(true)}
-                title="Exportar & Compartilhar Mapa"
-                className="w-11 h-11 rounded-xl flex items-center justify-center text-slate-400 hover:text-emerald-400 hover:bg-slate-800/70 transition-colors cursor-pointer"
-              >
-                <Share2 className="w-5 h-5 text-emerald-400" />
-              </button>
-
-              {/* 10. Camadas / Lista de Pontos */}
-              <button
-                onClick={() => setIsDrawerOpen(true)}
-                title="Camadas & Lista de Pontos"
-                className="w-11 h-11 rounded-xl flex items-center justify-center text-slate-400 hover:text-teal-400 hover:bg-slate-800/70 transition-colors cursor-pointer"
-              >
-                <Layers className="w-5 h-5 text-teal-400" />
-              </button>
-
-              {/* 11. Ajustar à Tela */}
-              <button
-                onClick={handleFitBounds}
-                title="Ajustar Mapa à Tela"
-                className="w-11 h-11 rounded-xl flex items-center justify-center text-slate-400 hover:text-white hover:bg-slate-800/70 transition-colors cursor-pointer"
-              >
-                <Maximize2 className="w-5 h-5" />
+                <Square className="w-3 h-3 fill-white" />
+                <span>Finalizar</span>
               </button>
             </div>
           </div>
+        )}
+
+        {/* ------------------------------------------------------------- */}
+        {/* BOTTOM FLOATING BAR: MANUAL DRAWING CONTROLLER               */}
+        {/* ------------------------------------------------------------- */}
+        {activeTool === 'draw_track' && currentTrackPoints.length > 0 && (
+          <div
+            className={`absolute bottom-20 sm:bottom-6 left-1/2 -translate-x-1/2 z-[1000] transition-opacity duration-300 pointer-events-auto ${
+              isMapInteracting ? 'opacity-20 pointer-events-none' : 'opacity-100 pointer-events-auto'
+            }`}
+          >
+            <div className="bg-slate-950/95 backdrop-blur-md border border-amber-500/80 rounded-full px-3.5 py-1.5 shadow-2xl flex items-center gap-2 text-white">
+              <span className="text-xs font-bold text-amber-400 px-1">
+                {currentTrackPoints.length} pts
+              </span>
+              <button
+                onClick={() => setCurrentTrackPoints((prev) => prev.slice(0, -1))}
+                className="p-1.5 bg-slate-800 text-slate-200 rounded-full hover:bg-slate-700 active:scale-95 cursor-pointer"
+                title="Desfazer último vértice"
+              >
+                <Undo2 className="w-3.5 h-3.5" />
+              </button>
+              <button
+                onClick={() => setIsTrackModalOpen(true)}
+                className="flex items-center gap-1 px-3 py-1 bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs rounded-full shadow active:scale-95 cursor-pointer"
+              >
+                <Check className="w-3.5 h-3.5" />
+                <span>Salvar</span>
+              </button>
+              <button
+                onClick={() => {
+                  setCurrentTrackPoints([]);
+                  setActiveTool('pan');
+                }}
+                className="px-2.5 py-1 text-slate-400 hover:text-white text-xs font-bold rounded-full cursor-pointer"
+              >
+                Cancelar
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* ------------------------------------------------------------- */}
+        {/* BOTTOM SHEET: DISCRETE TOOLS MENU (IDENTICAL TO GPS MAP)     */}
+        {/* ------------------------------------------------------------- */}
+        {activeDoc && (
+          <BottomSheet
+            isOpen={isToolsPanelOpen}
+            onClose={() => setIsToolsPanelOpen(false)}
+            title="Ferramentas do Mapa PDF"
+            subtitle={activeDoc.name}
+            icon={<SlidersHorizontal className="w-5 h-5" />}
+          >
+            <div className="p-4 space-y-4 max-h-[75dvh] overflow-y-auto">
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
+                {/* 1. Marcar Ponto */}
+                <button
+                  onClick={() => {
+                    setActiveTool('add_point');
+                    setCurrentTrackPoints([]);
+                    setIsToolsPanelOpen(false);
+                    notifyInfo('Marcar Ponto Ativado', 'Toque em qualquer local do mapa para adicionar um ponto com foto.');
+                  }}
+                  className={`p-3.5 rounded-2xl border text-left flex flex-col gap-2 transition-all active:scale-95 cursor-pointer ${
+                    activeTool === 'add_point'
+                      ? 'bg-emerald-500/20 border-emerald-500/50 text-white'
+                      : 'bg-slate-900/90 border-slate-800 text-slate-300 hover:border-slate-700 hover:bg-slate-800/80'
+                  }`}
+                >
+                  <div className="w-9 h-9 rounded-xl bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 flex items-center justify-center">
+                    <Camera className="w-4.5 h-4.5" />
+                  </div>
+                  <div>
+                    <strong className="block text-xs text-white font-extrabold">Marcar Ponto</strong>
+                    <span className="text-[10px] text-slate-400">Ponto de campo com foto</span>
+                  </div>
+                </button>
+
+                {/* 2. Gravar Trilha GPS */}
+                <button
+                  onClick={() => {
+                    setIsToolsPanelOpen(false);
+                    handleStartLiveRecording();
+                  }}
+                  className={`p-3.5 rounded-2xl border text-left flex flex-col gap-2 transition-all active:scale-95 cursor-pointer ${
+                    isRecordingLive
+                      ? 'bg-rose-500/20 border-rose-500/50 text-white'
+                      : 'bg-slate-900/90 border-slate-800 text-slate-300 hover:border-slate-700 hover:bg-slate-800/80'
+                  }`}
+                >
+                  <div className="w-9 h-9 rounded-xl bg-rose-500/10 text-rose-400 border border-rose-500/20 flex items-center justify-center">
+                    <Footprints className="w-4.5 h-4.5" />
+                  </div>
+                  <div>
+                    <strong className="block text-xs text-white font-extrabold">Gravar Trilha</strong>
+                    <span className="text-[10px] text-slate-400">Rastreio em tempo real</span>
+                  </div>
+                </button>
+
+                {/* 3. Traçar Rota Manual */}
+                <button
+                  onClick={() => {
+                    setActiveTool('draw_track');
+                    setCurrentTrackPoints([]);
+                    setIsToolsPanelOpen(false);
+                    notifyInfo('Traçado Manual', 'Toque no mapa para desenhar os vértices do trajeto.');
+                  }}
+                  className={`p-3.5 rounded-2xl border text-left flex flex-col gap-2 transition-all active:scale-95 cursor-pointer ${
+                    activeTool === 'draw_track'
+                      ? 'bg-amber-500/20 border-amber-500/50 text-white'
+                      : 'bg-slate-900/90 border-slate-800 text-slate-300 hover:border-slate-700 hover:bg-slate-800/80'
+                  }`}
+                >
+                  <div className="w-9 h-9 rounded-xl bg-amber-500/10 text-amber-400 border border-amber-500/20 flex items-center justify-center">
+                    <Activity className="w-4.5 h-4.5" />
+                  </div>
+                  <div>
+                    <strong className="block text-xs text-white font-extrabold">Traçar Rota</strong>
+                    <span className="text-[10px] text-slate-400">Desenho de polilinha</span>
+                  </div>
+                </button>
+
+                {/* 4. Régua / Medir Distância */}
+                <button
+                  onClick={() => {
+                    setActiveTool('measure');
+                    setCurrentTrackPoints([]);
+                    setIsToolsPanelOpen(false);
+                    notifyInfo('Modo Medição', 'Toque no mapa para marcar pontos e calcular distâncias e área.');
+                  }}
+                  className={`p-3.5 rounded-2xl border text-left flex flex-col gap-2 transition-all active:scale-95 cursor-pointer ${
+                    activeTool === 'measure'
+                      ? 'bg-sky-500/20 border-sky-500/50 text-white'
+                      : 'bg-slate-900/90 border-slate-800 text-slate-300 hover:border-slate-700 hover:bg-slate-800/80'
+                  }`}
+                >
+                  <div className="w-9 h-9 rounded-xl bg-sky-500/10 text-sky-400 border border-sky-500/20 flex items-center justify-center">
+                    <Ruler className="w-4.5 h-4.5" />
+                  </div>
+                  <div>
+                    <strong className="block text-xs text-white font-extrabold">Régua / Área</strong>
+                    <span className="text-[10px] text-slate-400">Distâncias e polígonos</span>
+                  </div>
+                </button>
+
+                {/* 5. Cubagem de Madeira */}
+                <button
+                  onClick={() => {
+                    setActiveTool('woodpile');
+                    setCurrentTrackPoints([]);
+                    setIsToolsPanelOpen(false);
+                  }}
+                  className={`p-3.5 rounded-2xl border text-left flex flex-col gap-2 transition-all active:scale-95 cursor-pointer ${
+                    activeTool === 'woodpile'
+                      ? 'bg-amber-500/20 border-amber-500/50 text-white'
+                      : 'bg-slate-900/90 border-slate-800 text-slate-300 hover:border-slate-700 hover:bg-slate-800/80'
+                  }`}
+                >
+                  <div className="w-9 h-9 rounded-xl bg-amber-500/10 text-amber-400 border border-amber-500/20 flex items-center justify-center">
+                    <WoodpileIcon className="w-4.5 h-4.5" />
+                  </div>
+                  <div>
+                    <strong className="block text-xs text-white font-extrabold">Cubagem Madeira</strong>
+                    <span className="text-[10px] text-slate-400">Cálculo de estéreo</span>
+                  </div>
+                </button>
+
+                {/* 6. Calibrar Georreferenciamento */}
+                <button
+                  onClick={() => {
+                    setIsToolsPanelOpen(false);
+                    setIsCalibrationModalOpen(true);
+                  }}
+                  className="p-3.5 rounded-2xl border border-slate-800 bg-slate-900/90 text-left flex flex-col gap-2 hover:border-slate-700 hover:bg-slate-800/80 transition-all active:scale-95 cursor-pointer"
+                >
+                  <div className="w-9 h-9 rounded-xl bg-amber-500/10 text-amber-400 border border-amber-500/20 flex items-center justify-center">
+                    <Sliders className="w-4.5 h-4.5" />
+                  </div>
+                  <div>
+                    <strong className="block text-xs text-white font-extrabold">Calibrar Planta</strong>
+                    <span className="text-[10px] text-slate-400">2 Pontos GCP / GPS / Moldura</span>
+                  </div>
+                </button>
+
+                {/* 7. Folhas & Camadas */}
+                <button
+                  onClick={() => {
+                    setIsToolsPanelOpen(false);
+                    setIsDrawerOpen(true);
+                  }}
+                  className="p-3.5 rounded-2xl border border-slate-800 bg-slate-900/90 text-left flex flex-col gap-2 hover:border-slate-700 hover:bg-slate-800/80 transition-all active:scale-95 cursor-pointer"
+                >
+                  <div className="w-9 h-9 rounded-xl bg-teal-500/10 text-teal-400 border border-teal-500/20 flex items-center justify-center">
+                    <Layers className="w-4.5 h-4.5" />
+                  </div>
+                  <div>
+                    <strong className="block text-xs text-white font-extrabold">Folhas & Páginas</strong>
+                    <span className="text-[10px] text-slate-400">Gerenciar mapas salvos</span>
+                  </div>
+                </button>
+
+                {/* 8. Importar KML / KMZ */}
+                <button
+                  onClick={() => {
+                    setIsToolsPanelOpen(false);
+                    triggerFileInput(importKmlInputRef);
+                  }}
+                  className="p-3.5 rounded-2xl border border-slate-800 bg-slate-900/90 text-left flex flex-col gap-2 hover:border-slate-700 hover:bg-slate-800/80 transition-all active:scale-95 cursor-pointer"
+                >
+                  <div className="w-9 h-9 rounded-xl bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 flex items-center justify-center">
+                    <UploadCloud className="w-4.5 h-4.5" />
+                  </div>
+                  <div>
+                    <strong className="block text-xs text-white font-extrabold">Importar KML</strong>
+                    <span className="text-[10px] text-slate-400">Sobrepor vetores</span>
+                  </div>
+                </button>
+
+                {/* 9. Exportar / Compartilhar */}
+                <button
+                  onClick={() => {
+                    setIsToolsPanelOpen(false);
+                    setIsExportModalOpen(true);
+                  }}
+                  className="p-3.5 rounded-2xl border border-slate-800 bg-slate-900/90 text-left flex flex-col gap-2 hover:border-slate-700 hover:bg-slate-800/80 transition-all active:scale-95 cursor-pointer"
+                >
+                  <div className="w-9 h-9 rounded-xl bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 flex items-center justify-center">
+                    <Share2 className="w-4.5 h-4.5" />
+                  </div>
+                  <div>
+                    <strong className="block text-xs text-white font-extrabold">Exportar / Enviar</strong>
+                    <span className="text-[10px] text-slate-400">Compartilhar mapa e dados</span>
+                  </div>
+                </button>
+
+                {/* 10. Modo Navegação (Pan) */}
+                <button
+                  onClick={() => {
+                    setActiveTool('pan');
+                    setCurrentTrackPoints([]);
+                    setIsToolsPanelOpen(false);
+                  }}
+                  className={`p-3.5 rounded-2xl border text-left flex flex-col gap-2 transition-all active:scale-95 cursor-pointer ${
+                    activeTool === 'pan'
+                      ? 'bg-slate-800/90 border-slate-600 text-white'
+                      : 'bg-slate-900/90 border-slate-800 text-slate-300 hover:border-slate-700'
+                  }`}
+                >
+                  <div className="w-9 h-9 rounded-xl bg-slate-800 text-slate-300 border border-slate-700 flex items-center justify-center">
+                    <MousePointer className="w-4.5 h-4.5" />
+                  </div>
+                  <div>
+                    <strong className="block text-xs text-white font-extrabold">Modo Navegar</strong>
+                    <span className="text-[10px] text-slate-400">Apenas mover e dar zoom</span>
+                  </div>
+                </button>
+              </div>
+            </div>
+          </BottomSheet>
         )}
 
         {/* Bottom Status Badge */}
@@ -3489,73 +4048,406 @@ export const PdfMapNavigator: React.FC = () => {
         </div>
       )}
 
-      {/* MODAL: Calibração de Georreferenciamento (z-[200]) */}
+      {/* MODAL: Calibração de Georreferenciamento Avançada (z-[200]) */}
       {isCalibrationModalOpen && activeDoc && (
-        <div className="fixed inset-0 z-[200] bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 animate-in fade-in">
-          <div className="bg-slate-900 border border-slate-800 w-full max-w-md rounded-2xl shadow-2xl p-5 space-y-4 max-h-[min(90dvh,calc(100vh-32px))] overflow-y-auto">
+        <div className="fixed inset-0 z-[200] bg-slate-950/85 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 animate-in fade-in">
+          <div className="bg-slate-900 border border-slate-800 w-full max-w-lg rounded-3xl shadow-2xl p-5 space-y-4 max-h-[min(90dvh,calc(100vh-32px))] overflow-y-auto">
+            {/* Header */}
             <div className="flex items-center justify-between border-b border-slate-800 pb-3">
               <div className="flex items-center gap-2">
-                <Sliders className="w-5 h-5 text-amber-400" />
-                <h3 className="text-sm font-extrabold text-white">Calibrar Georreferenciamento</h3>
+                <Sliders className="w-5 h-5 text-emerald-400" />
+                <div>
+                  <h3 className="text-sm font-extrabold text-white">Georreferenciamento da Planta</h3>
+                  <div className="flex items-center gap-2 mt-0.5">
+                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${isDocumentCalibrated(activeDoc) ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' : 'bg-amber-500/20 text-amber-400 border border-amber-500/30'}`}>
+                      {isDocumentCalibrated(activeDoc) ? '✅ Georreferenciada' : '⚠️ Não Calibrada'}
+                    </span>
+                    {activeDoc.calibration?.method && (
+                      <span className="text-[10px] font-mono text-slate-400">
+                        ({activeDoc.calibration.method === 'gcp_2pt' ? '2 Pontos GCP' : activeDoc.calibration.method === 'gcp_4pt' ? 'Moldura' : 'Ancorada'})
+                      </span>
+                    )}
+                  </div>
+                </div>
               </div>
               <button
                 onClick={() => setIsCalibrationModalOpen(false)}
-                className="p-1 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800"
+                className="p-1.5 text-slate-400 hover:text-white rounded-xl hover:bg-slate-800 transition"
               >
                 <X className="w-4 h-4" />
               </button>
             </div>
 
-            <p className="text-xs text-slate-400 leading-relaxed">
-              Vincule a folha desta planta às coordenadas do mundo real. Você pode ancorar a planta usando sua localização atual do GPS para que o rastreio e navegação fiquem alinhados.
-            </p>
-
-            <div className="bg-slate-950 p-3 rounded-xl border border-slate-800 space-y-2">
-              <div className="flex items-center justify-between text-xs">
-                <span className="text-slate-400">Status do GPS:</span>
-                <span className={`font-bold ${isGpsActive && userGps ? 'text-emerald-400' : 'text-amber-400'}`}>
-                  {isGpsActive && userGps ? `Conectado (±${userGps.accuracy.toFixed(0)}m)` : 'Desconectado'}
-                </span>
-              </div>
-              {userGps && (
-                <div className="text-xs font-mono text-slate-300">
-                  Posição: {userGps.lat.toFixed(5)}, {userGps.lng.toFixed(5)}
+            {/* GPS Telemetry Pill */}
+            <div className="bg-slate-950/80 p-3 rounded-2xl border border-slate-800/80 flex items-center justify-between text-xs">
+              <div className="flex items-center gap-2">
+                <LocateFixed className={`w-4 h-4 ${currentGps ? 'text-emerald-400' : 'text-slate-500'}`} />
+                <div>
+                  <span className="text-slate-400 text-[10px] block">Sensor GNSS / GPS:</span>
+                  <span className="font-mono font-bold text-slate-200">
+                    {currentGps ? `${currentGps.lat.toFixed(5)}, ${currentGps.lng.toFixed(5)}` : 'Aguardando satélites...'}
+                  </span>
                 </div>
-              )}
+              </div>
+              <span className={`px-2 py-1 rounded-lg text-[10px] font-black ${currentGps ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-slate-800 text-slate-400'}`}>
+                {currentGps ? `±${(currentGps.accuracy || 5).toFixed(0)}m` : 'Sem Sinal'}
+              </span>
             </div>
 
-            <div>
-              <div className="flex items-center justify-between text-xs mb-1">
-                <label className="text-slate-300 font-bold">Escala Estimada (Metros por Pixel)</label>
-                <span className="font-mono font-bold text-amber-400">{calibScale.toFixed(2)} m/px</span>
-              </div>
-              <input
-                type="range"
-                min="0.1"
-                max="5.0"
-                step="0.05"
-                value={calibScale}
-                onChange={(e) => setCalibScale(parseFloat(e.target.value))}
-                className="w-full accent-amber-500"
-              />
-              <div className="flex justify-between text-[10px] text-slate-500 mt-1">
-                <span>0.1 m/px (Planta Detalhada)</span>
-                <span>5.0 m/px (Carta Regional)</span>
-              </div>
-            </div>
-
-            <div className="pt-2 border-t border-slate-800 flex flex-col gap-2">
+            {/* Calibration Tabs */}
+            <div className="grid grid-cols-3 gap-1 bg-slate-950 p-1 rounded-2xl border border-slate-800">
               <button
-                onClick={handleCalibrateCurrentGps}
-                className="w-full flex items-center justify-center gap-2 py-3 bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs rounded-xl shadow active:scale-95"
+                onClick={() => setCalibTab('gps_anchor')}
+                className={`py-2 text-xs font-black rounded-xl transition ${calibTab === 'gps_anchor' ? 'bg-emerald-500 text-slate-950 shadow' : 'text-slate-400 hover:text-white'}`}
               >
-                <LocateFixed className="w-4 h-4" />
-                <span>Ancorar na Minha Posição Atual</span>
+                📍 Centro / GPS
               </button>
+              <button
+                onClick={() => setCalibTab('gcp_2pt')}
+                className={`py-2 text-xs font-black rounded-xl transition ${calibTab === 'gcp_2pt' ? 'bg-emerald-500 text-slate-950 shadow' : 'text-slate-400 hover:text-white'}`}
+              >
+                🎯 2 Pontos (GCP)
+              </button>
+              <button
+                onClick={() => setCalibTab('bounds')}
+                className={`py-2 text-xs font-black rounded-xl transition ${calibTab === 'bounds' ? 'bg-emerald-500 text-slate-950 shadow' : 'text-slate-400 hover:text-white'}`}
+              >
+                📐 Moldura
+              </button>
+            </div>
 
+            {/* TAB 1: GPS / Centro da Fazenda */}
+            {calibTab === 'gps_anchor' && (
+              <div className="space-y-3.5 animate-in fade-in">
+                <p className="text-xs text-slate-400 leading-relaxed">
+                  Defina as coordenadas geográficas reais do centro da fazenda/propriedade. Se estiver longe, o pontinho azul mostrará seu deslocamento na estrada até chegar ao local!
+                </p>
+
+                {/* Manual Farm / Property Coordinates Input */}
+                <div className="bg-slate-950 p-3 rounded-2xl border border-slate-800 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs text-slate-200 font-bold block">Coordenadas Reais da Fazenda / Local</label>
+                    {currentGps && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setCalibCenterLat(currentGps.lat.toFixed(6));
+                          setCalibCenterLng(currentGps.lng.toFixed(6));
+                        }}
+                        className="text-[10px] font-bold text-sky-400 hover:text-sky-300 transition cursor-pointer"
+                      >
+                        Copiar meu GPS atual
+                      </button>
+                    )}
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <span className="text-[10px] text-slate-400 block mb-0.5">Latitude (Graus):</span>
+                      <input
+                        type="number"
+                        step="any"
+                        placeholder="-18.123456"
+                        value={calibCenterLat}
+                        onChange={(e) => setCalibCenterLat(e.target.value)}
+                        className="w-full bg-slate-900 border border-slate-700 rounded-xl px-2.5 py-1.5 text-xs text-white font-mono focus:border-sky-500 focus:outline-hidden"
+                      />
+                    </div>
+                    <div>
+                      <span className="text-[10px] text-slate-400 block mb-0.5">Longitude (Graus):</span>
+                      <input
+                        type="number"
+                        step="any"
+                        placeholder="-48.123456"
+                        value={calibCenterLng}
+                        onChange={(e) => setCalibCenterLng(e.target.value)}
+                        className="w-full bg-slate-900 border border-slate-700 rounded-xl px-2.5 py-1.5 text-xs text-white font-mono focus:border-sky-500 focus:outline-hidden"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Scale presets */}
+                <div>
+                  <label className="text-xs text-slate-300 font-bold block mb-1.5">Escala Cartográfica Sugerida</label>
+                  <div className="grid grid-cols-3 gap-1.5 text-xs">
+                    {[
+                      { label: '1:1.000', mpx: 0.25 },
+                      { label: '1:5.000', mpx: 0.75 },
+                      { label: '1:10.000', mpx: 1.50 },
+                      { label: '1:25.000', mpx: 3.50 },
+                      { label: '1:50.000', mpx: 7.00 },
+                      { label: '1:100.000', mpx: 14.0 },
+                    ].map((s) => (
+                      <button
+                        key={s.label}
+                        type="button"
+                        onClick={() => {
+                          setCalibScale(s.mpx);
+                          setCalibNominalScale(s.label);
+                        }}
+                        className={`py-1.5 px-2 rounded-xl border text-[11px] font-bold transition ${calibNominalScale === s.label ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/40' : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-white'}`}
+                      >
+                        {s.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Custom scale slider */}
+                <div>
+                  <div className="flex items-center justify-between text-xs mb-1">
+                    <span className="text-slate-300 font-bold">Resolução por Pixel:</span>
+                    <span className="font-mono font-bold text-emerald-400">{calibScale.toFixed(2)} metros/px</span>
+                  </div>
+                  <input
+                    type="range"
+                    min="0.05"
+                    max="15.0"
+                    step="0.05"
+                    value={calibScale}
+                    onChange={(e) => {
+                      setCalibScale(parseFloat(e.target.value));
+                      setCalibNominalScale('Personalizada');
+                    }}
+                    className="w-full accent-emerald-500"
+                  />
+                </div>
+
+                {/* Rotation slider */}
+                <div>
+                  <div className="flex items-center justify-between text-xs mb-1">
+                    <span className="text-slate-300 font-bold">Rotação do Norte:</span>
+                    <span className="font-mono font-bold text-cyan-400">{calibRotation}°</span>
+                  </div>
+                  <input
+                    type="range"
+                    min="0"
+                    max="360"
+                    step="5"
+                    value={calibRotation}
+                    onChange={(e) => setCalibRotation(parseInt(e.target.value, 10))}
+                    className="w-full accent-cyan-500"
+                  />
+                  <div className="flex justify-between text-[10px] text-slate-500 mt-0.5">
+                    <span>0° (Norte para cima)</span>
+                    <span>90° (Leste)</span>
+                    <span>180° (Sul)</span>
+                    <span>270° (Oeste)</span>
+                  </div>
+                </div>
+
+                <div className="flex flex-col sm:flex-row gap-2 pt-1">
+                  <button
+                    type="button"
+                    onClick={handleCalibrateCustomCenter}
+                    className="flex-1 flex items-center justify-center gap-2 py-3 bg-sky-600 hover:bg-sky-500 text-white font-black text-xs rounded-2xl shadow-lg active:scale-95 transition cursor-pointer"
+                  >
+                    <MapPin className="w-4 h-4" />
+                    <span>Salvar Coordenadas da Fazenda</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleCalibrateCurrentGps}
+                    className="flex-1 flex items-center justify-center gap-2 py-3 bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs rounded-2xl shadow-lg active:scale-95 transition cursor-pointer"
+                  >
+                    <LocateFixed className="w-4 h-4" />
+                    <span>Ancorar no Meu GPS Atual</span>
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* TAB 2: 2-Point GCP */}
+            {calibTab === 'gcp_2pt' && (
+              <div className="space-y-3 animate-in fade-in">
+                <p className="text-xs text-slate-400 leading-relaxed">
+                  Identifique 2 pontos de referência no mapa (ex: cerca, porteira, marco) e insira as coordenadas reais de cada um. O sistema calcula a matriz afim exata.
+                </p>
+
+                {/* Ponto 1 */}
+                <div className="bg-slate-950 p-3 rounded-2xl border border-slate-800 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-black text-emerald-400">PONTO DE CONTROLE 1</span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsSelectingGcpOnMap(1);
+                        setIsCalibrationModalOpen(false);
+                      }}
+                      className="px-2 py-1 bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 rounded-lg text-[10px] font-bold border border-emerald-500/40"
+                    >
+                      {gcpPt1.x ? `Definido [${gcpPt1.x.toFixed(0)}, ${gcpPt1.y.toFixed(0)}] 📍` : '📍 Marcar na Folha'}
+                    </button>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="text-[10px] text-slate-400 block mb-0.5">Latitude</label>
+                      <input
+                        type="text"
+                        placeholder="-15.82345"
+                        value={gcpPt1.lat}
+                        onChange={(e) => setGcpPt1({ ...gcpPt1, lat: e.target.value })}
+                        className="w-full bg-slate-900 border border-slate-800 rounded-xl px-2.5 py-1.5 text-xs text-white font-mono"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[10px] text-slate-400 block mb-0.5">Longitude</label>
+                      <input
+                        type="text"
+                        placeholder="-47.92345"
+                        value={gcpPt1.lng}
+                        onChange={(e) => setGcpPt1({ ...gcpPt1, lng: e.target.value })}
+                        className="w-full bg-slate-900 border border-slate-800 rounded-xl px-2.5 py-1.5 text-xs text-white font-mono"
+                      />
+                    </div>
+                  </div>
+                  {currentGps && (
+                    <button
+                      type="button"
+                      onClick={() => setGcpPt1((p) => ({ ...p, lat: currentGps.lat.toFixed(6), lng: currentGps.lng.toFixed(6) }))}
+                      className="text-[10px] text-cyan-400 hover:text-cyan-300 font-bold"
+                    >
+                      Copiar Meu GPS Atual para Ponto 1
+                    </button>
+                  )}
+                </div>
+
+                {/* Ponto 2 */}
+                <div className="bg-slate-950 p-3 rounded-2xl border border-slate-800 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-black text-amber-400">PONTO DE CONTROLE 2</span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsSelectingGcpOnMap(2);
+                        setIsCalibrationModalOpen(false);
+                      }}
+                      className="px-2 py-1 bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 rounded-lg text-[10px] font-bold border border-amber-500/40"
+                    >
+                      {gcpPt2.x ? `Definido [${gcpPt2.x.toFixed(0)}, ${gcpPt2.y.toFixed(0)}] 📍` : '📍 Marcar na Folha'}
+                    </button>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="text-[10px] text-slate-400 block mb-0.5">Latitude</label>
+                      <input
+                        type="text"
+                        placeholder="-15.83456"
+                        value={gcpPt2.lat}
+                        onChange={(e) => setGcpPt2({ ...gcpPt2, lat: e.target.value })}
+                        className="w-full bg-slate-900 border border-slate-800 rounded-xl px-2.5 py-1.5 text-xs text-white font-mono"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[10px] text-slate-400 block mb-0.5">Longitude</label>
+                      <input
+                        type="text"
+                        placeholder="-47.93456"
+                        value={gcpPt2.lng}
+                        onChange={(e) => setGcpPt2({ ...gcpPt2, lng: e.target.value })}
+                        className="w-full bg-slate-900 border border-slate-800 rounded-xl px-2.5 py-1.5 text-xs text-white font-mono"
+                      />
+                    </div>
+                  </div>
+                  {currentGps && (
+                    <button
+                      type="button"
+                      onClick={() => setGcpPt2((p) => ({ ...p, lat: currentGps.lat.toFixed(6), lng: currentGps.lng.toFixed(6) }))}
+                      className="text-[10px] text-cyan-400 hover:text-cyan-300 font-bold"
+                    >
+                      Copiar Meu GPS Atual para Ponto 2
+                    </button>
+                  )}
+                </div>
+
+                <button
+                  onClick={handleCalibrate2Points}
+                  className="w-full flex items-center justify-center gap-2 py-3 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs rounded-2xl shadow-lg active:scale-95 transition"
+                >
+                  <Sparkles className="w-4 h-4" />
+                  <span>Calcular e Aplicar Matriz Afim (2 Pontos)</span>
+                </button>
+              </div>
+            )}
+
+            {/* TAB 3: Bounding Box */}
+            {calibTab === 'bounds' && (
+              <div className="space-y-3 animate-in fade-in">
+                <p className="text-xs text-slate-400 leading-relaxed">
+                  Informe as 4 coordenadas impressas nos limites da moldura da carta topográfica:
+                </p>
+
+                <div className="bg-slate-950 p-3 rounded-2xl border border-slate-800 space-y-2.5">
+                  <div>
+                    <label className="text-[10px] text-slate-400 block mb-0.5">Norte (Latitude Superior Máxima)</label>
+                    <input
+                      type="text"
+                      placeholder="-23.50000"
+                      value={boundsNorth}
+                      onChange={(e) => setBoundsNorth(e.target.value)}
+                      className="w-full bg-slate-900 border border-slate-800 rounded-xl px-2.5 py-1.5 text-xs text-white font-mono"
+                    />
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="text-[10px] text-slate-400 block mb-0.5">Oeste (Lng Mín)</label>
+                      <input
+                        type="text"
+                        placeholder="-46.70000"
+                        value={boundsWest}
+                        onChange={(e) => setBoundsWest(e.target.value)}
+                        className="w-full bg-slate-900 border border-slate-800 rounded-xl px-2.5 py-1.5 text-xs text-white font-mono"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[10px] text-slate-400 block mb-0.5">Leste (Lng Máx)</label>
+                      <input
+                        type="text"
+                        placeholder="-46.50000"
+                        value={boundsEast}
+                        onChange={(e) => setBoundsEast(e.target.value)}
+                        className="w-full bg-slate-900 border border-slate-800 rounded-xl px-2.5 py-1.5 text-xs text-white font-mono"
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="text-[10px] text-slate-400 block mb-0.5">Sul (Latitude Inferior Mínima)</label>
+                    <input
+                      type="text"
+                      placeholder="-23.60000"
+                      value={boundsSouth}
+                      onChange={(e) => setBoundsSouth(e.target.value)}
+                      className="w-full bg-slate-900 border border-slate-800 rounded-xl px-2.5 py-1.5 text-xs text-white font-mono"
+                    />
+                  </div>
+                </div>
+
+                <button
+                  onClick={handleCalibrateBounds}
+                  className="w-full flex items-center justify-center gap-2 py-3 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs rounded-2xl shadow-lg active:scale-95 transition"
+                >
+                  <Sparkles className="w-4 h-4" />
+                  <span>Aplicar Limites da Moldura</span>
+                </button>
+              </div>
+            )}
+
+            <div className="pt-2 border-t border-slate-800 flex items-center justify-between">
+              {isDocumentCalibrated(activeDoc) ? (
+                <button
+                  type="button"
+                  onClick={handleClearCalibration}
+                  className="py-2 px-3 text-rose-400 hover:text-rose-300 hover:bg-rose-950/40 border border-rose-900/60 rounded-xl text-xs font-bold transition flex items-center gap-1.5"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                  <span>Limpar Calibração</span>
+                </button>
+              ) : (
+                <div />
+              )}
               <button
                 onClick={() => setIsCalibrationModalOpen(false)}
-                className="w-full py-2 text-slate-400 hover:text-white text-xs font-bold"
+                className="py-2 px-4 text-slate-400 hover:text-white text-xs font-bold"
               >
                 Fechar
               </button>
@@ -3780,7 +4672,7 @@ export const PdfMapNavigator: React.FC = () => {
 
       {/* Slide-over Drawer: Lista de Mapas & Pontos (z-[100]) */}
       {isDrawerOpen && (
-        <div className="fixed inset-0 z-[100] bg-slate-950/75 backdrop-blur-xs flex justify-end animate-in fade-in">
+        <div className="absolute inset-0 z-30 bg-slate-950/75 backdrop-blur-xs flex justify-end animate-in fade-in">
           <div className="w-full sm:w-96 bg-slate-900 border-l border-slate-800 flex flex-col h-[100dvh] shadow-2xl animate-in slide-in-from-right">
             
             <div className="p-4 border-b border-slate-800 flex items-center justify-between bg-slate-950 shrink-0">

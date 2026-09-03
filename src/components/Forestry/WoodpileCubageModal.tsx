@@ -212,10 +212,10 @@ export const WoodpileCubageModal: React.FC<WoodpileCubageModalProps> = ({ isOpen
         <div className="grid grid-cols-3 p-1.5 sm:p-2 bg-slate-950/60 border-b border-slate-800 text-[11px] sm:text-xs font-bold gap-1 sm:gap-1.5 shrink-0">
           <button
             onClick={() => setActiveTab('pile')}
-            className={`py-2 px-1.5 sm:px-2 rounded-xl transition-all flex items-center justify-center gap-1 sm:gap-1.5 ${
+            className={`py-2 px-1.5 sm:px-2 rounded-xl transition-all flex items-center justify-center gap-1 sm:gap-1.5 cursor-pointer ${
               activeTab === 'pile'
-                ? 'bg-emerald-600 text-white shadow'
-                : 'text-slate-400 hover:text-white hover:bg-slate-900'
+                ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30'
+                : 'text-slate-400 hover:text-white hover:bg-slate-900 border border-transparent'
             }`}
           >
             <Layers className="w-3.5 h-3.5 shrink-0" />
@@ -224,10 +224,10 @@ export const WoodpileCubageModal: React.FC<WoodpileCubageModalProps> = ({ isOpen
 
           <button
             onClick={() => setActiveTab('smalian')}
-            className={`py-2 px-1.5 sm:px-2 rounded-xl transition-all flex items-center justify-center gap-1 sm:gap-1.5 ${
+            className={`py-2 px-1.5 sm:px-2 rounded-xl transition-all flex items-center justify-center gap-1 sm:gap-1.5 cursor-pointer ${
               activeTab === 'smalian'
-                ? 'bg-emerald-600 text-white shadow'
-                : 'text-slate-400 hover:text-white hover:bg-slate-900'
+                ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30'
+                : 'text-slate-400 hover:text-white hover:bg-slate-900 border border-transparent'
             }`}
           >
             <Calculator className="w-3.5 h-3.5 shrink-0" />
@@ -236,10 +236,10 @@ export const WoodpileCubageModal: React.FC<WoodpileCubageModalProps> = ({ isOpen
 
           <button
             onClick={() => setActiveTab('history')}
-            className={`py-2 px-1.5 sm:px-2 rounded-xl transition-all flex items-center justify-center gap-1 sm:gap-1.5 ${
+            className={`py-2 px-1.5 sm:px-2 rounded-xl transition-all flex items-center justify-center gap-1 sm:gap-1.5 cursor-pointer ${
               activeTab === 'history'
-                ? 'bg-emerald-600 text-white shadow'
-                : 'text-slate-400 hover:text-white hover:bg-slate-900'
+                ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30'
+                : 'text-slate-400 hover:text-white hover:bg-slate-900 border border-transparent'
             }`}
           >
             <Tag className="w-3.5 h-3.5 shrink-0" />

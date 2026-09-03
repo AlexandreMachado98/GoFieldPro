@@ -35,6 +35,7 @@ import {
   EyeOff,
 } from 'lucide-react';
 import { MeasurementControlBar } from './MeasurementControlBar';
+import { MapToolsController } from './MapToolsController';
 import { PointDetailModal } from './PointDetailModal';
 import { MeasurementSummaryModal } from './MeasurementSummaryModal';
 import { OfflineMapDownloadModal } from '../Offline/OfflineMapDownloadModal';
@@ -107,6 +108,7 @@ export const MapViewer: React.FC = () => {
     navigateToWaypoint,
     deleteWaypoint,
     setIsAddWaypointModalOpen,
+    setIsWoodpileModalOpen,
     setPendingWaypointCoord,
     setIsLayerModalOpen,
     setIsAiModalOpen,
@@ -1200,79 +1202,6 @@ export const MapViewer: React.FC = () => {
         </button>
       )}
 
-      {/* Floating Tactical Top-Left Telemetry Bar */}
-      {isToolsVisible && (
-        <div className="absolute top-3 left-3 z-10 flex flex-col gap-1.5 pointer-events-none animate-in fade-in duration-200">
-          <div className="pointer-events-auto bg-slate-900/90 backdrop-blur-md border border-slate-800 rounded-lg p-2.5 shadow-2xl text-xs text-slate-200 flex items-center gap-4">
-            <div className="flex items-center gap-2">
-              <div
-                className={`w-2.5 h-2.5 rounded-full ${
-                  isManualGpsLocked
-                    ? 'bg-amber-400'
-                    : hasGpsLock
-                    ? 'bg-emerald-500 animate-pulse'
-                    : 'bg-amber-500 animate-ping'
-                }`}
-              ></div>
-              <div>
-                <div className="text-[10px] text-slate-400 uppercase font-semibold flex items-center gap-1.5">
-                  {isManualGpsLocked ? '📌 Posição Calibrada' : 'Posição GPS Atual'}
-                </div>
-                {hasGpsLock ? (
-                  <div className="font-mono font-bold text-slate-100">
-                    {currentGps.lat.toFixed(5)}°, {currentGps.lng.toFixed(5)}°
-                  </div>
-                ) : (
-                  <div className="text-xs text-amber-400 font-mono flex items-center gap-1.5">
-                    <Loader2 className="w-3 h-3 animate-spin" /> Conectando GPS...
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {isManualGpsLocked && (
-              <button
-                onClick={unlockDeviceGps}
-                title="Alternar para GPS Automático do Dispositivo"
-                className="text-[10px] bg-slate-800 hover:bg-slate-700 text-sky-400 font-bold px-2 py-1 rounded border border-slate-700 transition-colors flex items-center gap-1"
-              >
-                <span>🛰️ Usar GPS Automático</span>
-              </button>
-            )}
-
-            <div className="h-6 w-px bg-slate-800"></div>
-
-            <div className="hidden sm:block">
-              <div className="text-[10px] text-slate-400 uppercase font-semibold">UTM Fuso 23S</div>
-              {hasGpsLock ? (
-                <div className="font-mono text-slate-200">
-                  E: {currentUtm.easting} N: {currentUtm.northing}
-                </div>
-              ) : (
-                <div className="text-xs text-slate-400">---</div>
-              )}
-            </div>
-
-            <div className="h-6 w-px bg-slate-800 hidden sm:block"></div>
-
-            <div>
-              <div className="text-[10px] text-slate-400 uppercase font-semibold">
-                Altitude / Precisão
-              </div>
-              {hasGpsLock ? (
-                <div className="font-mono text-sky-400 font-bold">
-                  {currentGps.altitude}m{' '}
-                  <span className="text-[10px] text-slate-400 font-normal">
-                    ±{currentGps.accuracy}m
-                  </span>
-                </div>
-              ) : (
-                <div className="text-xs text-slate-400">---</div>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Active GPS Manual Calibration Overlay Banner */}
       {isCalibratingGps && (
@@ -1288,265 +1217,46 @@ export const MapViewer: React.FC = () => {
         </div>
       )}
 
-      {/* Floating Open Tools Button (When Tools are hidden) */}
-      {!isToolsVisible && (
-        <button
-          onClick={() => setIsToolsVisible(true)}
-          className="absolute top-3 right-3 z-20 px-3 py-2 rounded-2xl bg-slate-900/95 backdrop-blur-md border border-sky-500/80 text-sky-400 font-extrabold text-xs flex items-center gap-1.5 shadow-2xl hover:bg-slate-800 active:scale-95 transition-all pointer-events-auto cursor-pointer animate-in fade-in"
-          title="Mostrar Ferramentas e Controles do Mapa"
-        >
-          <LayersIcon className="w-4 h-4 text-sky-400" />
-          <span>☰ Ferramentas</span>
-        </button>
-      )}
+{/* Unified Map Tools Controller (Material 3 Android Floating System) */}
+      <MapToolsController
+        onMarkWaypoint={() => {
+          setPendingWaypointCoord(null);
+          setIsAddWaypointModalOpen(true);
+        }}
+        onMarkWaypointClickMap={() => setIsPinModeActive(true)}
+        isRecordingTrack={isRecordingTrack}
+        isRecordingPaused={isRecordingPaused}
+        onStartTrackRecording={() => {
+          startTrackRecording(`Trilha Campo ${new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`);
+          notifySuccess('Gravação Iniciada', 'Traçado em tempo real ativado.');
+        }}
+        onStopTrackRecording={() => setIsSaveTrackModalOpen(true)}
+        onPauseTrackRecording={pauseTrackRecording}
+        onResumeTrackRecording={resumeTrackRecording}
+        trackDistanceFormatted={activeTrack?.distance || '0.00 km'}
+        trackDurationFormatted={activeTrack?.duration || '00:00'}
 
-      {/* Floating Tactical Map Controls (Right Side) - Compact Clustered Group */}
-      {isToolsVisible && (
-        <div className="absolute top-3 right-3 z-20 flex flex-col gap-2 pointer-events-auto animate-in slide-in-from-right duration-200 bg-[#070A10]/90 backdrop-blur-md p-2 rounded-2xl border border-slate-800/90 shadow-2xl max-h-[calc(100dvh-160px)] overflow-y-auto no-scrollbar">
-          {/* Header row: Toggle Hide Tools */}
-          <div className="flex items-center justify-between gap-1 pb-1 border-b border-slate-800/80 px-1">
-            <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Ações</span>
-            <button
-              onClick={() => setIsToolsVisible(false)}
-              title="Ocultar Painel"
-              className="p-1 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 transition-colors"
-            >
-              <EyeOff className="w-3.5 h-3.5" />
-            </button>
-          </div>
+        isMeasuring={isMeasuring}
+        onToggleMeasuring={() => setIsMeasuring(!isMeasuring)}
+        measurementPointsCount={measurementPoints.length}
+        totalDistanceFormatted={
+          totalDistanceMeters >= 1000
+            ? `${(totalDistanceMeters / 1000).toFixed(2)} km`
+            : `${totalDistanceMeters.toFixed(0)} m`
+        }
+        onClearMeasurement={handleClearMeasurement}
+        onFinishMeasurement={() => setIsSummaryModalOpen(true)}
 
-          {/* Group 1: GPS & Location */}
-          <div className="flex flex-col gap-2">
-            <button
-              id="btn-center-gps"
-              onClick={centerOnGps}
-              title="Centralizar no GPS (Minha Localização)"
-              className="w-11 h-11 rounded-xl bg-slate-900/95 hover:bg-slate-800 text-sky-400 border border-slate-800/90 shadow-lg flex items-center justify-center transition-all hover:scale-105 active:scale-95 cursor-pointer"
-            >
-              {isLocating ? (
-                <Loader2 className="w-5 h-5 animate-spin text-sky-400" />
-              ) : (
-                <Crosshair className="w-5 h-5" />
-              )}
-            </button>
+        onRecenterGps={centerOnGps}
+        hasGpsLock={hasGpsLock}
+        onZoomIn={() => mapInstanceRef.current?.zoomIn()}
+        onZoomOut={() => mapInstanceRef.current?.zoomOut()}
+        onFitBounds={fitAllLayers}
 
-            <button
-              id="btn-calibrate-gps"
-              onClick={() => setIsCalibratingGps(!isCalibratingGps)}
-              title={isCalibratingGps ? 'Cancelar Calibração' : 'Calibrar Posição Manualmente no Mapa'}
-              className={`w-11 h-11 rounded-xl border shadow-lg flex items-center justify-center transition-all hover:scale-105 active:scale-95 cursor-pointer ${
-                isCalibratingGps
-                  ? 'bg-amber-500 text-slate-950 border-amber-400 shadow-amber-900/50 animate-bounce'
-                  : 'bg-slate-900/95 hover:bg-slate-800 text-amber-400 border-slate-800/90'
-              }`}
-            >
-              <MapPin className="w-5 h-5" />
-            </button>
-          </div>
-
-          {/* Group 2: Pins & Track Recording */}
-          <div className="flex flex-col gap-2 pt-1 border-t border-slate-800/80">
-            {/* Pin Dropping Tool Trigger with Quick Selector */}
-            <div className="relative">
-              <button
-                id="btn-add-pin-tool"
-                onClick={() => setIsPinChoiceMenuOpen(!isPinChoiceMenuOpen)}
-                title="Adicionar Alfinete de Marcação no Mapa"
-                className={`w-11 h-11 rounded-xl border shadow-lg flex items-center justify-center transition-all hover:scale-105 active:scale-95 cursor-pointer ${
-                  isPinModeActive
-                    ? 'bg-sky-500 text-white border-sky-400 shadow-sky-900/50 animate-bounce'
-                    : 'bg-slate-900/95 hover:bg-slate-800 text-sky-400 border-slate-800/90'
-                }`}
-              >
-                <Pin className="w-5 h-5" />
-              </button>
-
-              {/* Pin Choice Dropdown */}
-              {isPinChoiceMenuOpen && (
-                <div className="absolute right-12 top-0 bg-slate-900/95 border border-slate-700 p-2 rounded-2xl shadow-2xl flex flex-col gap-1 w-52 z-40 backdrop-blur-md animate-in fade-in slide-in-from-right-2">
-                  <button
-                    onClick={() => {
-                      setIsPinChoiceMenuOpen(false);
-                      setPendingWaypointCoord(null);
-                      setIsAddWaypointModalOpen(true);
-                    }}
-                    className="text-left px-3 py-2.5 rounded-xl hover:bg-slate-800 text-xs font-bold text-sky-400 flex items-center gap-2 transition-colors cursor-pointer"
-                  >
-                    <Crosshair className="w-4 h-4 shrink-0" />
-                    <span>Marcar no GPS Atual</span>
-                  </button>
-                  <button
-                    onClick={() => {
-                      setIsPinChoiceMenuOpen(false);
-                      setIsPinModeActive(true);
-                    }}
-                    className="text-left px-3 py-2.5 rounded-xl hover:bg-slate-800 text-xs font-bold text-amber-400 flex items-center gap-2 transition-colors cursor-pointer"
-                  >
-                    <MapPin className="w-4 h-4 shrink-0" />
-                    <span>Marcar Clicando no Mapa</span>
-                  </button>
-                </div>
-              )}
-            </div>
-
-            {/* Live Track Recording Toggle Trigger */}
-            <button
-              id="btn-track-record-tool"
-              onClick={() => {
-                if (isRecordingTrack) {
-                  setIsSaveTrackModalOpen(true);
-                } else {
-                  startTrackRecording(
-                    `Trilha Campo ${new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`
-                  );
-                  notifySuccess(
-                    'Gravação de Rota Iniciada',
-                    'O traçado em tempo real está ativo. Percorra o terreno para registrar os pontos.'
-                  );
-                }
-              }}
-              title={
-                isRecordingTrack
-                  ? 'Trilha em Gravação Ativa - Clique para Concluir'
-                  : 'Gravar Trilha / Rota no Mapa'
-              }
-              className={`w-11 h-11 rounded-xl border shadow-lg flex items-center justify-center transition-all hover:scale-105 active:scale-95 cursor-pointer ${
-                isRecordingTrack
-                  ? 'bg-red-600 text-white border-red-500 shadow-red-900/50 animate-pulse'
-                  : 'bg-slate-900/95 hover:bg-slate-800 text-emerald-400 border-slate-800/90'
-              }`}
-            >
-              <Activity className="w-5 h-5" />
-            </button>
-
-            {/* Ruler / Geodesic Measurement Tool Trigger */}
-            <button
-              id="btn-measure-tool"
-              onClick={() => {
-                if (isMeasuring && measurementPoints.length > 0) {
-                  setIsSummaryModalOpen(true);
-                } else {
-                  setIsMeasuring(!isMeasuring);
-                }
-              }}
-              title={
-                isMeasuring
-                  ? 'Régua Ativa - Clique para Ver Resumo'
-                  : 'Ativar Régua Geodésica de Medição'
-              }
-              className={`w-11 h-11 rounded-xl border shadow-lg flex items-center justify-center transition-all hover:scale-105 active:scale-95 cursor-pointer relative ${
-                isMeasuring
-                  ? 'bg-rose-600 text-white border-rose-500 shadow-rose-900/50 animate-pulse'
-                  : 'bg-slate-900/95 hover:bg-slate-800 text-slate-300 border-slate-800/90'
-              }`}
-            >
-              <Ruler className="w-5 h-5" />
-              {measurementPoints.length > 0 && (
-                <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-amber-500 text-slate-950 text-[9px] font-black flex items-center justify-center">
-                  {measurementPoints.length}
-                </span>
-              )}
-            </button>
-          </div>
-
-          {/* Group 3: Zoom & Bounds */}
-          <div className="flex flex-col gap-2 pt-1 border-t border-slate-800/80">
-            <button
-              id="btn-zoom-in"
-              onClick={() => mapInstanceRef.current?.zoomIn()}
-              title="Aproximar Zoom (+)"
-              className="w-11 h-11 rounded-xl bg-slate-900/95 hover:bg-slate-800 text-slate-300 border border-slate-800/90 shadow-lg flex items-center justify-center transition-all hover:scale-105 active:scale-95 cursor-pointer"
-            >
-              <ZoomIn className="w-5 h-5" />
-            </button>
-
-            <button
-              id="btn-zoom-out"
-              onClick={() => mapInstanceRef.current?.zoomOut()}
-              title="Afastar Zoom (-)"
-              className="w-11 h-11 rounded-xl bg-slate-900/95 hover:bg-slate-800 text-slate-300 border border-slate-800/90 shadow-lg flex items-center justify-center transition-all hover:scale-105 active:scale-95 cursor-pointer"
-            >
-              <ZoomOut className="w-5 h-5" />
-            </button>
-
-            <button
-              id="btn-fit-bounds"
-              onClick={fitAllLayers}
-              title="Ajustar Visualização a Todas as Camadas"
-              className="w-11 h-11 rounded-xl bg-slate-900/95 hover:bg-slate-800 text-slate-300 border border-slate-800/90 shadow-lg flex items-center justify-center transition-all hover:scale-105 active:scale-95 cursor-pointer"
-            >
-              <Maximize2 className="w-5 h-5" />
-            </button>
-          </div>
-
-          {/* Group 4: Layers & Offline Maps */}
-          <div className="flex flex-col gap-2 pt-1 border-t border-slate-800/80">
-            <button
-              id="btn-layer-manager-quick"
-              onClick={() => setIsLayerModalOpen(true)}
-              title="Camadas"
-              aria-label="Camadas"
-              className="w-11 h-11 rounded-xl bg-slate-900/95 hover:bg-slate-800 text-slate-300 border border-slate-800/90 shadow-lg flex items-center justify-center transition-all hover:scale-105 active:scale-95 cursor-pointer relative"
-            >
-              <LayersIcon className="w-5 h-5 text-sky-400" />
-              <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-sky-600 text-white text-[9px] font-black flex items-center justify-center">
-                {layers.filter((l) => l.visible).length}
-              </span>
-            </button>
-
-            <button
-              id="btn-download-offline-map-quick"
-              onClick={() => setIsOfflineModalOpen(true)}
-              title="Baixar Área do Mapa para Uso Offline"
-              className="w-11 h-11 rounded-xl bg-slate-900/95 hover:bg-slate-800 text-emerald-400 border border-slate-800/90 shadow-lg flex items-center justify-center transition-all hover:scale-105 active:scale-95 cursor-pointer"
-            >
-              <Download className="w-5 h-5" />
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* Floating Bottom Quick Action FAB: Mark Waypoint & Track (Safe Area Above Bottom Nav) */}
-      {currentRole !== 'auditor' && (
-        <div className="absolute bottom-[calc(5.2rem+env(safe-area-inset-bottom,0px))] right-3 sm:bottom-6 sm:right-6 z-20 pointer-events-auto flex items-center gap-2.5">
-          {/* Quick Track Recording on Map */}
-          {isRecordingTrack ? (
-            <button
-              onClick={() => setIsSaveTrackModalOpen(true)}
-              className="flex items-center gap-2 bg-rose-600 hover:bg-rose-500 text-white px-4 py-3 rounded-2xl font-bold shadow-2xl transition-all active:scale-95 border border-rose-400/50 text-xs animate-pulse cursor-pointer"
-            >
-              <Square className="w-4 h-4 fill-white" />
-              <span>Finalizar Trilha</span>
-            </button>
-          ) : (
-            <button
-              onClick={() => {
-                startTrackRecording(
-                  `Trilha Campo ${new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`
-                );
-                notifySuccess('Gravação Iniciada', 'Traçado em tempo real ativado.');
-              }}
-              className="flex items-center gap-2 bg-slate-900/95 hover:bg-slate-800 text-emerald-400 border border-slate-800/90 px-3.5 py-3 rounded-2xl font-bold shadow-xl transition-all active:scale-95 text-xs cursor-pointer"
-              title="Iniciar Gravação de Trilha GPS no Mapa"
-            >
-              <Play className="w-4 h-4 text-emerald-400 fill-emerald-400" />
-              <span className="hidden sm:inline">Gravar Trilha</span>
-            </button>
-          )}
-
-          <button
-            id="btn-quick-drop-waypoint"
-            onClick={() => {
-              setPendingWaypointCoord(null);
-              setIsAddWaypointModalOpen(true);
-            }}
-            className="flex items-center gap-2 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 px-4 py-3 rounded-2xl font-black shadow-[0_10px_25px_rgba(16,185,129,0.35)] transition-all active:scale-95 border border-emerald-300/40 cursor-pointer text-xs sm:text-sm"
-          >
-            <Pin className="w-4 h-4 text-slate-950 fill-slate-950" />
-            <span>Marcar Ponto</span>
-          </button>
-        </div>
-      )}
+        onOpenLayers={() => setIsLayerModalOpen(true)}
+        onOpenOfflineDownload={() => setIsOfflineModalOpen(true)}
+        onOpenWoodpileCubage={() => setIsWoodpileModalOpen(true)}
+      />
 
       {/* Map Bottom-Left Copyright & Attribution Badge */}
       <div className="hidden sm:flex absolute bottom-2 left-2 z-10 pointer-events-auto bg-slate-950/90 backdrop-blur-xs px-2.5 py-1 rounded-md text-[10px] text-slate-400 border border-slate-800/80 items-center gap-1.5 shadow-md">

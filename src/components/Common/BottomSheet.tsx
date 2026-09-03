@@ -34,9 +34,9 @@ export const BottomSheet: React.FC<BottomSheetProps> = ({
 
   return (
     <div className="fixed inset-0 z-[999] flex flex-col justify-end transition-opacity duration-200">
-      {/* Backdrop */}
+      {/* Backdrop without canvas-breaking blur */}
       <div
-        className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm animate-in fade-in duration-200"
+        className="fixed inset-0 bg-black/40 animate-in fade-in duration-200"
         onClick={onClose}
       />
 
@@ -59,14 +59,13 @@ export const BottomSheet: React.FC<BottomSheetProps> = ({
                 </div>
               )}
               <div>
-                {title && <h3 className="text-base font-extrabold text-white leading-tight">{title}</h3>}
-                {subtitle && <p className="text-xs text-slate-400 mt-0.5">{subtitle}</p>}
+                {title && <h3 className="text-sm font-extrabold text-white">{title}</h3>}
+                {subtitle && <p className="text-[11px] text-slate-400 mt-0.5">{subtitle}</p>}
               </div>
             </div>
-
             <button
               onClick={onClose}
-              className="p-2 text-slate-400 hover:text-white hover:bg-slate-800 rounded-full transition-colors cursor-pointer"
+              className="p-1.5 text-slate-400 hover:text-white rounded-xl hover:bg-slate-800 transition-colors"
               aria-label="Fechar"
             >
               <X className="w-5 h-5" />
@@ -74,10 +73,8 @@ export const BottomSheet: React.FC<BottomSheetProps> = ({
           </div>
         )}
 
-        {/* Body Content */}
-        <div className="flex-1 overflow-y-auto p-5 space-y-4">
-          {children}
-        </div>
+        {/* Content */}
+        <div className="flex-1 overflow-y-auto p-5 text-slate-200">{children}</div>
       </div>
     </div>
   );

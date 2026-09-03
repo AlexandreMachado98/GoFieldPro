@@ -106,182 +106,47 @@ export const Topbar: React.FC = () => {
       )}
 
       <header className="bg-[#070A10]/95 backdrop-blur-md border-b border-slate-800/80 select-none z-40 sticky top-0 relative shadow-lg shadow-black/40 pt-[env(safe-area-inset-top,0px)]">
-        <div className="px-3 sm:px-4 py-2 flex items-center justify-between gap-2 h-14">
-          {/* Left Side: Menu Trigger & Project Selector Pill */}
-          <div className="flex items-center gap-2">
+        <div className="px-3.5 sm:px-5 py-2 flex items-center justify-between gap-3 h-14">
+          {/* Left Side: Menu Trigger & App Title */}
+          <div className="flex items-center gap-2.5">
             <button 
-              className="p-2 -ml-1 text-slate-300 hover:text-white rounded-xl hover:bg-[#0D121D] border border-transparent hover:border-slate-800 transition-colors active:scale-95 cursor-pointer"
+              className="p-2 -ml-1.5 text-slate-300 hover:text-white rounded-xl hover:bg-[#0D121D] border border-transparent hover:border-slate-800 transition-colors active:scale-95 cursor-pointer"
               onClick={() => setIsMobileMenuOpen(true)}
               aria-label="Abrir Menu Lateral"
             >
               <Menu className="w-5 h-5" />
             </button>
 
-            {/* Project Pill Selector */}
-            <div className="relative">
-              <button
-                onClick={() => setIsProjectsDropdownOpen(!isProjectsDropdownOpen)}
-                className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-slate-900/90 border border-slate-800 hover:border-slate-700 text-xs font-bold text-slate-200 transition-all active:scale-95 cursor-pointer max-w-[140px] sm:max-w-[200px]"
-                title="Trocar Projeto Ativo"
-              >
-                <Folder className="w-3.5 h-3.5 text-sky-400 shrink-0" />
-                <span className="truncate">{activeProject?.name || 'Projeto Padrão'}</span>
-                <ChevronDown className="w-3 h-3 text-slate-400 shrink-0" />
-              </button>
-
-              {/* Projects Dropdown Menu */}
-              {isProjectsDropdownOpen && (
-                <div className="absolute top-full left-0 mt-2 w-64 bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl z-50 p-2 animate-in fade-in slide-in-from-top-2 space-y-1">
-                  <div className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider px-2 py-1">
-                    Selecione o Projeto
-                  </div>
-                  <div className="max-h-56 overflow-y-auto space-y-1">
-                    {projects.map((p) => (
-                      <button
-                        key={p.id}
-                        onClick={() => {
-                          setActiveProject(p);
-                          setIsProjectsDropdownOpen(false);
-                          notifySuccess('Projeto Selecionado', `Alternado para "${p.name}".`);
-                        }}
-                        className={`w-full text-left p-2 rounded-xl text-xs flex items-center justify-between transition-colors ${
-                          activeProject?.id === p.id
-                            ? 'bg-sky-950/60 border border-sky-500/40 text-sky-300 font-bold'
-                            : 'hover:bg-slate-800 text-slate-300'
-                        }`}
-                      >
-                        <span className="truncate">{p.name}</span>
-                        {activeProject?.id === p.id && <CheckCircle2 className="w-3.5 h-3.5 text-sky-400 shrink-0" />}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
+            <div className="flex flex-col">
+              <span className="text-sm font-extrabold tracking-tight text-white leading-none">GoField Pro</span>
+              <span className="text-[10px] font-medium text-slate-400 leading-tight truncate max-w-[140px] sm:max-w-[200px]">
+                {activeProject?.name || 'Projeto Padrão'}
+              </span>
             </div>
           </div>
 
-          {/* Right Side: GPS Live Status + Actions */}
-          <div className="flex flex-1 items-center justify-end gap-1.5 sm:gap-2">
-            {/* Live GPS Telemetry Pill */}
+          {/* Right Side: GPS Live Pill & Single User Profile Trigger */}
+          <div className="flex items-center gap-2">
+            {/* Live GPS Status Pill */}
             <div
               className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-mono font-bold border shadow-xs transition-colors ${
                 hasGpsLock
-                  ? 'bg-emerald-950/50 border-emerald-500/40 text-emerald-300'
-                  : 'bg-amber-950/50 border-amber-500/40 text-amber-300 animate-pulse'
+                  ? 'bg-slate-900/90 border-emerald-500/40 text-emerald-400'
+                  : 'bg-slate-900/90 border-amber-500/40 text-amber-400 animate-pulse'
               }`}
-              title={hasGpsLock ? `GPS Conectado (Precisão ±${currentGps?.accuracy?.toFixed(1) || '2.0'}m)` : 'Buscando sinal de satélites GPS...'}
+              title={hasGpsLock ? `GPS Conectado (Precisão ±${currentGps?.accuracy?.toFixed(1) || '2.0'}m)` : 'Buscando sinal GPS...'}
             >
               <span
                 className={`w-2 h-2 rounded-full shrink-0 ${
                   hasGpsLock ? 'bg-emerald-400 shadow-[0_0_8px_#10b981]' : 'bg-amber-400'
                 }`}
               />
-              <span className="hidden xs:inline">
+              <span className="text-[10px]">
                 {hasGpsLock ? `±${(currentGps?.accuracy || 2.0).toFixed(0)}m` : 'GPS...'}
               </span>
             </div>
 
-            {/* 1. Botão de Planos & Assinatura Pro no Topbar */}
-            <button
-              onClick={() => openUpgradeModal('Adesão / Upgrade')}
-              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-gradient-to-r from-amber-500/20 to-emerald-500/20 hover:from-amber-500/30 hover:to-emerald-500/30 border border-amber-500/40 text-amber-300 text-xs font-black transition-all active:scale-95 cursor-pointer shadow-sm"
-              title="Ver Planos e Assinaturas"
-            >
-              <Crown className="w-4 h-4 text-amber-400" />
-              <span className="hidden sm:inline">Planos Pro</span>
-            </button>
-
-            {/* 2. Modo Escuro / Claro Toggle */}
-            <button
-              id="btn-theme-toggle"
-              onClick={toggleTheme}
-              className="p-2 rounded-xl bg-[#0D121D] hover:bg-slate-850 border border-slate-800/80 text-slate-300 hover:text-white transition-colors active:scale-95 cursor-pointer shadow-sm"
-              title={settings.theme === 'light' ? 'Mudar para Modo Escuro' : 'Mudar para Modo Claro (Alta Visibilidade)'}
-            >
-              {settings.theme === 'light' ? (
-                <Moon className="w-4 h-4 text-sky-400" />
-              ) : (
-                <Sun className="w-4 h-4 text-amber-400" />
-              )}
-            </button>
-
-            {/* 3. Notificações */}
-            <div className="relative">
-              <button
-                id="btn-notifications"
-                onClick={handleOpenNotifications}
-                className={`p-2 rounded-xl border transition-colors relative cursor-pointer active:scale-95 shadow-sm ${
-                  isNotifDropdownOpen
-                    ? 'bg-slate-800 border-sky-500/50 text-white'
-                    : 'bg-[#0D121D] hover:bg-slate-850 border-slate-800/80 text-slate-300 hover:text-white'
-                }`}
-                title="Notificações"
-              >
-                <Bell className="w-4 h-4" />
-                {unreadNotificationsCount > 0 && (
-                  <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-emerald-500 text-slate-950 text-[9px] font-black flex items-center justify-center animate-pulse shadow">
-                    {unreadNotificationsCount}
-                  </span>
-                )}
-              </button>
-              {isNotifDropdownOpen && (
-                <div className="fixed sm:absolute top-14 right-2 sm:right-0 sm:mt-2 w-[calc(100vw-1rem)] max-w-sm sm:w-84 bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl z-50 p-2.5 animate-in fade-in slide-in-from-top-2">
-                  <div className="flex items-center justify-between px-2 py-2 border-b border-slate-800">
-                    <div className="flex items-center gap-1.5">
-                      <Bell className="w-4 h-4 text-sky-400" />
-                      <span className="text-xs font-bold text-white">Central de Notificações</span>
-                    </div>
-                    <div className="flex items-center gap-1">
-                      <button
-                        onClick={markAllNotificationsAsRead}
-                        className="text-[10px] text-sky-400 hover:text-sky-300 p-1 rounded hover:bg-slate-800 font-semibold"
-                        title="Marcar todas como lidas"
-                      >
-                        <CheckCheck className="w-3.5 h-3.5" />
-                      </button>
-                      {notifications.length > 0 && (
-                        <button
-                          onClick={clearAllNotifications}
-                          className="text-[10px] text-slate-400 hover:text-rose-400 p-1 rounded hover:bg-slate-800"
-                          title="Limpar todas as notificações"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                  <div className="max-h-80 overflow-y-auto space-y-1.5 py-1.5">
-                    {notifications.length === 0 ? (
-                      <div className="p-6 text-center text-xs text-slate-500">
-                        Nenhuma notificação no momento.
-                      </div>
-                    ) : (
-                      notifications.map((n) => (
-                        <div
-                          key={n.id}
-                          onClick={() => markNotificationAsRead(n.id)}
-                          className={`p-2.5 rounded-xl text-xs cursor-pointer transition-colors border ${
-                            n.read
-                              ? 'bg-slate-950/40 border-slate-800/40 text-slate-400'
-                              : 'bg-slate-800/90 border-slate-700/80 text-slate-200 font-semibold shadow-sm'
-                          }`}
-                        >
-                          <div className="flex items-center justify-between gap-1">
-                            <span className="text-white font-bold truncate">{n.title}</span>
-                            <span className="text-[10px] text-slate-500 shrink-0">
-                              {new Date(n.timestamp).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
-                            </span>
-                          </div>
-                          <p className="text-[11px] text-slate-300 mt-1 leading-relaxed">{n.message}</p>
-                        </div>
-                      ))
-                    )}
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* 5. Menu do Usuário & Configurações */}
+            {/* Profile Avatar Trigger */}
             <div className="relative">
               <button
                 id="btn-user-dropdown"
@@ -289,172 +154,163 @@ export const Topbar: React.FC = () => {
                   setIsNotifDropdownOpen(false);
                   setIsUserDropdownOpen(!isUserDropdownOpen);
                 }}
-                className="flex items-center gap-2 p-1.5 sm:px-2 sm:py-1 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 transition-colors"
-                title="Menu do Usuário"
+                className="flex items-center gap-1.5 p-1 rounded-full bg-slate-900 hover:bg-slate-800 border border-slate-700/80 transition-all active:scale-95 cursor-pointer relative"
+                title="Perfil e Configurações"
               >
-                <img src={profile?.avatar} alt={profile?.name} className="w-6 h-6 rounded-full object-cover border border-slate-700" />
-                <div className="hidden lg:flex flex-col items-start leading-none">
-                  <span className="text-[11px] font-bold text-slate-200">{profile?.name}</span>
-                  <span className="text-[9px] text-sky-400 uppercase font-semibold">{profile?.role.replace('_', ' ')}</span>
-                </div>
-                <ChevronDown className="w-3 h-3 text-slate-400" />
+                <img src={profile?.avatar} alt={profile?.name} className="w-7 h-7 rounded-full object-cover border border-slate-700" />
+                {unreadNotificationsCount > 0 && (
+                  <span className="absolute -top-0.5 -right-0.5 w-3.5 h-3.5 rounded-full bg-emerald-500 text-slate-950 text-[9px] font-black flex items-center justify-center animate-pulse shadow">
+                    {unreadNotificationsCount}
+                  </span>
+                )}
+                <ChevronDown className="w-3 h-3 text-slate-400 mr-1" />
               </button>
+
+              {/* User Dropdown Menu */}
               {isUserDropdownOpen && (
-                <div className="absolute top-full right-0 mt-2 w-64 bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl z-50 p-2 animate-in fade-in slide-in-from-top-2 space-y-1">
-                  <div className="px-3 py-2.5 border-b border-slate-800 mb-1 bg-slate-950/60 rounded-xl space-y-1">
+                <div className="absolute top-full right-0 mt-2 w-72 bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl z-50 p-2.5 animate-in fade-in slide-in-from-top-2 space-y-1.5 backdrop-blur-md">
+                  {/* User Profile Header */}
+                  <div className="px-3 py-2.5 border-b border-slate-800 bg-slate-950/60 rounded-xl space-y-1">
                     <div className="flex items-center justify-between gap-1">
                       <div className="text-xs font-bold text-white truncate">{profile?.name}</div>
-                      <span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded-full border ${
+                      <span className={`text-[9px] font-bold uppercase px-2 py-0.5 rounded-full border ${
                         profile?.role === 'super_admin'
-                          ? 'bg-purple-500/20 text-purple-300 border-purple-500/40'
-                          : hasSpecialAccessActive(profile)
-                          ? 'bg-amber-500/20 text-amber-300 border-amber-500/40'
+                          ? 'bg-slate-800 text-emerald-300 border-slate-700'
                           : isProUser
-                          ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
-                          : 'bg-sky-500/20 text-sky-300 border-sky-500/30'
+                          ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30'
+                          : 'bg-slate-800 text-slate-300 border-slate-700'
                       }`}>
                         {profile?.role === 'super_admin'
                           ? 'Super Admin'
                           : hasSpecialAccessActive(profile)
-                          ? '🔑 Acesso Especial'
+                          ? 'Acesso Especial'
                           : isProUser
                           ? 'Plano Pro'
                           : 'Plano Free'}
                       </span>
                     </div>
                     <div className="text-[10px] text-slate-400 truncate">{profile?.email}</div>
-                    {!isProUser && profile?.role !== 'super_admin' && (
-                      <div className="pt-1 flex items-center justify-between text-[10px] text-slate-400 border-t border-slate-800/80 mt-1">
-                        <span>Limite: 2 Mapas PDF</span>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            closeAllDropdowns();
-                            openUpgradeModal('Upgrade Pro');
-                          }}
-                          className="text-amber-400 font-bold hover:underline cursor-pointer"
-                        >
-                          Fazer Upgrade
-                        </button>
-                      </div>
-                    )}
                   </div>
 
-                  {/* 2. Botão de Sincronização de Dados no menu do perfil */}
+                  {/* 1. Planos e Assinatura Pro */}
+                  <button
+                    onClick={() => {
+                      closeAllDropdowns();
+                      openUpgradeModal('Menu Usuário');
+                    }}
+                    className="w-full text-left p-2.5 rounded-xl text-xs font-semibold flex items-center justify-between bg-slate-950/60 hover:bg-slate-800 border border-slate-800 text-slate-200 transition-all cursor-pointer"
+                  >
+                    <div className="flex items-center gap-2">
+                      <Crown className="w-4 h-4 text-emerald-400 shrink-0" />
+                      <span>Planos & Assinatura</span>
+                    </div>
+                    <span className="text-[10px] uppercase font-bold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-1.5 py-0.5 rounded">Ver</span>
+                  </button>
+
+                  {/* 2. Seletor de Projetos */}
+                  <div className="space-y-1 pt-1 border-t border-slate-800/60">
+                    <div className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider px-2 py-0.5 flex items-center justify-between">
+                      <span>Projeto Ativo</span>
+                      <Folder className="w-3 h-3 text-sky-400" />
+                    </div>
+                    <div className="max-h-36 overflow-y-auto space-y-1">
+                      {projects.map((p) => (
+                        <button
+                          key={p.id}
+                          onClick={() => {
+                            setActiveProject(p);
+                            closeAllDropdowns();
+                            notifySuccess('Projeto Selecionado', `Alternado para "${p.name}".`);
+                          }}
+                          className={`w-full text-left px-2.5 py-2 rounded-xl text-xs flex items-center justify-between transition-colors ${
+                            activeProject?.id === p.id
+                              ? 'bg-slate-800/90 border border-emerald-500/40 text-emerald-400 font-bold'
+                              : 'hover:bg-slate-800 text-slate-300'
+                          }`}
+                        >
+                          <span className="truncate">{p.name}</span>
+                          {activeProject?.id === p.id && <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* 3. Notificações */}
+                  <button
+                    onClick={() => {
+                      closeAllDropdowns();
+                      handleOpenNotifications();
+                    }}
+                    className="w-full text-left p-2.5 rounded-xl text-xs font-semibold flex items-center justify-between hover:bg-slate-800 text-slate-200 transition-colors cursor-pointer border-t border-slate-800/60 pt-2"
+                  >
+                    <div className="flex items-center gap-2">
+                      <Bell className="w-4 h-4 text-slate-400 shrink-0" />
+                      <span>Central de Notificações</span>
+                    </div>
+                    {unreadNotificationsCount > 0 && (
+                      <span className="text-[10px] font-bold bg-emerald-500 text-slate-950 px-1.5 py-0.5 rounded-full">
+                        {unreadNotificationsCount} novas
+                      </span>
+                    )}
+                  </button>
+
+                  {/* 4. Modo Escuro / Claro Toggle */}
+                  <button
+                    onClick={() => {
+                      toggleTheme();
+                    }}
+                    className="w-full text-left p-2.5 rounded-xl text-xs font-semibold flex items-center justify-between hover:bg-slate-800 text-slate-200 transition-colors cursor-pointer"
+                  >
+                    <div className="flex items-center gap-2">
+                      {settings.theme === 'light' ? (
+                        <Moon className="w-4 h-4 text-sky-400 shrink-0" />
+                      ) : (
+                        <Sun className="w-4 h-4 text-amber-400 shrink-0" />
+                      )}
+                      <span>{settings.theme === 'light' ? 'Modo Escuro' : 'Modo Claro'}</span>
+                    </div>
+                    <span className="text-[10px] text-slate-400 font-mono uppercase">{settings.theme}</span>
+                  </button>
+
+                  {/* 5. Sincronizar Dados */}
                   <button
                     onClick={() => {
                       triggerManualSync();
                     }}
                     disabled={isSyncing}
-                    className="w-full text-left p-2.5 rounded-xl text-xs font-semibold flex items-center justify-between bg-slate-950/40 hover:bg-slate-850 border border-slate-800 text-slate-200 transition-all cursor-pointer mb-1"
+                    className="w-full text-left p-2.5 rounded-xl text-xs font-semibold flex items-center justify-between hover:bg-slate-800 text-slate-200 transition-colors cursor-pointer"
                   >
                     <div className="flex items-center gap-2">
-                      <RefreshCw className={`w-4 h-4 text-emerald-400 ${isSyncing ? 'animate-spin' : ''}`} />
-                      <span>Sincronizar Nuvem</span>
+                      <RefreshCw className={`w-4 h-4 text-emerald-400 shrink-0 ${isSyncing ? 'animate-spin' : ''}`} />
+                      <span>Sincronizar Dados</span>
                     </div>
-                    {offlineQueue.length > 0 ? (
-                      <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30">
-                        {offlineQueue.length} pendentes
-                      </span>
-                    ) : (
-                      <span className="text-[10px] font-bold text-emerald-400 flex items-center gap-1">
-                        <CheckCircle2 className="w-3 h-3" /> Atualizado
-                      </span>
-                    )}
+                    <span className="text-[10px] text-slate-400 font-semibold">{isSyncing ? 'Sincronizando...' : 'Nuvem'}</span>
                   </button>
 
-                  {/* 3. Online / Offline Toggle within user menu */}
+                  {/* 6. Configurações */}
                   <button
                     onClick={() => {
-                      setIsOffline(!isOffline);
-                    }}
-                    className={`w-full text-left p-2.5 rounded-xl text-xs font-semibold flex items-center justify-between border transition-all ${
-                      isOffline
-                        ? 'bg-amber-950/40 border-amber-800/60 text-amber-300'
-                        : 'bg-emerald-950/30 border-emerald-800/50 text-emerald-300'
-                    }`}
-                  >
-                    <div className="flex items-center gap-2">
-                      {isOffline ? <WifiOff className="w-4 h-4 text-amber-400" /> : <Wifi className="w-4 h-4 text-emerald-400" />}
-                      <span>Modo de Operação</span>
-                    </div>
-                    <span className="text-[10px] font-bold uppercase">{isOffline ? 'Offline' : 'Online'}</span>
-                  </button>
-
-                  <button
-                    onClick={() => {
-                      setIsUserDropdownOpen(false);
+                      closeAllDropdowns();
                       setIsSettingsModalOpen(true);
                     }}
-                    className="w-full text-left p-2.5 rounded-xl text-xs font-semibold flex items-center gap-2 text-slate-300 hover:bg-slate-800 transition-colors"
+                    className="w-full text-left p-2.5 rounded-xl text-xs font-semibold flex items-center justify-between hover:bg-slate-800 text-slate-200 transition-colors cursor-pointer"
                   >
-                    <Settings className="w-4 h-4 text-sky-400" />
-                    <span>Configurações do Sistema</span>
+                    <div className="flex items-center gap-2">
+                      <Settings className="w-4 h-4 text-slate-400 shrink-0" />
+                      <span>Configurações do App</span>
+                    </div>
                   </button>
 
-                  {/* App Version Info / Update Action in User Dropdown */}
-                  {isUpdateAvailable ? (
-                    <button
-                      onClick={() => {
-                        setIsUserDropdownOpen(false);
-                        applyUpdate();
-                      }}
-                      className="w-full text-left p-2.5 rounded-xl text-xs font-bold flex items-center justify-between bg-sky-950/60 border border-sky-500 text-sky-300 hover:bg-sky-900/60 transition-all animate-pulse"
-                    >
-                      <div className="flex items-center gap-2">
-                        <Sparkles className="w-4 h-4 text-amber-400" />
-                        <span>Atualizar ({latestVersion})</span>
-                      </div>
-                      <span className="text-[10px] bg-sky-500 text-slate-950 px-2 py-0.5 rounded-full font-black">
-                        Novo
-                      </span>
-                    </button>
-                  ) : (
-                    <button
-                      onClick={async () => {
-                        setIsUserDropdownOpen(false);
-                        notifyInfo('Verificando Atualizações', 'Conectando ao servidor...');
-                        const hasNew = await checkForUpdates(true);
-                        if (hasNew) {
-                          notifySuccess('Nova Versão Encontrada!', `A versão ${latestVersion} está pronta.`);
-                          showConfirm({
-                            title: `Instalar Atualização (${latestVersion})?`,
-                            message: 'O aplicativo será atualizado e o cache antigo será eliminado para evitar conflitos. Todos os seus dados locais continuarão intactos.',
-                            type: 'info',
-                            confirmText: 'Atualizar Agora',
-                            onConfirm: applyUpdate,
-                          });
-                        } else {
-                          notifySuccess('Aplicativo Atualizado', `Você já está na versão mais recente (${APP_VERSION}).`);
-                          showConfirm({
-                            title: 'Limpar Cache & Sincronizar?',
-                            message: 'Deseja forçar a eliminação de arquivos antigos em cache e recarregar o sistema? Seus dados locais permanecem 100% seguros e intactos.',
-                            type: 'info',
-                            confirmText: 'Limpar Cache & Recarregar',
-                            onConfirm: forceCleanUpdate,
-                          });
-                        }
-                      }}
-                      className="w-full text-left px-3 py-2.5 rounded-xl text-xs font-bold flex items-center justify-between text-sky-300 bg-sky-950/40 border border-sky-500/40 hover:bg-sky-900/50 hover:border-sky-400 transition-colors cursor-pointer"
-                    >
-                      <div className="flex items-center gap-2">
-                        <RefreshCw className={`w-4 h-4 text-sky-400 ${isCheckingUpdate ? 'animate-spin' : ''}`} />
-                        <span>Verificar Atualizações</span>
-                      </div>
-                      <span className="font-mono text-emerald-400 text-[10px] font-bold flex items-center gap-1">
-                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                        {APP_VERSION}
-                      </span>
-                    </button>
-                  )}
-
+                  {/* 7. Sair da Conta */}
                   <button
-                    type="button"
-                    onClick={handleLogout}
-                    className="w-full text-left p-2.5 rounded-xl text-xs font-semibold flex items-center gap-2 text-rose-400 hover:bg-rose-950/40 transition-colors border-t border-slate-800/60 pt-2"
+                    onClick={() => {
+                      closeAllDropdowns();
+                      handleLogout();
+                    }}
+                    className="w-full text-left p-2.5 rounded-xl text-xs font-bold flex items-center gap-2 text-rose-400 hover:bg-rose-950/40 transition-colors cursor-pointer border-t border-slate-800/60"
                   >
-                    <LogOut className="w-4 h-4" />
-                    <span>Sair do Aplicativo</span>
+                    <LogOut className="w-4 h-4 text-rose-400 shrink-0" />
+                    <span>Sair da Conta</span>
                   </button>
                 </div>
               )}

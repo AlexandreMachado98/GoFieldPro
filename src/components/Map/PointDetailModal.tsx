@@ -287,7 +287,7 @@ export const PointDetailModal: React.FC<PointDetailModalProps> = ({
             <button
               type="button"
               onClick={handleSave}
-              className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-sky-600 hover:bg-sky-500 text-white font-bold text-xs transition-all shadow-lg active:scale-95"
+              className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs transition-all shadow-md active:scale-95 cursor-pointer"
             >
               <Check className="w-4 h-4" />
               <span>Salvar Alterações</span>

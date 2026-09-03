@@ -633,15 +633,15 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   );
 
   const notifySuccess = useCallback(
-    (title: string, message: string) => notify({ title, message, type: 'success' }),
+    (title: string, message: string, showToast = false) => notify({ title, message, type: 'success', silentToast: !showToast }),
     [notify]
   );
   const notifyError = useCallback(
-    (title: string, message: string) => notify({ title, message, type: 'error', duration: 4500 }),
+    (title: string, message: string) => notify({ title, message, type: 'error', duration: 4000 }),
     [notify]
   );
   const notifyWarning = useCallback(
-    (title: string, message: string) => notify({ title, message, type: 'warning', duration: 3500 }),
+    (title: string, message: string) => notify({ title, message, type: 'warning', duration: 3000 }),
     [notify]
   );
   const notifyInfo = useCallback(
@@ -673,6 +673,18 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState<boolean>(false);
   const [isWoodpileModalOpen, setIsWoodpileModalOpen] = useState<boolean>(false);
   const [isPoliciesModalOpen, setIsPoliciesModalOpen] = useState<boolean>(false);
+
+  // Auto-dismiss transient modal overlays whenever activeTab changes to prevent lingering screens
+  useEffect(() => {
+    setIsAddWaypointModalOpen(false);
+    setIsLayerModalOpen(false);
+    setIsSettingsModalOpen(false);
+    setIsWoodpileModalOpen(false);
+    setIsPoliciesModalOpen(false);
+    setIsAiModalOpen(false);
+    setIsReportModalOpen(false);
+    setIsMobileMenuOpen(false);
+  }, [activeTab]);
 
   // App Settings with LocalStorage persistence
   const [settings, setSettings] = useState<AppSettings>(() => {
@@ -857,38 +869,14 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
               setHasGpsLock(true);
               resolve(coord);
             },
-            async (finalErr) => {
-              console.warn('Standard geolocation error, trying IP fallback:', finalErr);
-              if (isManualGpsLockedRef.current) return;
-              try {
-                // 3. Fallback to IP Geolocation API if browser GPS is blocked/unsupported on desktop
-                const res = await fetch('https://ipwho.is/');
-                if (res.ok) {
-                  const data = await res.json();
-                  if (data && data.success && typeof data.latitude === 'number' && typeof data.longitude === 'number') {
-                    if (isManualGpsLockedRef.current) return;
-                    const coord: GeoCoordinate = {
-                      lat: data.latitude,
-                      lng: data.longitude,
-                      altitude: 700,
-                      accuracy: 1500,
-                      timestamp: Date.now(),
-                    };
-                    setCurrentGps(coord);
-                    setHasGpsLock(true);
-                    resolve(coord);
-                    return;
-                  }
-                }
-              } catch (ipErr) {
-                console.warn('IP fallback failed:', ipErr);
-              }
+            (finalErr) => {
+              console.warn('[GPS] Geolocation indisponível no momento:', finalErr.message);
               resolve(null);
             },
-            { enableHighAccuracy: false, timeout: 8000, maximumAge: 60000 }
+            { enableHighAccuracy: false, timeout: 10000, maximumAge: 10000 }
           );
         },
-        { enableHighAccuracy: true, timeout: 8000, maximumAge: 0 }
+        { enableHighAccuracy: true, timeout: 12000, maximumAge: 2000 }
       );
     });
   }, [notifyWarning, currentGps]);

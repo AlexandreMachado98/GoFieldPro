@@ -2,22 +2,27 @@
 
 @layer base {
   :root {
-    --bg-oled: #070d1e;
-    --surface-1: #0b132b;
-    --surface-2: #17223b;
-    --border-tactical: rgba(37, 51, 82, 0.8);
+    /* Design System Oficial GoField Pro (5 Cores Estratégicas) */
+    --color-base: #070a10;
+    --color-surface: #0f172a;
+    --color-surface-elevated: #1e293b;
+    --color-border: rgba(51, 65, 85, 0.6);
+    --color-text-main: #f8fafc;
+    --color-text-muted: #94a3b8;
+    --color-action: #10b981;
+    --color-action-hover: #059669;
+    --color-danger: #ef4444;
+    --color-warning: #f59e0b;
+
+    /* Semantic Compatibility Tokens */
+    --bg-oled: #070a10;
+    --surface-1: #0f172a;
+    --surface-2: #1e293b;
+    --border-tactical: rgba(51, 65, 85, 0.6);
     --text-main: #f8fafc;
     --text-muted: #94a3b8;
-    
-    /* AM TST Brand Palette */
     --amtst-green: #10b981;
     --amtst-green-dark: #059669;
-    --amtst-green-light: #34d399;
-    --amtst-navy: #0b132b;
-    --amtst-navy-deep: #070d1e;
-    --amtst-cyan: #38bdf8;
-    --amtst-amber: #fbbf24;
-    --amtst-rose: #f43f5e;
   }
 
 
