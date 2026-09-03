@@ -192,22 +192,7 @@ const ToastItem: React.FC<ToastItemProps> = ({ toast, onDismiss }) => {
 };
 
 export const ToastContainer: React.FC = () => {
-  const { toasts, dismissToast } = useApp();
-
-  if (!toasts || toasts.length === 0) return null;
-
-  // Limit to most recent 2 toasts to avoid cluttering field screens
-  const visibleToasts = toasts.slice(-2);
-
-  return (
-    <div
-      id="tactical-toast-container"
-      className="fixed top-16 left-1/2 -translate-x-1/2 sm:left-auto sm:right-4 sm:translate-x-0 z-[300] flex flex-col gap-2 pointer-events-none w-full max-w-[92vw] sm:max-w-sm"
-      aria-live="polite"
-    >
-      {visibleToasts.map((toast) => (
-        <ToastItem key={toast.id} toast={toast} onDismiss={dismissToast} />
-      ))}
-    </div>
-  );
+  // As notificações flutuantes (Toasts) foram desativadas globalmente 
+  // para deixar a tela limpa, conforme solicitado pelo usuário.
+  return null;
 };
