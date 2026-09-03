@@ -66,6 +66,8 @@ import {
   isDocumentCalibrated,
   calculateNavigationToMarker
 } from '../../utils/geoTransform';
+import { canAddPdfMap } from '../../utils/featureAccess';
+import { createPdfGridLayer } from './PdfGridLayer';
 import { parseGeoPdfMetadata } from '../../utils/geoPdfParser';
 import { calculateDistanceMeters, calculatePolygonArea } from '../../utils/geoUtils';
 import { parseKMLString, parseKMZFile } from '../../utils/kmlParser';
@@ -873,7 +875,7 @@ export const PdfMapNavigator: React.FC = () => {
     return () => document.removeEventListener('fullscreenchange', handleFsChange);
   }, []);
 
-  // Update Image Overlay when active doc or page changes
+  // Update Image Overlay or PDF Grid Layer when active doc or page changes
   useEffect(() => {
     initializeMap();
 
@@ -894,11 +896,6 @@ export const PdfMapNavigator: React.FC = () => {
 
     const pageIdx = activeDoc.currentPage || 0;
     const currentDataUrl = activeDoc.dataUrls[pageIdx] || activeDoc.dataUrls[0];
-    if (!currentDataUrl) {
-      console.warn('PDF image data is missing or corrupted.');
-      return;
-    }
-
     const docPageKey = `${activeDoc.id}_p${pageIdx}`;
 
     if (lastLoadedDocPageRef.current !== docPageKey) {
@@ -913,17 +910,36 @@ export const PdfMapNavigator: React.FC = () => {
         imageOverlayRef.current = null;
       }
 
-      if (currentDataUrl) {
+      const loadMapLayer = async () => {
         try {
-          imageOverlayRef.current = L.imageOverlay(currentDataUrl, bounds).addTo(map);
-          map.fitBounds(bounds, { padding: [15, 15] });
-          // Allow zooming out freely so user can view their GPS position approaching the sheet from afar
-          const baseZoom = map.getBoundsZoom(bounds);
-          map.setMinZoom(isFinite(baseZoom) ? Math.min(-5, baseZoom - 5) : -6);
+          if (activeDoc.pdfBuffer) {
+            // Dynamic Tiling with PdfGridLayer (Zero OOM)
+            const loadingTask = pdfjsLib.getDocument({
+              data: new Uint8Array(activeDoc.pdfBuffer),
+              cMapUrl: 'https://unpkg.com/pdfjs-dist@6.2.108/cmaps/',
+              cMapPacked: true,
+            });
+            const pdf = await loadingTask.promise;
+            const page = await pdf.getPage(pageIdx + 1);
+
+            const PdfGridLayerClass = createPdfGridLayer(page, w, h);
+            imageOverlayRef.current = new PdfGridLayerClass().addTo(map);
+          } else if (currentDataUrl) {
+            // Legacy Base64 Image Overlay Fallback
+            imageOverlayRef.current = L.imageOverlay(currentDataUrl, bounds).addTo(map);
+          }
+          
+          if (imageOverlayRef.current) {
+            map.fitBounds(bounds, { padding: [15, 15] });
+            const baseZoom = map.getBoundsZoom(bounds);
+            map.setMinZoom(isFinite(baseZoom) ? Math.min(-5, baseZoom - 5) : -6);
+          }
         } catch (err) {
-          console.warn('Error loading image overlay:', err);
+          console.warn('Error loading map overlay:', err);
         }
-      }
+      };
+
+      loadMapLayer();
 
       // If document is not calibrated, strictly ensure no GPS markers exist on sheet
       if (!isDocumentCalibrated(activeDoc)) {
@@ -2049,42 +2065,37 @@ export const PdfMapNavigator: React.FC = () => {
         let baseWidth = 1200;
         let baseHeight = 1200;
 
-        for (let pageNum = 1; pageNum <= totalPages; pageNum++) {
-          setProcessingProgress(`Renderizando folha ${pageNum} de ${totalPages}...`);
-          const page = await pdf.getPage(pageNum);
-
+        // Render only the first page as a low-res thumbnail
+        if (totalPages > 0) {
+          setProcessingProgress('Extraindo miniatura e dimensões...');
+          const page = await pdf.getPage(1);
           const unscaledViewport = page.getViewport({ scale: 1.0 });
           const maxDim = Math.max(unscaledViewport.width, unscaledViewport.height);
-          const scale = Math.min(2.5, 1800 / maxDim);
+          // Scale down to a very small thumbnail (max 512px)
+          const scale = Math.min(1.0, 512 / maxDim);
           const viewport = page.getViewport({ scale });
 
-          if (pageNum === 1) {
-            baseWidth = viewport.width;
-            baseHeight = viewport.height;
-          }
+          baseWidth = unscaledViewport.width * 1.5; // Set base grid coordinate space (1.5x scale for good native zoom mapping)
+          baseHeight = unscaledViewport.height * 1.5;
 
           const canvas = document.createElement('canvas');
           const context = canvas.getContext('2d', { alpha: false });
-          if (!context) throw new Error('Falha ao instanciar renderizador');
-
-          canvas.height = viewport.height;
-          canvas.width = viewport.width;
-
-          context.fillStyle = '#ffffff';
-          context.fillRect(0, 0, canvas.width, canvas.height);
-
-          await page.render({
-            canvasContext: context,
-            viewport: viewport,
-            canvas: canvas,
-          } as any).promise;
-
-          const dataUrl = canvas.toDataURL('image/jpeg', 0.82);
-          renderedPages.push(dataUrl);
-
-          // Instantly free GPU/RAM canvas backing store on mobile
-          canvas.width = 0;
-          canvas.height = 0;
+          if (context) {
+            canvas.height = viewport.height;
+            canvas.width = viewport.width;
+            context.fillStyle = '#ffffff';
+            context.fillRect(0, 0, canvas.width, canvas.height);
+            await page.render({
+              canvasContext: context,
+              viewport: viewport,
+              canvas: canvas,
+            } as any).promise;
+            
+            // This is just a tiny thumbnail now, not the 13MB canvas it used to be!
+            renderedPages.push(canvas.toDataURL('image/jpeg', 0.6));
+            canvas.width = 0;
+            canvas.height = 0;
+          }
         }
 
         setProcessingProgress('Verificando metadados georreferenciados (GeoPDF)...');
@@ -2107,19 +2118,21 @@ export const PdfMapNavigator: React.FC = () => {
         }
 
         const newDoc: PdfDocument = {
-          id: `pdf-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-          name: file.name.replace(/\.[^/.]+$/, '').replace(/[_]/g, ' '),
+          id: `pdf-${Date.now()}`,
+          userId: currentUserId || undefined,
+          name: file.name.replace('.pdf', ''),
           fileName: file.name,
-          fileSize: `${(file.size / (1024 * 1024)).toFixed(1)} MB`,
+          fileSize: (file.size / (1024 * 1024)).toFixed(2) + ' MB',
           dataUrls: renderedPages,
-          pageCount: renderedPages.length,
+          pdfBuffer: arrayBuffer,
+          pageCount: totalPages,
           currentPage: 0,
           width: baseWidth,
           height: baseHeight,
-          userId: currentUserId,
-          calibration: initialCalibration,
           markers: [],
           tracks: [],
+          polygons: [],
+          calibration: initialCalibration,
           uploadedAt: new Date().toLocaleDateString('pt-BR'),
         };
 

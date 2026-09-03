@@ -20,7 +20,7 @@ export interface GeoPdfMetadata {
 /**
  * Decodes buffer chunks safely using fast native TextDecoder
  */
-function decodeBufferFast(buffer: ArrayBuffer, maxBytes = 40 * 1024 * 1024): string {
+function decodeBufferFast(buffer: ArrayBuffer, maxBytes = 100 * 1024 * 1024): string {
   try {
     const decoder = new TextDecoder('latin1');
     const bytes = new Uint8Array(buffer);
@@ -28,9 +28,9 @@ function decodeBufferFast(buffer: ArrayBuffer, maxBytes = 40 * 1024 * 1024): str
       return decoder.decode(bytes);
     }
 
-    // For very large files (e.g. > 40MB), inspect first 10MB + last 20MB (where xref/dictionaries reside)
-    const headSize = 10 * 1024 * 1024;
-    const tailSize = 20 * 1024 * 1024;
+    // For extremely large files (> 100MB), inspect first 20MB + last 30MB
+    const headSize = 20 * 1024 * 1024;
+    const tailSize = 30 * 1024 * 1024;
     const headText = decoder.decode(bytes.subarray(0, headSize));
     const tailText = decoder.decode(bytes.subarray(bytes.length - tailSize));
     return headText + '\n' + tailText;

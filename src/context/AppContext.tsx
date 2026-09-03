@@ -901,8 +901,12 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     const unsubscribe = locationTrackingService.subscribe({
       onGpsUpdate: (coord) => {
         if (isManualGpsLockedRef.current) return;
-        setCurrentGps(coord);
+        // Merge last heading into current coord if available, so it doesn't get lost
+        setCurrentGps(prev => ({ ...coord, heading: prev?.heading ?? coord.heading }));
         setHasGpsLock(true);
+      },
+      onHeadingUpdate: (heading) => {
+        setCurrentGps(prev => prev ? { ...prev, heading } : prev);
       },
       onTrackPointAdded: (_pt, track) => {
         setActiveTrack(track);

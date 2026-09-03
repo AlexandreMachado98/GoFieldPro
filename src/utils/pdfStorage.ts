@@ -83,7 +83,8 @@ export interface PdfDocument {
   name: string;
   fileName: string;
   fileSize: string;
-  dataUrls: string[]; // Page data URLs
+  dataUrls: string[]; // Legacy page data URLs or thumbnails
+  pdfBuffer?: ArrayBuffer; // Raw PDF binary for dynamic tiling
   pageCount: number;
   currentPage: number;
   width: number;
@@ -122,6 +123,7 @@ function sanitizeDocument(doc: any, fallbackUserId?: string): PdfDocument {
     fileName: doc.fileName || 'documento.pdf',
     fileSize: doc.fileSize || '1 MB',
     dataUrls: Array.isArray(doc.dataUrls) ? doc.dataUrls : (doc.dataUrl ? [doc.dataUrl] : []),
+    pdfBuffer: doc.pdfBuffer instanceof ArrayBuffer ? doc.pdfBuffer : undefined,
     pageCount: typeof doc.pageCount === 'number' && doc.pageCount > 0 ? doc.pageCount : 1,
     currentPage: typeof doc.currentPage === 'number' ? Math.max(0, doc.currentPage) : 0,
     width: typeof doc.width === 'number' && doc.width > 0 ? doc.width : 1600,

@@ -1,4 +1,5 @@
-﻿import { GeoCoordinate, Track, TrackPoint } from '../types';
+import { Geolocation } from '@capacitor/geolocation';
+import { GeoCoordinate, Track, TrackPoint } from '../types';
 import { validateAndProcessGpsReading, GPS_CONFIG } from '../utils/gpsEngine';
 import { calculateDistanceMeters } from '../utils/geoUtils';
 import { saveActiveTrackDraft, clearActiveTrackDraft, loadActiveTrackDraft } from '../utils/stateStorage';
@@ -7,6 +8,7 @@ export type TrackingStatus = 'idle' | 'tracking' | 'recording' | 'paused';
 
 export interface LocationTrackingCallbacks {
   onGpsUpdate?: (coord: GeoCoordinate) => void;
+  onHeadingUpdate?: (heading: number) => void;
   onTrackPointAdded?: (point: TrackPoint, totalTrack: Track) => void;
   onTrackStatsUpdate?: (track: Track) => void;
   onStatusChange?: (status: TrackingStatus) => void;
@@ -25,6 +27,7 @@ class LocationTrackingService {
   private currentUserId: string | null = null;
 
   private lastValidCoord: GeoCoordinate | null = null;
+  private lastHeading: number | null = null;
   private activeTrack: Track | null = null;
   private isSimulated: boolean = false;
   private isManualLocked: boolean = false;
@@ -36,6 +39,29 @@ class LocationTrackingService {
     if (typeof document !== 'undefined') {
       document.addEventListener('visibilitychange', this.handleVisibilityChange);
     }
+    if (typeof window !== 'undefined' && window.DeviceOrientationEvent) {
+      window.addEventListener('deviceorientationabsolute', this.handleDeviceOrientation.bind(this), true);
+      window.addEventListener('deviceorientation', this.handleDeviceOrientation.bind(this), true);
+    }
+  }
+
+  private handleDeviceOrientation(event: DeviceOrientationEvent) {
+    let heading = null;
+    const ev = event as any;
+    if (ev.webkitCompassHeading !== undefined) {
+      heading = ev.webkitCompassHeading;
+    } else if (ev.alpha !== null) {
+      // Convert standard alpha (0 is East or varying) to compass heading (0 is North) if absolute
+      heading = 360 - ev.alpha;
+    }
+    if (heading !== null) {
+      this.lastHeading = heading;
+      for (const l of this.listeners) {
+        try {
+          l.onHeadingUpdate?.(heading);
+        } catch (err) { }
+      }
+    }
   }
 
   public static getInstance(): LocationTrackingService {
@@ -43,6 +69,14 @@ class LocationTrackingService {
       LocationTrackingService.instance = new LocationTrackingService();
     }
     return LocationTrackingService.instance;
+  }
+
+  public getLastCoord(): GeoCoordinate | null {
+    return this.lastValidCoord;
+  }
+
+  public getLastHeading(): number | null {
+    return this.lastHeading;
   }
 
   public setUserId(userId: string | null) {
@@ -53,6 +87,9 @@ class LocationTrackingService {
     this.listeners.add(callbacks);
     if (this.lastValidCoord && callbacks.onGpsUpdate) {
       callbacks.onGpsUpdate(this.lastValidCoord);
+    }
+    if (this.lastHeading !== null && callbacks.onHeadingUpdate) {
+      callbacks.onHeadingUpdate(this.lastHeading);
     }
     if (this.activeTrack && callbacks.onTrackStatsUpdate) {
       callbacks.onTrackStatsUpdate(this.activeTrack);
@@ -107,7 +144,7 @@ class LocationTrackingService {
     }
   }
 
-  public startGpsWatch(options: { isSimulated?: boolean; isManualLocked?: boolean } = {}) {
+  public async startGpsWatch(options: { isSimulated?: boolean; isManualLocked?: boolean } = {}) {
     this.isSimulated = !!options.isSimulated;
     this.isManualLocked = !!options.isManualLocked;
 
@@ -125,6 +162,20 @@ class LocationTrackingService {
 
     if (this.watchId !== null) {
       return;
+    }
+
+    // Explicit native permission request for Capacitor Android/iOS
+    try {
+      const perm = await Geolocation.checkPermissions();
+      if (perm.location !== 'granted') {
+        const req = await Geolocation.requestPermissions();
+        if (req.location !== 'granted') {
+          console.warn('[LocationTrackingService] Permissão de GPS negada pelo usuário.');
+          return;
+        }
+      }
+    } catch (permError) {
+      console.warn('[LocationTrackingService] Erro ao checar permissões nativas (possivelmente rodando em desktop):', permError);
     }
 
     if (typeof navigator === 'undefined' || !navigator.geolocation) {
