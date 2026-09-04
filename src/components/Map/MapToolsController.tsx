@@ -20,8 +20,6 @@ import {
   FileText,
   Activity,
   CheckCircle2,
-  Plus,
-  Route,
 } from 'lucide-react';
 import { BottomSheet } from '../Common/BottomSheet';
 
@@ -102,7 +100,6 @@ export const MapToolsController: React.FC<MapToolsControllerProps> = ({
   pdfDocName,
 }) => {
   const [isToolsBottomSheetOpen, setIsToolsBottomSheetOpen] = useState(false);
-  const [isActionMenuOpen, setIsActionMenuOpen] = useState(false);
 
   return (
     <>
@@ -113,15 +110,15 @@ export const MapToolsController: React.FC<MapToolsControllerProps> = ({
       {/* Track Recording Active Top Pill */}
       {isRecordingTrack && (
         <div className="absolute top-3 left-1/2 -translate-x-1/2 z-30 w-auto max-w-[92vw] pointer-events-none animate-in fade-in slide-in-from-top-2 duration-200">
-          <div className="pointer-events-auto rounded-full border border-rose-200 bg-white/95 px-3.5 py-1.5 text-slate-800 shadow-xl backdrop-blur-md">
+          <div className="pointer-events-auto bg-slate-950/95 backdrop-blur-md border border-rose-500/60 rounded-full px-3.5 py-1.5 shadow-2xl flex items-center gap-2.5 text-white">
             <span className="w-2.5 h-2.5 rounded-full bg-rose-500 animate-pulse shadow-[0_0_10px_#f43f5e]" />
             <div className="flex items-center gap-2 text-xs font-mono font-bold">
-              <span className="text-rose-600">{trackDistanceFormatted}</span>
-              <span className="text-slate-300">•</span>
-              <span className="text-slate-600">{trackDurationFormatted}</span>
+              <span className="text-rose-400">{trackDistanceFormatted}</span>
+              <span className="text-slate-500">•</span>
+              <span className="text-slate-300">{trackDurationFormatted}</span>
             </div>
 
-            <div className="h-3.5 w-px bg-slate-200 shrink-0" />
+            <div className="h-3.5 w-px bg-slate-800 shrink-0" />
 
             {onPauseTrackRecording && (
               <button
@@ -147,7 +144,7 @@ export const MapToolsController: React.FC<MapToolsControllerProps> = ({
       {/* Geodesic Ruler Active Top Pill */}
       {isMeasuring && !isRecordingTrack && (
         <div className="absolute top-3 left-1/2 -translate-x-1/2 z-30 w-auto max-w-[92vw] pointer-events-none animate-in fade-in slide-in-from-top-2 duration-200">
-          <div className="pointer-events-auto flex items-center gap-2 rounded-full border border-amber-200 bg-white/95 px-3.5 py-1.5 text-slate-800 shadow-xl backdrop-blur-md">
+          <div className="pointer-events-auto bg-slate-950/95 backdrop-blur-md border border-amber-500/60 rounded-full px-3.5 py-1.5 shadow-2xl flex items-center gap-2 text-white">
             <div className="w-5 h-5 rounded-full bg-amber-500/20 text-amber-400 flex items-center justify-center shrink-0">
               <Ruler className="w-3 h-3" />
             </div>
@@ -157,7 +154,7 @@ export const MapToolsController: React.FC<MapToolsControllerProps> = ({
               <span className="text-[10px] text-slate-400 font-semibold">({measurementPointsCount} pts)</span>
             </div>
 
-            <div className="h-3.5 w-px bg-slate-200 shrink-0" />
+            <div className="h-3.5 w-px bg-slate-800 shrink-0" />
 
             {onClearMeasurement && measurementPointsCount > 0 && (
               <button
@@ -191,71 +188,62 @@ export const MapToolsController: React.FC<MapToolsControllerProps> = ({
 
       {/* ------------------------------------------------------------- */}
       {/* TOP-RIGHT CORNER: MAP CONTROLS & TOOLS BUTTON STACK          */}
-      {/* BOTTOM-RIGHT CORNER: MODERN FLOATING ACTION BUTTONS           */}
       {/* ------------------------------------------------------------- */}
-      <div className="absolute bottom-[5.5rem] right-4 z-20 flex flex-col items-end gap-3 pointer-events-auto sm:bottom-6">
-        {isActionMenuOpen && (
-          <div className="flex flex-col items-end gap-2 animate-in fade-in slide-in-from-bottom-2 duration-200">
-            <button
-              onClick={() => {
-                setIsActionMenuOpen(false);
-                onMarkWaypoint();
-              }}
-              className="flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-2 text-xs font-black text-slate-800 shadow-lg active:scale-95"
-            >
-              <span>Marcar ponto</span>
-              <span className="flex h-9 w-9 items-center justify-center rounded-full bg-indigo-50 text-[#3E4FEF]"><Pin className="h-4 w-4" /></span>
-            </button>
-            <button
-              onClick={() => {
-                setIsActionMenuOpen(false);
-                if (isRecordingTrack) onStopTrackRecording(); else onStartTrackRecording();
-              }}
-              className="flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-2 text-xs font-black text-slate-800 shadow-lg active:scale-95"
-            >
-              <span>{isRecordingTrack ? 'Parar trilha' : 'Gravar trilha'}</span>
-              <span className="flex h-9 w-9 items-center justify-center rounded-full bg-rose-50 text-rose-600"><Route className="h-4 w-4" /></span>
-            </button>
-            <button
-              onClick={() => {
-                setIsActionMenuOpen(false);
-                onToggleMeasuring();
-              }}
-              className="flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-2 text-xs font-black text-slate-800 shadow-lg active:scale-95"
-            >
-              <span>Medição</span>
-              <span className="flex h-9 w-9 items-center justify-center rounded-full bg-amber-50 text-amber-600"><Ruler className="h-4 w-4" /></span>
-            </button>
-          </div>
-        )}
-        {/* Recenter GPS FAB */}
+      <div className="absolute top-3 right-3 z-20 pointer-events-auto flex flex-col gap-2">
+        {/* Tools Drawer Button */}
+        <button
+          onClick={() => setIsToolsBottomSheetOpen(true)}
+          className="w-10 h-10 rounded-xl bg-slate-950/90 hover:bg-slate-900 text-slate-200 hover:text-emerald-400 border border-slate-800 shadow-lg flex items-center justify-center transition-all active:scale-95 cursor-pointer backdrop-blur-md"
+          title="Ferramentas do Mapa"
+        >
+          <SlidersHorizontal className="w-4 h-4" />
+        </button>
+
+        {/* Recenter GPS */}
         <button
           onClick={onRecenterGps}
-          className={`flex h-12 w-12 items-center justify-center rounded-full border shadow-lg transition-all active:scale-95 cursor-pointer backdrop-blur-md ${
+          className={`w-10 h-10 rounded-xl border shadow-lg flex items-center justify-center transition-all active:scale-95 cursor-pointer ${
             hasGpsLock
-              ? 'border-white bg-white/95 text-[#3E4FEF] hover:bg-indigo-50'
-              : 'border-amber-200 bg-amber-50 text-amber-600 animate-pulse'
+              ? 'bg-slate-950/90 text-emerald-400 border-slate-800 hover:bg-slate-900'
+              : 'bg-amber-950/90 text-amber-400 border-amber-500/50 animate-pulse'
           }`}
           title="Recentralizar no GPS"
         >
-          <Crosshair className="w-5 h-5" />
+          <Crosshair className="w-4.5 h-4.5" />
         </button>
 
-        {/* Tools Drawer FAB */}
-        <button
-          onClick={() => setIsActionMenuOpen((open) => !open)}
-          className="flex h-16 w-16 items-center justify-center rounded-full bg-[#3E4FEF] text-white shadow-[0_10px_28px_rgba(62,79,239,0.38)] transition-all active:scale-95 cursor-pointer"
-          title="Ações de campo"
-        >
-          <Plus className={`h-8 w-8 transition-transform duration-200 ${isActionMenuOpen ? 'rotate-45' : ''}`} />
-        </button>
-        <button
-          onClick={() => setIsToolsBottomSheetOpen(true)}
-          className="flex h-12 w-12 items-center justify-center rounded-full border border-slate-200 bg-white/95 text-slate-700 shadow-lg transition-all active:scale-95 cursor-pointer"
-          title="Ferramentas do Mapa"
-        >
-          <Layers className="h-5 w-5" />
-        </button>
+        {/* Zoom In */}
+        {onZoomIn && (
+          <button
+            onClick={onZoomIn}
+            className="w-10 h-10 rounded-xl bg-slate-950/90 hover:bg-slate-900 text-slate-300 border border-slate-800 shadow-lg flex items-center justify-center transition-all active:scale-95 cursor-pointer"
+            title="Aproximar Zoom (+)"
+          >
+            <ZoomIn className="w-4.5 h-4.5" />
+          </button>
+        )}
+
+        {/* Zoom Out */}
+        {onZoomOut && (
+          <button
+            onClick={onZoomOut}
+            className="w-10 h-10 rounded-xl bg-slate-950/90 hover:bg-slate-900 text-slate-300 border border-slate-800 shadow-lg flex items-center justify-center transition-all active:scale-95 cursor-pointer"
+            title="Afastar Zoom (-)"
+          >
+            <ZoomOut className="w-4.5 h-4.5" />
+          </button>
+        )}
+
+        {/* Fit Bounds */}
+        {onFitBounds && (
+          <button
+            onClick={onFitBounds}
+            className="w-10 h-10 rounded-xl bg-slate-950/90 hover:bg-slate-900 text-slate-300 border border-slate-800 shadow-lg flex items-center justify-center transition-all active:scale-95 cursor-pointer"
+            title="Enquadrar Todas as Camadas"
+          >
+            <Maximize2 className="w-4.5 h-4.5" />
+          </button>
+        )}
       </div>
 
       {/* ------------------------------------------------------------- */}

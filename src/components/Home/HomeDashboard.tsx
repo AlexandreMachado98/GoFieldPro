@@ -1,263 +1,276 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
+import { useAuth } from '../../context/AuthContext';
 import {
-  Bell,
-  Briefcase,
-  Crosshair,
-  CloudOff,
-  Cloud,
+  Map as MapIcon,
+  FileText,
+  Gauge,
+  Trees,
+  Flame,
+  Plus,
+  Compass,
   CheckCircle2,
+  Clock,
   ChevronRight,
-  ShieldCheck,
-  BookOpen,
-  MapPin,
-  Camera,
-  FileCheck,
+  HardDrive,
+  Crown,
+  FileDown,
+  Navigation,
 } from 'lucide-react';
-
-const StatusTile: React.FC<{
-  icon: React.ReactNode;
-  label: string;
-  value: string;
-  detail: string;
-  tone?: 'success' | 'indigo' | 'neutral';
-}> = ({ icon, label, value, detail, tone = 'neutral' }) => {
-  const toneClass = {
-    success: 'field-status-success',
-    indigo: 'field-status-offline',
-    neutral: 'bg-slate-50 text-slate-700 border-slate-200',
-  }[tone];
-
-  return (
-    <div className={`rounded-2xl border p-4 ${toneClass}`}>
-      <div className="flex items-center gap-2 text-[11px] font-bold opacity-80">
-        {icon}
-        <span>{label}</span>
-      </div>
-      <div className="mt-2 text-xl font-black tracking-tight">{value}</div>
-      <div className="mt-0.5 text-[11px] font-medium opacity-75">{detail}</div>
-    </div>
-  );
-};
-
-const QuickAction: React.FC<{
-  icon: React.ReactNode;
-  title: string;
-  detail: string;
-  onClick: () => void;
-  tone?: 'indigo' | 'green' | 'amber' | 'neutral';
-}> = ({ icon, title, detail, onClick, tone = 'indigo' }) => {
-  const iconTone = {
-    indigo: 'bg-indigo-50 text-[#3E4FEF] border-indigo-100',
-    green: 'bg-emerald-50 text-emerald-600 border-emerald-100',
-    amber: 'bg-amber-50 text-amber-600 border-amber-100',
-    neutral: 'bg-slate-100 text-slate-600 border-slate-200',
-  }[tone];
-
-  return (
-    <button
-      onClick={onClick}
-      className="field-card group flex min-h-[112px] items-start gap-3 p-4 text-left transition-transform hover:-translate-y-0.5 active:scale-[0.98]"
-    >
-      <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border ${iconTone}`}>
-        {icon}
-      </span>
-      <span className="min-w-0 flex-1">
-        <span className="block truncate text-sm font-extrabold text-slate-900">{title}</span>
-        <span className="mt-1 block text-[11px] font-medium leading-4 text-slate-500">{detail}</span>
-      </span>
-      <ArrowUpRight className="mt-0.5 h-4 w-4 shrink-0 text-slate-300 transition-colors group-hover:text-[#3E4FEF]" />
-    </button>
-  );
-};
+import { BottomSheet } from '../Common/BottomSheet';
+import { formatFieldDistance } from '../../utils/geoUtils';
 
 export const HomeDashboard: React.FC = () => {
   const {
     setActiveTab,
-    waypoints,
-    currentGps,
-    hasGpsLock,
-    isOffline,
-    activeProject,
     fieldRounds,
+    setIsWoodpileModalOpen,
+    hasGpsLock,
+    currentGps,
+    openUpgradeModal,
+    isProUser,
+    activeProject,
   } = useApp();
 
-  // Metrics matching the official mockup
-  const gpsAccuracyFormatted = hasGpsLock && currentGps?.accuracy
-    ? `${currentGps.accuracy.toFixed(1).replace('.', ',')} m`
-    : '2,4 m';
+  const { profile } = useAuth();
+  const [isQuickActionSheetOpen, setIsQuickActionSheetOpen] = useState(false);
 
-  const waypointsCount = Math.max(26, waypoints.length);
-  const waypointsTarget = 40;
-  const evidencesCount = Math.max(18, Math.round(waypointsCount * 0.7));
-  const evidencesTarget = 30;
-  const formsCount = Math.max(3, fieldRounds.length);
-  const formsTarget = 5;
-
-  const missionProgressPercent = 65;
+  const completedRounds = fieldRounds.filter((r) => r.status === 'finalizada');
+  const activeRounds = fieldRounds.filter((r) => r.status === 'em_andamento');
 
   return (
-    <div className="flex-1 flex flex-col overflow-y-auto bg-slate-50 dark:bg-[#0B1120] text-slate-900 dark:text-slate-100 pb-28 select-none">
-      {/* Top App Header */}
-      <header className="sticky top-0 z-20 bg-white/90 dark:bg-[#0B1120]/90 backdrop-blur-md px-5 pt-4 pb-3 border-b border-slate-200/80 dark:border-slate-800/80 flex items-center justify-between">
-        <h1 className="text-xl font-extrabold text-slate-900 dark:text-white tracking-tight">
-          Área de Trabalho
-        </h1>
-        <button
-          className="relative w-10 h-10 rounded-full flex items-center justify-center text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
-          aria-label="Notificações"
-        >
-          <Bell className="w-5 h-5 stroke-[2]" />
-          <span className="absolute top-2 right-2 w-2 h-2 rounded-full bg-blue-600" />
-        </button>
-      </header>
-
-      <div className="p-4 sm:p-6 max-w-lg mx-auto w-full space-y-4">
-        {/* Card 1: Projeto Ativo */}
-        <div
-          onClick={() => setActiveTab('map')}
-          className="bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 rounded-3xl p-5 shadow-sm hover:shadow-md transition-all cursor-pointer group active:scale-[0.99]"
-        >
-          <div className="flex items-start justify-between gap-3">
-            <div className="flex items-center gap-2 text-slate-400 dark:text-slate-500 mb-2">
-              <Briefcase className="w-4 h-4 text-slate-400" />
-              <span className="text-xs font-semibold uppercase tracking-wider">Projeto ativo</span>
-            </div>
-            <ChevronRight className="w-5 h-5 text-slate-400 group-hover:translate-x-0.5 transition-transform" />
-          </div>
-
-          <h2 className="text-lg font-black text-slate-900 dark:text-white tracking-tight">
-            {activeProject?.name || 'Levantamento de Riscos'}
-          </h2>
-          <p className="text-sm font-medium text-slate-600 dark:text-slate-400 mt-0.5">
-            Fazenda Santa Esperança
-          </p>
-          <p className="text-xs font-semibold text-slate-400 dark:text-slate-500 mt-0.5">
-            Área: Talhão 07
-          </p>
-        </div>
-
-        {/* Grid: 2 Metric Cards (Precisão do GPS & Status de Conexão) */}
-        <div className="grid grid-cols-2 gap-3">
-          {/* Card A: Precisão do GPS */}
-          <div className="bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 rounded-3xl p-4 shadow-sm">
-            <span className="text-[11px] font-semibold text-slate-400 dark:text-slate-500 block mb-2">
-              Precisão do GPS
-            </span>
-            <div className="flex items-center gap-2 mb-1">
-              <Crosshair className="w-5 h-5 text-emerald-500 stroke-[2.4]" />
-              <span className="text-lg font-black text-slate-900 dark:text-white font-mono">
-                {gpsAccuracyFormatted}
+    <div className="flex-1 flex flex-col p-4 sm:p-6 overflow-y-auto bg-[#070A10] text-slate-100 pb-28">
+      <div className="max-w-4xl mx-auto w-full space-y-6">
+        
+        {/* Welcome & GPS Status Hero Banner */}
+        <div className="bg-[#0F172A] border border-slate-800 p-5 rounded-3xl shadow-xl relative overflow-hidden">
+          <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-500/5 rounded-full blur-2xl pointer-events-none" />
+          
+          <div className="flex items-center justify-between gap-3 mb-3">
+            <div className="flex items-center gap-2">
+              <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse" />
+              <span className="text-xs font-bold text-slate-400">
+                {activeProject?.name || 'GoField Pro Android'}
               </span>
             </div>
-            <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400">
-              {hasGpsLock ? 'Excelente' : 'Excelente'}
-            </span>
-          </div>
 
-          {/* Card B: Status de Conexão */}
-          <div className="bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 rounded-3xl p-4 shadow-sm">
-            <span className="text-[11px] font-semibold text-slate-400 dark:text-slate-500 block mb-2">
-              Status de conexão
-            </span>
-            <div className="flex items-center gap-2 mb-1">
-              {isOffline ? (
-                <CloudOff className="w-5 h-5 text-blue-600 dark:text-blue-400 stroke-[2.2]" />
-              ) : (
-                <Cloud className="w-5 h-5 text-blue-600 dark:text-blue-400 stroke-[2.2]" />
-              )}
-              <span className="text-lg font-black text-slate-900 dark:text-white">
-                Offline
-              </span>
-            </div>
-            <span className="text-xs font-medium text-slate-500 dark:text-slate-400">
-              Dados no dispositivo
-            </span>
-          </div>
-        </div>
-
-        {/* Card 3: Progresso da Missão */}
-        <div className="bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 rounded-3xl p-5 shadow-sm">
-          <div className="flex items-center justify-between mb-3">
-            <span className="text-xs font-bold text-slate-800 dark:text-slate-200">
-              Progresso da missão
-            </span>
-            <span className="text-sm font-black text-slate-900 dark:text-white font-mono">
-              {missionProgressPercent}%
-            </span>
-          </div>
-
-          {/* Clean Material Progress Bar */}
-          <div className="w-full h-2.5 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden mb-4">
             <div
-              className="h-full bg-blue-600 rounded-full transition-all duration-500"
-              style={{ width: `${missionProgressPercent}%` }}
-            />
+              className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold border ${
+                hasGpsLock
+                  ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30'
+                  : 'bg-amber-500/10 text-amber-400 border-amber-500/30 animate-pulse'
+              }`}
+            >
+              <Navigation className="w-3.5 h-3.5" />
+              <span>{hasGpsLock ? `GPS ±${(currentGps?.accuracy || 2).toFixed(0)}m` : 'Buscando GPS...'}</span>
+            </div>
           </div>
 
-          {/* 3 Metric Columns */}
-          <div className="grid grid-cols-3 divide-x divide-slate-100 dark:divide-slate-800 text-center pt-1">
-            <div className="px-1">
-              <span className="block text-[11px] text-slate-400 dark:text-slate-500 mb-1">
-                Waypoints
-              </span>
-              <span className="text-sm font-extrabold text-slate-800 dark:text-slate-200">
-                {waypointsCount} / {waypointsTarget}
-              </span>
-            </div>
+          <h1 className="text-xl sm:text-2xl font-black text-white tracking-tight">
+            Olá, {profile?.name?.split(' ')[0] || 'Técnico de Campo'}
+          </h1>
+          <p className="text-xs text-slate-400 mt-1">
+            Pronto para mapear e registrar dados de campo offline.
+          </p>
 
-            <div className="px-1">
-              <span className="block text-[11px] text-slate-400 dark:text-slate-500 mb-1">
-                Evidências
-              </span>
-              <span className="text-sm font-extrabold text-slate-800 dark:text-slate-200">
-                {evidencesCount} / {evidencesTarget}
-              </span>
-            </div>
+          {/* Core Action Button */}
+          <div className="mt-5 grid grid-cols-2 gap-3">
+            <button
+              onClick={() => setActiveTab('map')}
+              className="flex items-center justify-center gap-2 py-3 px-4 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-extrabold text-xs uppercase tracking-wider shadow-md active:scale-95 transition-all cursor-pointer"
+            >
+              <MapIcon className="w-4 h-4 stroke-[2.2]" />
+              <span>Abrir Mapa GPS</span>
+            </button>
 
-            <div className="px-1">
-              <span className="block text-[11px] text-slate-400 dark:text-slate-500 mb-1">
-                Formulários
-              </span>
-              <span className="text-sm font-extrabold text-slate-800 dark:text-slate-200">
-                {formsCount} / {formsTarget}
-              </span>
-            </div>
+            <button
+              onClick={() => setActiveTab('pdf_maps')}
+              className="flex items-center justify-center gap-2 py-3 px-4 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs active:scale-95 transition-all cursor-pointer border border-slate-700"
+            >
+              <FileText className="w-4 h-4 text-emerald-400" />
+              <span>Plantas PDF</span>
+            </button>
           </div>
         </div>
 
-        {/* Card 4: Banner Tudo Certo! */}
-        <div
-          onClick={() => setActiveTab('map')}
-          className="bg-emerald-50/80 dark:bg-emerald-950/20 border border-emerald-200/70 dark:border-emerald-800/40 rounded-3xl p-4 flex items-center justify-between gap-3 cursor-pointer hover:bg-emerald-50 transition-colors"
-        >
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-full bg-emerald-100 dark:bg-emerald-900/50 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0">
-              <ShieldCheck className="w-5 h-5 stroke-[2.2]" />
-            </div>
-            <div>
-              <h4 className="text-xs font-black text-slate-900 dark:text-white">
-                Tudo certo!
-              </h4>
-              <p className="text-[11px] text-slate-500 dark:text-slate-400">
-                GPS preciso e dados seguros no dispositivo.
-              </p>
-            </div>
+        {/* Quick Tools Grid */}
+        <div className="space-y-3">
+          <h2 className="text-xs font-bold uppercase tracking-wider text-slate-400 px-1">
+            Ferramentas de Campo
+          </h2>
+
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <button
+              onClick={() => setIsWoodpileModalOpen(true)}
+              className="bg-slate-900 border border-slate-800 hover:border-emerald-500/40 p-4 rounded-2xl flex flex-col items-start gap-2.5 text-left active:scale-95 transition-all cursor-pointer group"
+            >
+              <div className="w-10 h-10 rounded-xl bg-slate-800 text-emerald-400 border border-slate-700/60 flex items-center justify-center group-hover:scale-105 transition-transform">
+                <Trees className="w-5 h-5" />
+              </div>
+              <div>
+                <span className="block text-xs font-bold text-white">Cubagem m³</span>
+                <span className="text-[10px] text-slate-400">Pilha de madeira</span>
+              </div>
+            </button>
+
+            <button
+              onClick={() => setActiveTab('field_rounds')}
+              className="bg-slate-900 border border-slate-800 hover:border-emerald-500/40 p-4 rounded-2xl flex flex-col items-start gap-2.5 text-left active:scale-95 transition-all cursor-pointer group"
+            >
+              <div className="w-10 h-10 rounded-xl bg-slate-800 text-emerald-400 border border-slate-700/60 flex items-center justify-center group-hover:scale-105 transition-transform">
+                <Gauge className="w-5 h-5" />
+              </div>
+              <div>
+                <span className="block text-xs font-bold text-white">Rondas & Frota</span>
+                <span className="text-[10px] text-slate-400">{fieldRounds.length} registros</span>
+              </div>
+            </button>
+
+            <button
+              onClick={() => setActiveTab('fire_incidents')}
+              className="bg-slate-900 border border-slate-800 hover:border-rose-500/40 p-4 rounded-2xl flex flex-col items-start gap-2.5 text-left active:scale-95 transition-all cursor-pointer group"
+            >
+              <div className="w-10 h-10 rounded-xl bg-slate-800 text-rose-400 border border-slate-700/60 flex items-center justify-center group-hover:scale-105 transition-transform">
+                <Flame className="w-5 h-5" />
+              </div>
+              <div>
+                <span className="block text-xs font-bold text-white">Incêndios</span>
+                <span className="text-[10px] text-slate-400">Focos e combate</span>
+              </div>
+            </button>
+
+            <button
+              onClick={() => setActiveTab('offline')}
+              className="bg-slate-900 border border-slate-800 hover:border-emerald-500/40 p-4 rounded-2xl flex flex-col items-start gap-2.5 text-left active:scale-95 transition-all cursor-pointer group"
+            >
+              <div className="w-10 h-10 rounded-xl bg-slate-800 text-slate-300 border border-slate-700/60 flex items-center justify-center group-hover:scale-105 transition-transform">
+                <HardDrive className="w-5 h-5" />
+              </div>
+              <div>
+                <span className="block text-xs font-bold text-white">Sincronização</span>
+                <span className="text-[10px] text-slate-400">Dados offline</span>
+              </div>
+            </button>
           </div>
-          <ChevronRight className="w-5 h-5 text-slate-400 shrink-0" />
         </div>
 
-        {/* Card 5: Big Royal Blue CTA Button (Continuar no campo) */}
-        <div className="pt-1">
+        {/* Recent Work Activity Summary */}
+        <div className="space-y-3">
+          <div className="flex items-center justify-between px-1">
+            <h2 className="text-xs font-black uppercase tracking-wider text-slate-400">
+              Atividades Recentes
+            </h2>
+            <button
+              onClick={() => setActiveTab('field_rounds')}
+              className="text-xs font-bold text-emerald-400 hover:text-emerald-300 flex items-center gap-1 cursor-pointer"
+            >
+              <span>Ver todas</span>
+              <ChevronRight className="w-3.5 h-3.5" />
+            </button>
+          </div>
+
+          {fieldRounds.length === 0 ? (
+            <div className="bg-[#0F172A] border border-slate-800/80 p-6 rounded-2xl text-center space-y-2">
+              <Compass className="w-8 h-8 text-slate-600 mx-auto" />
+              <p className="text-xs text-slate-400 font-medium">Nenhum registro de ronda realizado hoje.</p>
+              <button
+                onClick={() => setActiveTab('field_rounds')}
+                className="inline-flex items-center gap-1.5 text-xs font-bold text-emerald-400 bg-emerald-500/10 px-3 py-1.5 rounded-xl border border-emerald-500/20 cursor-pointer"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>Nova Ronda</span>
+              </button>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {fieldRounds.slice(0, 3).map((round) => (
+                <div
+                  key={round.id}
+                  onClick={() => setActiveTab('field_rounds')}
+                  className="bg-[#0F172A] border border-slate-800 p-3.5 rounded-2xl flex items-center justify-between gap-3 hover:border-slate-700 transition-colors cursor-pointer"
+                >
+                  <div className="flex items-center gap-3">
+                    <div
+                      className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${
+                        round.status === 'finalizada'
+                          ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+                          : 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
+                      }`}
+                    >
+                      {round.status === 'finalizada' ? (
+                        <CheckCircle2 className="w-4 h-4" />
+                      ) : (
+                        <Clock className="w-4 h-4 animate-spin" />
+                      )}
+                    </div>
+
+                    <div>
+                      <h4 className="text-xs font-extrabold text-white truncate max-w-[180px] sm:max-w-[300px]">
+                        {round.locationName}
+                      </h4>
+                      <p className="text-[10px] text-slate-400">
+                        {round.date} • {round.technicianName}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="text-right shrink-0">
+                    <span className="text-xs font-black text-emerald-400 block">
+                      {round.totalKm} KM
+                    </span>
+                    <span className="text-[9px] uppercase font-bold text-slate-500">
+                      {round.status}
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Upgrade Banner for Free Tier (Compact & Non-intrusive) */}
+        {!isProUser && (
+          <div className="bg-gradient-to-r from-emerald-950/60 to-slate-900 border border-emerald-500/30 p-4 rounded-2xl flex items-center justify-between gap-3 shadow-lg">
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-xl bg-amber-500/10 text-amber-400 border border-amber-500/30 flex items-center justify-center shrink-0">
+                <Crown className="w-5 h-5" />
+              </div>
+              <div>
+                <h4 className="text-xs font-black text-white">GoField Pro Anual</h4>
+                <p className="text-[10px] text-slate-400">Desbloqueie plantas PDF e mapas ilimitados.</p>
+              </div>
+            </div>
+
+            <button
+              onClick={() => openUpgradeModal('Home Banner')}
+              className="px-3.5 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-[11px] uppercase tracking-wider shrink-0 cursor-pointer shadow"
+            >
+              Assinar Pro
+            </button>
+          </div>
+        )}
+      </div>
+
+      {/* Bottom Sheet for Quick Actions (if triggered) */}
+      <BottomSheet
+        isOpen={isQuickActionSheetOpen}
+        onClose={() => setIsQuickActionSheetOpen(false)}
+        title="Ações Rápidas de Campo"
+        icon={<Compass className="w-5 h-5" />}
+      >
+        <div className="space-y-2">
           <button
-            onClick={() => setActiveTab('map')}
-            className="w-full py-4 px-6 rounded-2xl bg-blue-600 hover:bg-blue-700 active:scale-[0.98] text-white font-extrabold text-sm flex items-center justify-center gap-2.5 shadow-lg shadow-blue-600/30 transition-all cursor-pointer"
+            onClick={() => {
+              setIsQuickActionSheetOpen(false);
+              setActiveTab('map');
+            }}
+            className="w-full p-3.5 bg-slate-900 border border-slate-800 rounded-xl text-left font-bold text-xs text-white hover:border-emerald-500/40 transition-colors flex items-center justify-between cursor-pointer"
           >
-            <BookOpen className="w-5 h-5 stroke-[2.2]" />
-            <span>Continuar no campo</span>
+            <span>Iniciar Rastreamento GPS</span>
+            <ChevronRight className="w-4 h-4 text-slate-500" />
           </button>
         </div>
-      </div>
+      </BottomSheet>
     </div>
   );
 };
